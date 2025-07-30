@@ -1,0 +1,52 @@
+/* UI Components Base Styles */
+
+/* Button Styles */
+.ui-button {
+  @apply inline-flex items-center justify-center font-medium rounded-lg transition-colors;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-stone-900;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.ui-button-primary {
+  @apply bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700;
+  @apply text-white focus:ring-amber-500 dark:focus:ring-amber-400;
+}
+
+.ui-button-secondary {
+  @apply bg-stone-600 hover:bg-stone-700 dark:bg-stone-700 dark:hover:bg-stone-600;
+  @apply text-white focus:ring-stone-500 dark:focus:ring-stone-400;
+}
+
+.ui-button-outline {
+  @apply border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900;
+  @apply hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300;
+  @apply focus:ring-amber-500 dark:focus:ring-amber-400;
+}
+
+.ui-button-danger {
+  @apply bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700;
+  @apply text-white focus:ring-red-500 dark:focus:ring-red-400;
+}
+
+.ui-button-ghost {
+  @apply bg-transparent hover:bg-stone-100 dark:hover:bg-stone-800;
+  @apply text-stone-700 dark:text-stone-300 focus:ring-amber-500 dark:focus:ring-amber-400;
+}
+
+/* Button Sizes */
+.ui-button-xs { @apply px-2 py-1 text-xs; }
+.ui-button-sm { @apply px-3 py-1.5 text-sm; }
+.ui-button-md { @apply px-4 py-2 text-sm; }
+.ui-button-lg { @apply px-6 py-3 text-base; }
+
+/* Icon Button */
+.ui-icon-button {
+  @apply inline-flex items-center justify-center rounded-lg transition-colors;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-stone-900;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.ui-icon-button-xs { @apply p-1; }
+.ui-icon-button-sm { @apply p-1.5; }
+.ui-icon-button-md { @apply p-2; }
+.ui-icon-button-lg { @apply p-3; }

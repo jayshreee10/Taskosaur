@@ -1,0 +1,752 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String               @id @default(uuid()) @db.Uuid
+  email                  String               @unique
+  username               String?              @unique
+  firstName              String               @map("first_name")
+  lastName               String               @map("last_name")
+  avatar                 String?
+  bio                    String?
+  timezone               String               @default("UTC")
+  language               String               @default("en")
+  role                   UserRole             @default(MEMBER)
+  status                 UserStatus           @default(ACTIVE)
+  lastLoginAt            DateTime?            @map("last_login_at")
+  emailVerified          Boolean              @default(false) @map("email_verified")
+  password               String?
+  refreshToken           String?              @map("refresh_token")
+  preferences            Json?
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  resetToken             String?              @unique @map("reset_token")
+  resetTokenExpiry       DateTime?            @map("reset_token_expiry")
+  activityLogs           ActivityLog[]
+  createdAutomationRules AutomationRule[]     @relation("AutomationRuleCreatedBy")
+  updatedAutomationRules AutomationRule[]     @relation("AutomationRuleUpdatedBy")
+  notifications          Notification[]
+  organizationMembers    OrganizationMember[]
+  ownedOrganizations     Organization[]       @relation("OrganizationOwner")
+  createdOrganizations   Organization[]       @relation("OrganizationCreatedBy")
+  updatedOrganizations   Organization[]       @relation("OrganizationUpdatedBy")
+  createdWorkspaces      Workspace[]          @relation("WorkspaceCreatedBy")
+  updatedWorkspaces      Workspace[]          @relation("WorkspaceUpdatedBy")
+  createdProjects        Project[]            @relation("ProjectCreatedBy")
+  updatedProjects        Project[]            @relation("ProjectUpdatedBy")
+  createdWorkflows       Workflow[]           @relation("WorkflowCreatedBy")
+  updatedWorkflows       Workflow[]           @relation("WorkflowUpdatedBy")
+  createdTaskStatuses    TaskStatus[]         @relation("TaskStatusCreatedBy")
+  updatedTaskStatuses    TaskStatus[]         @relation("TaskStatusUpdatedBy")
+  createdStatusTransitions StatusTransition[] @relation("StatusTransitionCreatedBy")
+  updatedStatusTransitions StatusTransition[] @relation("StatusTransitionUpdatedBy")
+  createdSprints         Sprint[]             @relation("SprintCreatedBy")
+  updatedSprints         Sprint[]             @relation("SprintUpdatedBy")
+  createdLabels          Label[]              @relation("LabelCreatedBy")
+  updatedLabels          Label[]              @relation("LabelUpdatedBy")
+  createdCustomFields    CustomField[]        @relation("CustomFieldCreatedBy")
+  updatedCustomFields    CustomField[]        @relation("CustomFieldUpdatedBy")
+  projectMembers         ProjectMember[]
+  ruleExecutions         RuleExecution[]
+  taskComments           TaskComment[]
+  taskWatchers           TaskWatcher[]
+  assignedTasks          Task[]               @relation("TaskAssignee")
+  reportedTasks          Task[]               @relation("TaskReporter")
+  createdTasks           Task[]               @relation("TaskCreatedBy")
+  updatedTasks           Task[]               @relation("TaskUpdatedBy")
+  createdTaskComments    TaskComment[]        @relation("TaskCommentCreatedBy")
+  updatedTaskComments    TaskComment[]        @relation("TaskCommentUpdatedBy")
+  createdTaskAttachments TaskAttachment[]     @relation("TaskAttachmentCreatedBy")
+  updatedTaskAttachments TaskAttachment[]     @relation("TaskAttachmentUpdatedBy")
+  createdTimeEntries     TimeEntry[]          @relation("TimeEntryCreatedBy")
+  updatedTimeEntries     TimeEntry[]          @relation("TimeEntryUpdatedBy")
+  createdNotifications   Notification[]       @relation("NotificationCreatedBy")
+  updatedNotifications   Notification[]       @relation("NotificationUpdatedBy")
+  createdActivityLogs    ActivityLog[]        @relation("ActivityLogCreatedBy")
+  updatedActivityLogs    ActivityLog[]        @relation("ActivityLogUpdatedBy")
+  createdRuleExecutions  RuleExecution[]      @relation("RuleExecutionCreatedBy")
+  updatedRuleExecutions  RuleExecution[]      @relation("RuleExecutionUpdatedBy")
+  createdOrgMembers      OrganizationMember[] @relation("OrganizationMemberCreatedBy")
+  updatedOrgMembers      OrganizationMember[] @relation("OrganizationMemberUpdatedBy")
+  createdWorkspaceMembers WorkspaceMember[]   @relation("WorkspaceMemberCreatedBy")
+  updatedWorkspaceMembers WorkspaceMember[]   @relation("WorkspaceMemberUpdatedBy")
+  createdProjectMembers  ProjectMember[]      @relation("ProjectMemberCreatedBy")
+  updatedProjectMembers  ProjectMember[]      @relation("ProjectMemberUpdatedBy")
+  createdTaskLabels      TaskLabel[]          @relation("TaskLabelCreatedBy")
+  updatedTaskLabels      TaskLabel[]          @relation("TaskLabelUpdatedBy")
+  createdTaskWatchers    TaskWatcher[]        @relation("TaskWatcherCreatedBy")
+  updatedTaskWatchers    TaskWatcher[]        @relation("TaskWatcherUpdatedBy")
+  createdTaskDependencies TaskDependency[]    @relation("TaskDependencyCreatedBy")
+  updatedTaskDependencies TaskDependency[]    @relation("TaskDependencyUpdatedBy")
+  timeEntries            TimeEntry[]
+  workspaceMembers       WorkspaceMember[]
+
+  @@map("users")
+}
+
+model Organization {
+  id              String               @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String               @unique
+  description     String?
+  avatar          String?
+  website         String?
+  settings        Json?
+  ownerId         String               @db.Uuid @map("owner_id")
+  createdBy       String?              @db.Uuid @map("created_by_id")
+  updatedBy       String?              @db.Uuid @map("updated_by_id")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  automationRules AutomationRule[]
+  customFields    CustomField[]
+  members         OrganizationMember[]
+  owner           User                 @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  createdByUser   User?                @relation("OrganizationCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User?                @relation("OrganizationUpdatedBy", fields: [updatedBy], references: [id])
+  workflows       Workflow[]
+  workspaces      Workspace[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String           @id @default(uuid()) @db.Uuid
+  role           OrganizationRole @default(MEMBER)
+  joinedAt       DateTime         @default(now()) @map("joined_at")
+  userId         String           @db.Uuid @map("user_id")
+  organizationId String           @db.Uuid @map("organization_id")
+  createdBy      String?          @db.Uuid @map("created_by_id")
+  updatedBy      String?          @db.Uuid @map("updated_by_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser  User?            @relation("OrganizationMemberCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser  User?            @relation("OrganizationMemberUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([userId, organizationId])
+  @@map("organization_members")
+}
+
+model Workspace {
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String
+  description     String?
+  avatar          String?
+  color           String?
+  settings        Json?
+  organizationId  String            @db.Uuid @map("organization_id")
+  createdBy       String?           @db.Uuid @map("created_by_id")
+  updatedBy       String?           @db.Uuid @map("updated_by_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  automationRules AutomationRule[]
+  projects        Project[]
+  members         WorkspaceMember[]
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUser   User?             @relation("WorkspaceCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User?             @relation("WorkspaceUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([organizationId, slug])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id            String        @id @default(uuid()) @db.Uuid
+  role          WorkspaceRole @default(MEMBER)
+  joinedAt      DateTime      @default(now()) @map("joined_at")
+  userId        String        @db.Uuid @map("user_id")
+  workspaceId   String        @db.Uuid @map("workspace_id")
+  createdBy     String?       @db.Uuid @map("created_by_id")
+  updatedBy     String?       @db.Uuid @map("updated_by_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser User?         @relation("WorkspaceMemberCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?         @relation("WorkspaceMemberUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([userId, workspaceId])
+  @@map("workspace_members")
+}
+
+model Project {
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String           @unique
+  description     String?
+  avatar          String?
+  color           String?
+  status          ProjectStatus    @default(PLANNING)
+  priority        ProjectPriority  @default(MEDIUM)
+  startDate       DateTime?        @map("start_date")
+  endDate         DateTime?        @map("end_date")
+  settings        Json?
+  workspaceId     String           @db.Uuid @map("workspace_id")
+  createdBy       String?          @db.Uuid @map("created_by_id")
+  updatedBy       String?          @db.Uuid @map("updated_by_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  automationRules AutomationRule[]
+  labels          Label[]
+  members         ProjectMember[]
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?            @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User?            @relation("ProjectUpdatedBy", fields: [updatedBy], references: [id])
+  sprints         Sprint[]
+  tasks           Task[]
+
+  @@unique([workspaceId, slug])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id            String      @id @default(uuid()) @db.Uuid
+  role          ProjectRole @default(DEVELOPER)
+  joinedAt      DateTime    @default(now()) @map("joined_at")
+  userId        String      @db.Uuid @map("user_id")
+  projectId     String      @db.Uuid @map("project_id")
+  createdBy     String?     @db.Uuid @map("created_by_id")
+  updatedBy     String?     @db.Uuid @map("updated_by_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser User?       @relation("ProjectMemberCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?       @relation("ProjectMemberUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([userId, projectId])
+  @@map("project_members")
+}
+
+model Task {
+  id                String           @id @default(uuid()) @db.Uuid
+  title             String
+  description       String?
+  type              TaskType         @default(TASK)
+  priority          TaskPriority     @default(MEDIUM)
+  taskNumber        Int              @map("task_number")
+  slug              String
+  startDate         DateTime?        @map("start_date")
+  dueDate           DateTime?        @map("due_date")
+  completedAt       DateTime?        @map("completed_at")
+  storyPoints       Int?             @map("story_points")
+  originalEstimate  Int?             @map("original_estimate")
+  remainingEstimate Int?             @map("remaining_estimate")
+  customFields      Json?            @map("custom_fields")
+  projectId         String           @db.Uuid @map("project_id")
+  assigneeId        String?          @db.Uuid @map("assignee_id")
+  reporterId        String           @db.Uuid @map("reporter_id")
+  statusId          String           @db.Uuid @map("status_id")
+  sprintId          String?          @db.Uuid @map("sprint_id")
+  parentTaskId      String?          @db.Uuid @map("parent_task_id")
+  createdBy         String?          @db.Uuid @map("created_by_id")
+  updatedBy         String?          @db.Uuid @map("updated_by_id")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  attachments       TaskAttachment[]
+  comments          TaskComment[]
+  blocks            TaskDependency[] @relation("BlockingTask")
+  dependsOn         TaskDependency[] @relation("DependentTask")
+  labels            TaskLabel[]
+  watchers          TaskWatcher[]
+  assignee          User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  parentTask        Task?            @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
+  childTasks        Task[]           @relation("TaskHierarchy")
+  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter          User             @relation("TaskReporter", fields: [reporterId], references: [id])
+  createdByUser     User?            @relation("TaskCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser     User?            @relation("TaskUpdatedBy", fields: [updatedBy], references: [id])
+  sprint            Sprint?          @relation(fields: [sprintId], references: [id])
+  status            TaskStatus       @relation(fields: [statusId], references: [id])
+  timeEntries       TimeEntry[]
+
+  @@unique([projectId, taskNumber])
+  @@map("tasks")
+}
+
+model TaskDependency {
+  id              String         @id @default(uuid()) @db.Uuid
+  type            DependencyType @default(BLOCKS)
+  dependentTaskId String         @db.Uuid @map("dependent_task_id")
+  blockingTaskId  String         @db.Uuid @map("blocking_task_id")
+  createdBy       String?        @db.Uuid @map("created_by_id")
+  updatedBy       String?        @db.Uuid @map("updated_by_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  blockingTask    Task           @relation("BlockingTask", fields: [blockingTaskId], references: [id], onDelete: Cascade)
+  createdByUser   User?          @relation("TaskDependencyCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User?          @relation("TaskDependencyUpdatedBy", fields: [updatedBy], references: [id])
+  dependentTask   Task           @relation("DependentTask", fields: [dependentTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([dependentTaskId, blockingTaskId])
+  @@map("task_dependencies")
+}
+
+model Workflow {
+  id             String             @id @default(uuid()) @db.Uuid
+  name           String
+  description    String?
+  isDefault      Boolean            @default(false) @map("is_default")
+  organizationId String             @db.Uuid @map("organization_id")
+  createdBy      String?            @db.Uuid @map("created_by_id")
+  updatedBy      String?            @db.Uuid @map("updated_by_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  transitions    StatusTransition[]
+  statuses       TaskStatus[]
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUser  User?              @relation("WorkflowCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser  User?              @relation("WorkflowUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@map("workflows")
+}
+
+model TaskStatus {
+  id              String             @id @default(uuid()) @db.Uuid
+  name            String
+  color           String
+  category        StatusCategory
+  position        Int
+  workflowId      String             @db.Uuid @map("workflow_id")
+  createdBy       String?            @db.Uuid @map("created_by_id")
+  updatedBy       String?            @db.Uuid @map("updated_by_id")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  fromTransitions StatusTransition[] @relation("FromStatus")
+  toTransitions   StatusTransition[] @relation("ToStatus")
+  workflow        Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  createdByUser   User?              @relation("TaskStatusCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User?              @relation("TaskStatusUpdatedBy", fields: [updatedBy], references: [id])
+  tasks           Task[]
+
+  @@unique([workflowId, name])
+  @@map("task_statuses")
+}
+
+model StatusTransition {
+  id           String     @id @default(uuid()) @db.Uuid
+  name         String?
+  description  String?
+  workflowId   String     @db.Uuid @map("workflow_id")
+  fromStatusId String     @db.Uuid @map("from_status_id")
+  toStatusId   String     @db.Uuid @map("to_status_id")
+  createdBy    String?    @db.Uuid @map("created_by_id")
+  updatedBy    String?    @db.Uuid @map("updated_by_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  fromStatus   TaskStatus @relation("FromStatus", fields: [fromStatusId], references: [id])
+  toStatus     TaskStatus @relation("ToStatus", fields: [toStatusId], references: [id])
+  workflow     Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  createdByUser User?     @relation("StatusTransitionCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?     @relation("StatusTransitionUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([workflowId, fromStatusId, toStatusId])
+  @@map("status_transitions")
+}
+
+model Sprint {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  goal      String?
+  status    SprintStatus @default(PLANNING)
+  startDate DateTime?    @map("start_date")
+  endDate   DateTime?    @map("end_date")
+  projectId String       @db.Uuid @map("project_id")
+  createdBy String?      @db.Uuid @map("created_by_id")
+  updatedBy String?      @db.Uuid @map("updated_by_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User?     @relation("SprintCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?     @relation("SprintUpdatedBy", fields: [updatedBy], references: [id])
+  tasks     Task[]
+
+  @@map("sprints")
+}
+
+model Label {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String
+  color       String
+  description String?
+  projectId   String      @db.Uuid @map("project_id")
+  createdBy   String?     @db.Uuid @map("created_by_id")
+  updatedBy   String?     @db.Uuid @map("updated_by_id")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User?     @relation("LabelCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?     @relation("LabelUpdatedBy", fields: [updatedBy], references: [id])
+  taskLabels  TaskLabel[]
+
+  @@unique([projectId, name])
+  @@map("labels")
+}
+
+model TaskLabel {
+  taskId        String   @db.Uuid @map("task_id")
+  labelId       String   @db.Uuid @map("label_id")
+  createdBy     String?  @db.Uuid @map("created_by_id")
+  updatedBy     String?  @db.Uuid @map("updated_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  label         Label    @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdByUser User?    @relation("TaskLabelCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?    @relation("TaskLabelUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@id([taskId, labelId])
+  @@map("task_labels")
+}
+
+model TaskWatcher {
+  id            String   @id @default(uuid()) @db.Uuid
+  taskId        String   @db.Uuid @map("task_id")
+  userId        String   @db.Uuid @map("user_id")
+  createdBy     String?  @db.Uuid @map("created_by_id")
+  updatedBy     String?  @db.Uuid @map("updated_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser User?    @relation("TaskWatcherCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?    @relation("TaskWatcherUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([taskId, userId])
+  @@map("task_watchers")
+}
+
+model TaskComment {
+  id              String        @id @default(uuid()) @db.Uuid
+  content         String
+  taskId          String        @db.Uuid @map("task_id")
+  authorId        String        @db.Uuid @map("author_id")
+  parentCommentId String?       @db.Uuid @map("parent_comment_id")
+  createdBy       String?       @db.Uuid @map("created_by_id")
+  updatedBy       String?       @db.Uuid @map("updated_by_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdByUser   User?         @relation("TaskCommentCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser   User?         @relation("TaskCommentUpdatedBy", fields: [updatedBy], references: [id])
+  parentComment   TaskComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id])
+  replies         TaskComment[] @relation("CommentReplies")
+  task            Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileName  String   @map("file_name")
+  filePath  String   @map("file_path")
+  fileSize  Int      @map("file_size")
+  mimeType      String   @map("mime_type")
+  taskId        String   @db.Uuid @map("task_id")
+  createdBy     String?  @db.Uuid @map("created_by_id")
+  updatedBy     String?  @db.Uuid @map("updated_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdByUser User?    @relation("TaskAttachmentCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?    @relation("TaskAttachmentUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@map("task_attachments")
+}
+
+model TimeEntry {
+  id          String    @id @default(uuid()) @db.Uuid
+  description String?
+  timeSpent   Int       @map("time_spent")
+  startTime   DateTime? @map("start_time")
+  endTime     DateTime? @map("end_time")
+  date          DateTime  @default(now())
+  taskId        String    @db.Uuid @map("task_id")
+  userId        String    @db.Uuid @map("user_id")
+  createdBy     String?   @db.Uuid @map("created_by_id")
+  updatedBy     String?   @db.Uuid @map("updated_by_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser User?     @relation("TimeEntryCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?     @relation("TimeEntryUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@map("time_entries")
+}
+
+model CustomField {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  type           CustomFieldType
+  description    String?
+  isRequired     Boolean         @default(false) @map("is_required")
+  options        Json?
+  organizationId String          @db.Uuid @map("organization_id")
+  createdBy      String?         @db.Uuid @map("created_by_id")
+  updatedBy      String?         @db.Uuid @map("updated_by_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUser  User?           @relation("CustomFieldCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser  User?           @relation("CustomFieldUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([organizationId, name])
+  @@map("custom_fields")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false) @map("is_read")
+  data          Json?
+  userId        String           @db.Uuid @map("user_id")
+  createdBy     String?          @db.Uuid @map("created_by_id")
+  updatedBy     String?          @db.Uuid @map("updated_by_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser User?            @relation("NotificationCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?            @relation("NotificationUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id          String       @id @default(uuid()) @db.Uuid
+  type        ActivityType
+  description String
+  entityType  String       @map("entity_type")
+  entityId    String       @db.Uuid @map("entity_id")
+  oldValue    Json?        @map("old_value")
+  newValue      Json?        @map("new_value")
+  userId        String       @db.Uuid @map("user_id")
+  createdBy     String?      @db.Uuid @map("created_by_id")
+  updatedBy     String?      @db.Uuid @map("updated_by_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser User?        @relation("ActivityLogCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?        @relation("ActivityLogUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@map("activity_logs")
+}
+
+model AutomationRule {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  description    String?
+  status         RuleStatus      @default(ACTIVE)
+  triggerType    TriggerType     @map("trigger_type")
+  triggerConfig  Json?           @map("trigger_config")
+  actionType     ActionType      @map("action_type")
+  actionConfig   Json?           @map("action_config")
+  organizationId String?         @db.Uuid @map("organization_id")
+  workspaceId    String?         @db.Uuid @map("workspace_id")
+  projectId      String?         @db.Uuid @map("project_id")
+  executionCount Int             @default(0) @map("execution_count")
+  lastExecuted   DateTime?       @map("last_executed")
+  createdBy      String?         @db.Uuid @map("created_by_id")
+  updatedBy      String?         @db.Uuid @map("updated_by_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  createdByUser  User?           @relation("AutomationRuleCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser  User?           @relation("AutomationRuleUpdatedBy", fields: [updatedBy], references: [id])
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspace      Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  executions     RuleExecution[]
+
+  @@map("automation_rules")
+}
+
+model RuleExecution {
+  id            String         @id @default(uuid()) @db.Uuid
+  success       Boolean
+  errorMessage  String?        @map("error_message")
+  executionTime Int            @map("execution_time")
+  triggerData   Json?          @map("trigger_data")
+  actionResult  Json?          @map("action_result")
+  ruleId        String         @db.Uuid @map("rule_id")
+  triggeredById String?        @db.Uuid @map("triggered_by_id")
+  createdBy     String?        @db.Uuid @map("created_by_id")
+  updatedBy     String?        @db.Uuid @map("updated_by_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  rule          AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  triggeredBy   User?          @relation(fields: [triggeredById], references: [id])
+  createdByUser User?          @relation("RuleExecutionCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?          @relation("RuleExecutionUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@map("rule_executions")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum OrganizationRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum WorkspaceRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectRole {
+  ADMIN
+  MANAGER
+  DEVELOPER
+  VIEWER
+}
+
+enum TaskType {
+  TASK
+  BUG
+  EPIC
+  STORY
+  SUBTASK
+}
+
+enum TaskPriority {
+  LOWEST
+  LOW
+  MEDIUM
+  HIGH
+  HIGHEST
+}
+
+enum DependencyType {
+  BLOCKS
+  FINISH_START
+  START_START
+  FINISH_FINISH
+  START_FINISH
+}
+
+enum StatusCategory {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum SprintStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+  USER
+  URL
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_COMMENTED
+  TASK_COMPLETED
+  SPRINT_STARTED
+  SPRINT_COMPLETED
+  PROJECT_UPDATED
+  MENTION
+}
+
+enum ActivityType {
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+  TASK_ASSIGNED
+  TASK_COMMENTED
+  TASK_STATUS_CHANGED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DELETED
+  SPRINT_CREATED
+  SPRINT_STARTED
+  SPRINT_COMPLETED
+  USER_JOINED
+  USER_LEFT
+}
+
+enum TriggerType {
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_STATUS_CHANGED
+  TASK_ASSIGNED
+  TASK_DUE_DATE_APPROACHING
+  TASK_OVERDUE
+  SPRINT_STARTED
+  SPRINT_COMPLETED
+  PROJECT_CREATED
+  COMMENT_ADDED
+}
+
+enum ActionType {
+  ASSIGN_TASK
+  CHANGE_STATUS
+  ADD_LABEL
+  REMOVE_LABEL
+  SET_DUE_DATE
+  SEND_NOTIFICATION
+  SEND_EMAIL
+  ADD_COMMENT
+  MOVE_TO_SPRINT
+  CHANGE_PRIORITY
+}
+
+enum RuleStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}

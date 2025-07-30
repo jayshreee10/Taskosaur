@@ -1,0 +1,147 @@
+/* User Avatar */
+.user-avatar {
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Workspace and Project Avatars */
+.workspace-avatar {
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.project-avatar {
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Avatar Sizes */
+.user-avatar-xs, .workspace-avatar-xs, .project-avatar-xs {
+  height: 1.5rem;
+  width: 1.5rem;
+  font-size: 0.625rem;
+}
+
+.user-avatar-sm, .workspace-avatar-sm, .project-avatar-sm {
+  height: 2rem;
+  width: 2rem;
+  font-size: 0.75rem;
+}
+
+.user-avatar-md, .workspace-avatar-md, .project-avatar-md {
+  height: 2.5rem;
+  width: 2.5rem;
+  font-size: 0.875rem;
+}
+
+.user-avatar-lg, .workspace-avatar-lg, .project-avatar-lg {
+  height: 3rem;
+  width: 3rem;
+  font-size: 1rem;
+}
+
+.user-avatar-xl, .workspace-avatar-xl, .project-avatar-xl {
+  height: 4rem;
+  width: 4rem;
+  font-size: 1.125rem;
+}
+
+/* Avatar Colors */
+.user-avatar-primary, .workspace-avatar-primary, .project-avatar-primary {
+  background-color: var(--primary-500);
+  color: white;
+}
+
+.user-avatar-secondary, .workspace-avatar-secondary, .project-avatar-secondary {
+  background-color: var(--secondary-500);
+  color: white;
+}
+
+.user-avatar-success, .workspace-avatar-success, .project-avatar-success {
+  background-color: #10b981;
+  color: white;
+}
+
+.user-avatar-danger, .workspace-avatar-danger, .project-avatar-danger {
+  background-color: #ef4444;
+  color: white;
+}
+
+.user-avatar-warning, .workspace-avatar-warning, .project-avatar-warning {
+  background-color: #eab308;
+  color: white;
+}
+
+.user-avatar-info, .workspace-avatar-info, .project-avatar-info {
+  background-color: #3b82f6;
+  color: white;
+}
+
+/* Avatar Group */
+.avatar-group {
+  display: flex;
+  margin-left: -0.5rem;
+}
+
+.avatar-group > * + * {
+  margin-left: -0.5rem;
+}
+
+.avatar-group-item {
+  border: 2px solid white;
+  border-radius: 9999px;
+}
+
+.dark .avatar-group-item {
+  border-color: #1f2937;
+}
+
+/* Avatar with Status */
+.user-avatar-with-status {
+  position: relative;
+}
+
+.user-avatar-status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 9999px;
+  border: 2px solid white;
+}
+
+.dark .user-avatar-status {
+  border-color: #1f2937;
+}
+
+.user-avatar-status-online {
+  background-color: #10b981;
+}
+
+.user-avatar-status-offline {
+  background-color: #9ca3af;
+}
+
+.user-avatar-status-busy {
+  background-color: #ef4444;
+}
+
+.user-avatar-status-away {
+  background-color: #eab308;
+}

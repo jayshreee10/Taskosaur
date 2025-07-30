@@ -1,0 +1,108 @@
+/* Layout Utility Classes */
+
+/* Container Layouts */
+.layout-container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.layout-container-full {
+  @apply w-full px-4 sm:px-6 lg:px-8;
+}
+
+.layout-container-narrow {
+  @apply max-w-4xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Page Layouts */
+.layout-page {
+  @apply min-h-screen bg-stone-100 dark:bg-stone-950 transition-colors;
+}
+
+.layout-page-content {
+  @apply py-6;
+}
+
+/* Grid Layouts */
+.layout-grid-auto {
+  @apply grid gap-6;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.layout-grid-sidebar {
+  @apply grid grid-cols-1 lg:grid-cols-3 gap-6;
+}
+
+.layout-grid-sidebar-content {
+  @apply lg:col-span-2;
+}
+
+.layout-grid-sidebar-aside {
+  @apply lg:col-span-1;
+}
+
+/* Dashboard Specific Layouts */
+.layout-dashboard-header {
+  @apply mb-6 flex items-start justify-between;
+}
+
+.layout-dashboard-stats {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6;
+}
+
+.layout-dashboard-main {
+  @apply grid grid-cols-1 lg:grid-cols-3 gap-6;
+}
+
+/* Section Layouts */
+.layout-section {
+  @apply space-y-6;
+}
+
+.layout-section-header {
+  @apply flex items-center justify-between mb-4;
+}
+
+/* Card Grid Layouts */
+.layout-card-grid-1 {
+  @apply grid grid-cols-1 gap-3;
+}
+
+.layout-card-grid-2 {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-3;
+}
+
+.layout-card-grid-3 {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
+}
+
+.layout-card-grid-4 {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3;
+}
+
+/* Responsive Spacing */
+.layout-spacing-xs { @apply space-y-2; }
+.layout-spacing-sm { @apply space-y-3; }
+.layout-spacing-md { @apply space-y-4; }
+.layout-spacing-lg { @apply space-y-6; }
+.layout-spacing-xl { @apply space-y-8; }
+
+/* Flex Layouts */
+.layout-flex-between {
+  @apply flex items-center justify-between;
+}
+
+.layout-flex-start {
+  @apply flex items-center justify-start;
+}
+
+.layout-flex-center {
+  @apply flex items-center justify-center;
+}
+
+.layout-flex-col {
+  @apply flex flex-col;
+}
+
+.layout-flex-col-center {
+  @apply flex flex-col items-center justify-center;
+}

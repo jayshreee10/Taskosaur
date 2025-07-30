@@ -1,0 +1,82 @@
+@reference "tailwindcss";
+
+/* Kanban Layout */
+.kanban-container {
+  @apply p-4 grid grid-cols-1 md:grid-cols-4 gap-6 overflow-x-auto;
+}
+
+/* Kanban Wrapper */
+.kanban-wrapper {
+  @apply bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden mt-4;
+}
+
+/* Kanban Column */
+.kanban-column {
+  @apply bg-white dark:bg-gray-800 shadow rounded-lg p-5;
+}
+
+.kanban-column-header {
+  @apply flex justify-between items-center mb-4;
+}
+
+.kanban-column-title {
+  @apply font-medium text-gray-900 dark:text-white;
+}
+
+.kanban-column-count {
+  @apply text-xs text-gray-500 dark:text-gray-400;
+}
+
+.kanban-tasks-container {
+  @apply space-y-3;
+}
+
+/* Kanban Task Card */
+.kanban-task-card {
+  @apply block bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-600;
+}
+
+.kanban-task-title {
+  @apply text-sm font-medium text-gray-900 dark:text-white mb-3 leading-tight;
+}
+
+.kanban-task-footer {
+  @apply flex justify-between items-center pt-3 border-t border-gray-100 dark:border-gray-800;
+}
+
+.kanban-task-due-date {
+  @apply mt-2 text-xs text-gray-500 dark:text-gray-400;
+}
+
+/* Empty State */
+.kanban-empty-state {
+  @apply py-8 text-center text-gray-500 dark:text-gray-400 text-sm;
+}
+
+/* Drag and Drop States */
+.kanban-column.drag-over {
+  @apply bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-600 rounded-lg;
+}
+
+.kanban-task-card.dragging {
+  @apply opacity-50 rotate-1 shadow-lg;
+}
+
+/* Task Type and Priority Icons */
+.kanban-task-icons {
+  @apply flex items-center space-x-2 text-sm;
+}
+
+/* Task Metadata */
+.kanban-task-metadata {
+  @apply flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400;
+}
+
+.kanban-task-metadata span {
+  @apply bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded;
+}
+
+/* Add Task Link */
+.kanban-add-task-link {
+  @apply w-full text-left text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 mt-2;
+}

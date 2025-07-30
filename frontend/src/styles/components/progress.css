@@ -1,0 +1,77 @@
+@reference "tailwindcss";
+
+/* Progress Bar */
+.progress-container {
+  @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden;
+}
+
+.progress-container-xs {
+  @apply h-1;
+}
+
+.progress-container-sm {
+  @apply h-2;
+}
+
+.progress-container-md {
+  @apply h-3;
+}
+
+.progress-container-lg {
+  @apply h-4;
+}
+
+.progress-bar {
+  @apply h-full rounded-full transition-all duration-300;
+}
+
+/* Progress Bar Colors */
+.progress-bar-primary {
+  @apply bg-indigo-600 dark:bg-indigo-500;
+}
+
+.progress-bar-secondary {
+  @apply bg-gray-500 dark:bg-gray-400;
+}
+
+.progress-bar-success {
+  @apply bg-green-600 dark:bg-green-500;
+}
+
+.progress-bar-danger {
+  @apply bg-red-600 dark:bg-red-500;
+}
+
+.progress-bar-warning {
+  @apply bg-yellow-600 dark:bg-yellow-500;
+}
+
+.progress-bar-info {
+  @apply bg-blue-600 dark:bg-blue-500;
+}
+
+/* Progress with Label */
+.progress-with-label {
+  @apply flex flex-col;
+}
+
+.progress-label {
+  @apply flex justify-between mb-1 text-sm;
+}
+
+.progress-title {
+  @apply font-medium text-gray-700 dark:text-gray-300;
+}
+
+.progress-value {
+  @apply text-gray-600 dark:text-gray-400;
+}
+
+/* Segmented Progress Bar */
+.progress-segmented {
+  @apply flex w-full h-2;
+}
+
+.progress-segment {
+  @apply h-full first:rounded-l-full last:rounded-r-full;
+}

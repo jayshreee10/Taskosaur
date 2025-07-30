@@ -1,0 +1,54 @@
+/* Badge Component Styles */
+
+.ui-badge {
+  @apply inline-flex items-center font-medium rounded-full;
+}
+
+/* Badge Variants */
+.ui-badge-default {
+  @apply bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200;
+}
+
+.ui-badge-primary {
+  @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300;
+}
+
+.ui-badge-secondary {
+  @apply bg-stone-100 text-stone-800 dark:bg-stone-700 dark:text-stone-300;
+}
+
+.ui-badge-success {
+  @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300;
+}
+
+.ui-badge-warning {
+  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300;
+}
+
+.ui-badge-error {
+  @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300;
+}
+
+.ui-badge-info {
+  @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300;
+}
+
+/* Badge Sizes */
+.ui-badge-sm { @apply px-2 py-0.5 text-xs; }
+.ui-badge-md { @apply px-2.5 py-0.5 text-sm; }
+.ui-badge-lg { @apply px-3 py-1 text-sm; }
+
+/* Priority Badge Specific Styles */
+.priority-badge-low { @apply bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200; }
+.priority-badge-medium { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300; }
+.priority-badge-high { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300; }
+.priority-badge-highest { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300; }
+
+/* Status Badge Specific Styles */
+.status-badge-todo { @apply bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200; }
+.status-badge-backlog { @apply bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200; }
+.status-badge-in-progress { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300; }
+.status-badge-in-review { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300; }
+.status-badge-completed { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300; }
+.status-badge-done { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300; }
+.status-badge-cancelled { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300; }

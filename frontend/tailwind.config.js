@@ -1,0 +1,145 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/styles/**/*.css',
+  ],
+  theme: {
+    extend: {
+      // colors: {
+         
+        
+
+      //   primary: {
+      //     50: 'var(--primary-50)',
+      //     100: 'var(--primary-100)',
+      //     200: 'var(--primary-200)',
+      //     300: 'var(--primary-300)',
+      //     400: 'var(--primary-400)',
+      //     500: 'var(--primary-500)',
+      //     600: 'var(--primary-600)',
+      //     700: 'var(--primary-700)',
+      //     800: 'var(--primary-800)',
+      //     900: 'var(--primary-900)',
+      //     950: 'var(--primary-950)',
+      //   },
+      //   secondary: {
+      //     50: 'var(--secondary-50)',
+      //     100: 'var(--secondary-100)',
+      //     200: 'var(--secondary-200)',
+      //     300: 'var(--secondary-300)',
+      //     400: 'var(--secondary-400)',
+      //     500: 'var(--secondary-500)',
+      //     600: 'var(--secondary-600)',
+      //     700: 'var(--secondary-700)',
+      //     800: 'var(--secondary-800)',
+      //     900: 'var(--secondary-900)',
+      //     950: 'var(--secondary-950)',
+      //   },
+      //   // Override default colors with our CSS variables
+      //   gray: {
+      //     50: 'var(--gray-50)',
+      //     100: 'var(--gray-100)',
+      //     200: 'var(--gray-200)',
+      //     300: 'var(--gray-300)',
+      //     400: 'var(--gray-400)',
+      //     500: 'var(--gray-500)',
+      //     600: 'var(--gray-600)',
+      //     700: 'var(--gray-700)',
+      //     800: 'var(--gray-800)',
+      //     900: 'var(--gray-900)',
+      //     950: 'var(--gray-950)',
+      //   },
+      //   red: {
+      //     50: 'var(--red-50)',
+      //     100: 'var(--red-100)',
+      //     200: 'var(--red-200)',
+      //     300: 'var(--red-300)',
+      //     400: 'var(--red-400)',
+      //     500: 'var(--red-500)',
+      //     600: 'var(--red-600)',
+      //     700: 'var(--red-700)',
+      //     800: 'var(--red-800)',
+      //     900: 'var(--red-900)',
+      //     950: 'var(--red-950)',
+      //   },
+      //   green: {
+      //     50: 'var(--green-50)',
+      //     100: 'var(--green-100)',
+      //     200: 'var(--green-200)',
+      //     300: 'var(--green-300)',
+      //     400: 'var(--green-400)',
+      //     500: 'var(--green-500)',
+      //     600: 'var(--green-600)',
+      //     700: 'var(--green-700)',
+      //     800: 'var(--green-800)',
+      //     900: 'var(--green-900)',
+      //     950: 'var(--green-950)',
+      //   },
+      //   blue: {
+      //     50: 'var(--blue-50)',
+      //     100: 'var(--blue-100)',
+      //     200: 'var(--blue-200)',
+      //     300: 'var(--blue-300)',
+      //     400: 'var(--blue-400)',
+      //     500: 'var(--blue-500)',
+      //     600: 'var(--blue-600)',
+      //     700: 'var(--blue-700)',
+      //     800: 'var(--blue-800)',
+      //     900: 'var(--blue-900)',
+      //     950: 'var(--blue-950)',
+      //   },
+      //   // Semantic color mappings
+      //   background: {
+      //     DEFAULT: 'var(--background)',
+      //     dark: 'var(--background-dark)',
+      //   },
+      //   foreground: {
+      //     DEFAULT: 'var(--foreground)',
+      //     dark: 'var(--foreground-dark)',
+      //   },
+      //   card: {
+      //     DEFAULT: 'var(--card)',
+      //     dark: 'var(--card-dark)',
+      //   },
+      //   border: {
+      //     DEFAULT: 'var(--border)',
+      //     dark: 'var(--border-dark)',
+      //   },
+      //   muted: {
+      //     DEFAULT: 'var(--muted)',
+      //     foreground: 'var(--muted-foreground)',
+      //     'foreground-dark': 'var(--muted-foreground-dark)',
+      //   },
+      //   // Status colors
+      //   success: {
+      //     DEFAULT: 'var(--success)',
+      //     foreground: 'var(--success-foreground)',
+      //     light: 'var(--success-light)',
+      //     dark: 'var(--success-dark)',
+      //   },
+      //   warning: {
+      //     DEFAULT: 'var(--warning)',
+      //     foreground: 'var(--warning-foreground)',
+      //     light: 'var(--warning-light)',
+      //     dark: 'var(--warning-dark)',
+      //   },
+      //   error: {
+      //     DEFAULT: 'var(--error)',
+      //     foreground: 'var(--error-foreground)',
+      //     light: 'var(--error-light)',
+      //     dark: 'var(--error-dark)',
+      //   },
+      //   info: {
+      //     DEFAULT: 'var(--info)',
+      //     foreground: 'var(--info-foreground)',
+      //     light: 'var(--info-light)',
+      //     dark: 'var(--info-dark)',
+      //   },
+      //   test: '#ec4899',
+      // },
+    },
+  },
+};

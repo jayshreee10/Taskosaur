@@ -1,0 +1,88 @@
+@reference "tailwindcss";
+
+/* Calendar Container */
+.calendar-container {
+  @apply p-4;
+}
+
+.calendar-wrapper {
+  @apply bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden mt-4;
+}
+
+/* Calendar Header */
+.calendar-header {
+  @apply flex justify-between items-center mb-6;
+}
+
+.calendar-title {
+  @apply text-lg font-medium text-gray-900 dark:text-white;
+}
+
+.calendar-navigation {
+  @apply flex space-x-2;
+}
+
+.calendar-nav-button {
+  @apply p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700;
+}
+
+.calendar-today-button {
+  @apply px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700;
+}
+
+/* Calendar Grid */
+.calendar-grid {
+  @apply grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded overflow-hidden;
+}
+
+.calendar-weekday {
+  @apply bg-gray-100 dark:bg-gray-800 text-center py-2 text-xs font-medium text-gray-700 dark:text-gray-300;
+}
+
+.calendar-day {
+  @apply bg-white dark:bg-gray-800 min-h-[120px] p-2;
+}
+
+.calendar-day-current-month {
+  @apply text-gray-900 dark:text-white;
+}
+
+.calendar-day-other-month {
+  @apply text-gray-400 dark:text-gray-600;
+}
+
+.calendar-day-today {
+  @apply border-2 border-indigo-500 dark:border-indigo-400;
+}
+
+.calendar-day-header {
+  @apply flex justify-between items-start;
+}
+
+.calendar-day-number {
+  @apply text-sm font-medium;
+}
+
+.calendar-day-number-today {
+  @apply text-indigo-600 dark:text-indigo-400;
+}
+
+.calendar-day-number-current-month {
+  @apply text-gray-900 dark:text-white;
+}
+
+.calendar-day-number-other-month {
+  @apply text-gray-400 dark:text-gray-600;
+}
+
+.calendar-task-count {
+  @apply text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded-full px-2 py-0.5;
+}
+
+.calendar-tasks {
+  @apply mt-2 space-y-1 max-h-[80px] overflow-y-auto;
+}
+
+.calendar-task {
+  @apply block text-xs p-1 rounded truncate;
+}

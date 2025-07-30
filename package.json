@@ -1,0 +1,32 @@
+{
+    "name": "taskosaur-server",
+    "version": "1.0.0",
+    "description": "A Fastify-based reverse proxy with environment-based targets.",
+    "main": "taskosaur.js",
+    "scripts": {
+        "setup": "node taskosaur.js setup",
+        "start": "node taskosaur.js run",
+        "start:dev": "node taskosaur.js run --dev",
+        "db:migrate": "cd backend && npm run prisma:migrate:dev",
+        "db:reset": "cd backend && npm run prisma:reset",
+        "db:seed": "cd backend && npm run seed:core seed",
+        "db:generate": "cd backend && npm run prisma:generate"
+    },
+    "keywords": [
+        "fastify",
+        "reverse-proxy",
+        "proxy",
+        "http-proxy"
+    ],
+    "author": "",
+    "license": "CUSTOM",
+    "dependencies": {
+        "@fastify/http-proxy": "^11.3.0",
+        "dotenv": "^17.2.0",
+        "fastify": "^5.4.0",
+        "pm2": "^6.0.8"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.3"
+    }
+}

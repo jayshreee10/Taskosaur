@@ -1,0 +1,34 @@
+/* UI System Components */
+@import './components/ui-buttons.css';
+@import './components/ui-badges.css';
+@import './components/ui-cards.css';
+
+/* Layout System */
+@import './layouts/ui-layouts.css';
+
+/* Page Specific Components */
+@import './components/project-detail.css';
+
+/* Legacy Components (to be migrated) */
+@import './components/cards.css';
+@import './components/workspace-cards.css';
+@import './components/stat-cards.css';
+@import './components/deadline-cards.css';
+@import './components/buttons.css';
+@import './components/avatars.css';
+@import './components/badges.css';
+@import './components/progress.css';
+@import './components/tabs.css';
+
+/* Task Views */
+@import './components/workspace.css';
+@import './components/tasks.css';
+@import './components/gantt.css';
+@import './components/calendar.css';
+
+/* Legacy Layouts */
+@import './layouts/container.css';
+@import './layouts/dashboard.css';
+@import './layouts/header.css';
+@import './layouts/sidebar.css';
+@import './layouts/resizable-sidebar.css';

@@ -1,0 +1,54 @@
+@reference "tailwindcss";
+
+/* Stat Card */
+.stat-card {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow p-5;
+}
+
+.stat-card-header {
+  @apply flex justify-between items-center mb-3;
+}
+
+.stat-card-title {
+  @apply text-sm font-medium text-gray-500 dark:text-gray-400;
+}
+
+.stat-card-icon {
+  @apply text-gray-400 dark:text-gray-500;
+}
+
+.stat-card-value {
+  @apply text-2xl font-semibold text-gray-900 dark:text-white;
+}
+
+.stat-card-description {
+  @apply mt-1 text-sm text-gray-600 dark:text-gray-400;
+}
+
+.stat-card-footer {
+  @apply mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center;
+}
+
+.stat-card-trend {
+  @apply flex items-center text-sm;
+}
+
+.stat-card-trend-positive {
+  @apply text-green-600 dark:text-green-500;
+}
+
+.stat-card-trend-negative {
+  @apply text-red-600 dark:text-red-500;
+}
+
+.stat-card-trend-neutral {
+  @apply text-gray-600 dark:text-gray-400;
+}
+
+.stat-card-trend-text {
+  @apply ml-1;
+}
+
+.stat-card-period {
+  @apply ml-auto text-xs text-gray-500 dark:text-gray-400;
+}

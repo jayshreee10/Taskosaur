@@ -1,0 +1,497 @@
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  WorkspaceMember,
+  WorkspaceRole,
+  OrganizationRole,
+} from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  CreateWorkspaceMemberDto,
+  InviteWorkspaceMemberDto,
+} from './dto/create-workspace-member.dto';
+import { UpdateWorkspaceMemberDto } from './dto/update-workspace-member.dto';
+
+@Injectable()
+export class WorkspaceMembersService {
+  constructor(private prisma: PrismaService) {}
+
+  async create(
+    createWorkspaceMemberDto: CreateWorkspaceMemberDto,
+  ): Promise<WorkspaceMember> {
+    const {
+      userId,
+      workspaceId,
+      role = WorkspaceRole.MEMBER,
+    } = createWorkspaceMemberDto;
+
+    // Verify workspace exists and get organization info
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: {
+        id: true,
+        name: true,
+        organizationId: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    // Verify user exists and is a member of the organization
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        organizationMembers: {
+          where: { organizationId: workspace.organizationId },
+          select: { id: true, role: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.organizationMembers.length === 0) {
+      throw new BadRequestException(
+        'User must be a member of the organization to join this workspace',
+      );
+    }
+
+    try {
+      return await this.prisma.workspaceMember.create({
+        data: {
+          userId,
+          workspaceId,
+          role,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+              status: true,
+            },
+          },
+          workspace: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              avatar: true,
+              color: true,
+              organization: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new ConflictException(
+          'User is already a member of this workspace',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async inviteByEmail(
+    inviteWorkspaceMemberDto: InviteWorkspaceMemberDto,
+  ): Promise<WorkspaceMember> {
+    const {
+      email,
+      workspaceId,
+      role = WorkspaceRole.MEMBER,
+    } = inviteWorkspaceMemberDto;
+
+    // Find user by email
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User with this email not found');
+    }
+
+    return this.create({
+      userId: user.id,
+      workspaceId,
+      role,
+    });
+  }
+
+  async findAll(workspaceId?: string): Promise<WorkspaceMember[]> {
+    const whereClause = workspaceId ? { workspaceId } : {};
+
+    return this.prisma.workspaceMember.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            status: true,
+            lastLoginAt: true,
+          },
+        },
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            avatar: true,
+            color: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { role: 'asc' }, // Admins first
+        { joinedAt: 'asc' },
+      ],
+    });
+  }
+
+  async findOne(id: string): Promise<WorkspaceMember> {
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            bio: true,
+            timezone: true,
+            language: true,
+            status: true,
+            lastLoginAt: true,
+          },
+        },
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            avatar: true,
+            color: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                owner: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Workspace member not found');
+    }
+
+    return member;
+  }
+
+  async findByUserAndWorkspace(
+    userId: string,
+    workspaceId: string,
+  ): Promise<WorkspaceMember | null> {
+    return this.prisma.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+  }
+
+  async update(
+    id: string,
+    updateWorkspaceMemberDto: UpdateWorkspaceMemberDto,
+    requestUserId: string,
+  ): Promise<WorkspaceMember> {
+    // Get current member info
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: { id },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            organizationId: true,
+            organization: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Workspace member not found');
+    }
+
+    // Check if requester has permission to update
+    const requesterWorkspaceMember = await this.findByUserAndWorkspace(
+      requestUserId,
+      member.workspaceId,
+    );
+    const requesterOrgMember = await this.prisma.organizationMember.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: requestUserId,
+          organizationId: member.workspace.organizationId,
+        },
+      },
+    });
+
+    if (!requesterWorkspaceMember && !requesterOrgMember) {
+      throw new ForbiddenException(
+        'You are not a member of this workspace or organization',
+      );
+    }
+
+    // Permission check: organization owner, org admins, or workspace admins can update
+    const isOrgOwner = member.workspace.organization.ownerId === requestUserId;
+    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.ADMIN;
+    const isWorkspaceAdmin =
+      requesterWorkspaceMember?.role === WorkspaceRole.ADMIN;
+
+    if (!isOrgOwner && !isOrgAdmin && !isWorkspaceAdmin) {
+      throw new ForbiddenException(
+        'Only organization owners/admins or workspace admins can update member roles',
+      );
+    }
+
+    const updatedMember = await this.prisma.workspaceMember.update({
+      where: { id },
+      data: updateWorkspaceMemberDto,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            status: true,
+          },
+        },
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            avatar: true,
+            color: true,
+          },
+        },
+      },
+    });
+
+    return updatedMember;
+  }
+
+  async remove(id: string, requestUserId: string): Promise<void> {
+    // Get current member info
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: { id },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            organizationId: true,
+            organization: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Workspace member not found');
+    }
+
+    // Check if requester has permission to remove
+    const requesterWorkspaceMember = await this.findByUserAndWorkspace(
+      requestUserId,
+      member.workspaceId,
+    );
+    const requesterOrgMember = await this.prisma.organizationMember.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: requestUserId,
+          organizationId: member.workspace.organizationId,
+        },
+      },
+    });
+
+    // Users can remove themselves, or admins can remove others
+    const isSelfRemoval = member.userId === requestUserId;
+    const isOrgOwner = member.workspace.organization.ownerId === requestUserId;
+    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.ADMIN;
+    const isWorkspaceAdmin =
+      requesterWorkspaceMember?.role === WorkspaceRole.ADMIN;
+
+    if (!isSelfRemoval && !isOrgOwner && !isOrgAdmin && !isWorkspaceAdmin) {
+      throw new ForbiddenException(
+        'You can only remove yourself or you must be an admin',
+      );
+    }
+
+    await this.prisma.workspaceMember.delete({
+      where: { id },
+    });
+  }
+
+  async getUserWorkspaces(userId: string): Promise<WorkspaceMember[]> {
+    return this.prisma.workspaceMember.findMany({
+      where: { userId },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            avatar: true,
+            color: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+            _count: {
+              select: {
+                members: true,
+                projects: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        joinedAt: 'asc',
+      },
+    });
+  }
+
+  async getWorkspaceStats(workspaceId: string): Promise<any> {
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { id: true },
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    const [totalMembers, roleStats, recentJoins] = await Promise.all([
+      // Total members count
+      this.prisma.workspaceMember.count({
+        where: { workspaceId },
+      }),
+
+      // Members by role
+      this.prisma.workspaceMember.groupBy({
+        by: ['role'],
+        where: { workspaceId },
+        _count: { role: true },
+      }),
+
+      // Recent joins (last 30 days)
+      this.prisma.workspaceMember.count({
+        where: {
+          workspaceId,
+          joinedAt: {
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+    ]);
+
+    return {
+      totalMembers,
+      roleDistribution: roleStats.reduce(
+        (acc, stat) => {
+          acc[stat.role] = stat._count.role;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      recentJoins,
+    };
+  }
+}

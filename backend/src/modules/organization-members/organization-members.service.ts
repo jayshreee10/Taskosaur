@@ -1,0 +1,455 @@
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import { OrganizationMember, OrganizationRole } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  CreateOrganizationMemberDto,
+  InviteOrganizationMemberDto,
+} from './dto/create-organization-member.dto';
+import { UpdateOrganizationMemberDto } from './dto/update-organization-member.dto';
+
+@Injectable()
+export class OrganizationMembersService {
+  constructor(private prisma: PrismaService) {}
+
+  async create(
+    createOrganizationMemberDto: CreateOrganizationMemberDto,
+  ): Promise<OrganizationMember> {
+    const {
+      userId,
+      organizationId,
+      role = OrganizationRole.MEMBER,
+    } = createOrganizationMemberDto;
+
+    // Verify organization exists
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    // Verify user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    try {
+      return await this.prisma.organizationMember.create({
+        data: {
+          userId,
+          organizationId,
+          role,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+              status: true,
+            },
+          },
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              avatar: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new ConflictException(
+          'User is already a member of this organization',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async inviteByEmail(
+    inviteOrganizationMemberDto: InviteOrganizationMemberDto,
+  ): Promise<OrganizationMember> {
+    const {
+      email,
+      organizationId,
+      role = OrganizationRole.MEMBER,
+    } = inviteOrganizationMemberDto;
+
+    // Find user by email
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User with this email not found');
+    }
+
+    return this.create({
+      userId: user.id,
+      organizationId,
+      role,
+    });
+  }
+
+  async findAll(organizationId?: string): Promise<OrganizationMember[]> {
+    const whereClause = organizationId ? { organizationId } : {};
+
+    return this.prisma.organizationMember.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            status: true,
+            lastLoginAt: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: [
+        { role: 'asc' }, // Admins first
+        { joinedAt: 'asc' },
+      ],
+    });
+  }
+
+  async findOne(id: string): Promise<OrganizationMember> {
+    const member = await this.prisma.organizationMember.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            bio: true,
+            timezone: true,
+            language: true,
+            status: true,
+            lastLoginAt: true,
+            emailVerified: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            avatar: true,
+            website: true,
+            owner: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Organization member not found');
+    }
+
+    return member;
+  }
+
+  async findByUserAndOrganization(
+    userId: string,
+    organizationId: string,
+  ): Promise<OrganizationMember | null> {
+    return this.prisma.organizationMember.findUnique({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    });
+  }
+
+  async update(
+    id: string,
+    updateOrganizationMemberDto: UpdateOrganizationMemberDto,
+    requestUserId: string,
+  ): Promise<OrganizationMember> {
+    // Get current member info
+    const member = await this.prisma.organizationMember.findUnique({
+      where: { id },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Organization member not found');
+    }
+
+    // Check if requester has permission to update
+    const requesterMember = await this.findByUserAndOrganization(
+      requestUserId,
+      member.organizationId,
+    );
+
+    if (!requesterMember) {
+      throw new ForbiddenException('You are not a member of this organization');
+    }
+
+    // Only organization owner or admins can update member roles
+    const isOwner = member.organization.ownerId === requestUserId;
+    const isAdmin = requesterMember.role === OrganizationRole.ADMIN;
+
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException(
+        'Only organization owners and admins can update member roles',
+      );
+    }
+
+    // Prevent demoting the organization owner
+    if (
+      member.organization.ownerId === member.userId &&
+      updateOrganizationMemberDto.role !== OrganizationRole.ADMIN
+    ) {
+      throw new BadRequestException(
+        'Cannot change the role of organization owner',
+      );
+    }
+
+    const updatedMember = await this.prisma.organizationMember.update({
+      where: { id },
+      data: updateOrganizationMemberDto,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            status: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    return updatedMember;
+  }
+
+  async remove(id: string, requestUserId: string): Promise<void> {
+    // Get current member info
+    const member = await this.prisma.organizationMember.findUnique({
+      where: { id },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Organization member not found');
+    }
+
+    // Check if requester has permission to remove
+    const requesterMember = await this.findByUserAndOrganization(
+      requestUserId,
+      member.organizationId,
+    );
+
+    if (!requesterMember) {
+      throw new ForbiddenException('You are not a member of this organization');
+    }
+
+    // Users can remove themselves, or admins/owners can remove others
+    const isSelfRemoval = member.userId === requestUserId;
+    const isOwner = member.organization.ownerId === requestUserId;
+    const isAdmin = requesterMember.role === OrganizationRole.ADMIN;
+
+    if (!isSelfRemoval && !isOwner && !isAdmin) {
+      throw new ForbiddenException(
+        'You can only remove yourself or you must be an admin/owner',
+      );
+    }
+
+    // Prevent removing the organization owner
+    if (member.organization.ownerId === member.userId) {
+      throw new BadRequestException(
+        'Cannot remove organization owner from organization',
+      );
+    }
+
+    await this.prisma.organizationMember.delete({
+      where: { id },
+    });
+  }
+
+  async getUserOrganizations(userId: string) {
+    const organizations = await this.prisma.organization.findMany({
+      where: {
+        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        avatar: true,
+        website: true,
+        ownerId: true,
+        createdAt: true,
+        _count: {
+          select: {
+            members: true,
+            workspaces: true,
+          },
+        },
+        members: {
+          where: { userId },
+          select: {
+            id: true,
+            role: true,
+            joinedAt: true,
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Transform to include user's role (owner takes precedence)
+    return organizations.map((org) => {
+      const isOwner = org.ownerId === userId;
+      const memberRecord = org.members[0];
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        description: org.description,
+        avatar: org.avatar,
+        website: org.website,
+        _count: org._count,
+        userRole: isOwner ? 'OWNER' : memberRecord?.role || 'MEMBER',
+        joinedAt: memberRecord?.joinedAt || org.createdAt,
+        isOwner,
+      };
+    });
+  }
+
+  async getOrganizationStats(organizationId: string): Promise<any> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const [totalMembers, roleStats, recentJoins] = await Promise.all([
+      // Total members count
+      this.prisma.organizationMember.count({
+        where: { organizationId },
+      }),
+
+      // Members by role
+      this.prisma.organizationMember.groupBy({
+        by: ['role'],
+        where: { organizationId },
+        _count: { role: true },
+      }),
+
+      // Recent joins (last 30 days)
+      this.prisma.organizationMember.count({
+        where: {
+          organizationId,
+          joinedAt: {
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+    ]);
+
+    return {
+      totalMembers,
+      roleDistribution: roleStats.reduce(
+        (acc, stat) => {
+          acc[stat.role] = stat._count.role;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      recentJoins,
+    };
+  }
+}
