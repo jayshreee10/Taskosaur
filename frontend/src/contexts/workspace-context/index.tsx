@@ -1,454 +1,421 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authFetch } from '../../utils/authFetch';
 
-const BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000');
+import React, { 
+  createContext, 
+  useContext, 
+  useState, 
+  useEffect, 
+  useMemo, 
+  useCallback 
+} from 'react';
+import { 
+  workspaceApi,
+  Workspace,
+  WorkspaceData,
+  WorkspaceMember,
+  AddMemberToWorkspaceData,
+  InviteMemberToWorkspaceData,
+  UpdateMemberRoleData,
+  WorkspaceStats,
+  WorkspaceRole,
+  CreateWorkspaceData
+} from '@/utils/api/workspaceApi';
 
-type WorkspaceRole = 'ADMIN' | 'MANAGER' | 'MEMBER' | 'VIEWER';
-
-interface WorkspaceData {
-  name: string;
-  description?: string;
-  color?: string;
+interface WorkspaceState {
+  workspaces: Workspace[];
+  currentWorkspace: Workspace | null;
+  workspaceMembers: WorkspaceMember[];
+  workspaceStats: WorkspaceStats | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
-interface WorkspaceMember {
-  id: string;
-  userId: string;
-  workspaceId: string;
-  role: WorkspaceRole;
-  user?: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    username: string;
-  };
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface AddMemberToWorkspaceData {
-  userId: string;
-  workspaceId: string;
-  role: WorkspaceRole;
-}
-
-interface InviteMemberToWorkspaceData {
-  email: string;
-  workspaceId: string;
-  role: WorkspaceRole;
-}
-
-interface UpdateMemberRoleData {
-  role: WorkspaceRole;
-}
-
-interface WorkspaceStats {
-  totalMembers: number;
-  totalProjects: number;
-  totalTasks: number;
-  completedTasks: number;
-  // Add other stats properties as needed
-}
-
-export const useWorkspaceContext = () => {
-  const context = useContext(WorkspaceContext);
-  if (!context) {
-    throw new Error('useWorkspaceContext must be used within a WorkspaceProvider');
-  }
-  return context;
-};
-
-interface WorkspaceContextType {
-  createWorkspace: (workspaceData: WorkspaceData) => Promise<any>;
-  getWorkspaces: () => Promise<any>;
-  getWorkspacesByOrganization: (organizationId?: string) => Promise<any>;
-  getWorkspaceById: (workspaceId: string) => Promise<any>;
-  getWorkspaceBySlug: (slug: string, organizationId?: string) => Promise<any>;
-  updateWorkspace: (workspaceId: string, workspaceData: WorkspaceData) => Promise<any>;
-  deleteWorkspace: (workspaceId: string) => Promise<any>;
-  // Workspace member APIs
+interface WorkspaceContextType extends WorkspaceState {
+  // Workspace methods
+  createWorkspace: (workspaceData: WorkspaceData) => Promise<Workspace>;
+  getWorkspaces: () => Promise<Workspace[]>;
+  getWorkspacesByOrganization: (organizationId?: string) => Promise<Workspace[]>;
+  getWorkspaceById: (workspaceId: string) => Promise<Workspace>;
+  getWorkspaceBySlug: (slug: string, organizationId?: string) => Promise<Workspace>;
+  updateWorkspace: (workspaceId: string, workspaceData: Partial<WorkspaceData>) => Promise<Workspace>;
+  deleteWorkspace: (workspaceId: string) => Promise<{ success: boolean; message: string }>;
+  
+  // Workspace member methods
   getWorkspaceMembers: (workspaceId: string) => Promise<WorkspaceMember[]>;
   addMemberToWorkspace: (memberData: AddMemberToWorkspaceData) => Promise<WorkspaceMember>;
   inviteMemberToWorkspace: (inviteData: InviteMemberToWorkspaceData) => Promise<any>;
   updateMemberRole: (memberId: string, updateData: UpdateMemberRoleData, requestUserId: string) => Promise<WorkspaceMember>;
-  removeMemberFromWorkspace: (memberId: string, requestUserId: string) => Promise<{ success: boolean }>;
+  removeMemberFromWorkspace: (memberId: string, requestUserId: string) => Promise<{ success: boolean; message: string }>;
+  
+  // Stats and utility methods
   getWorkspaceStats: (workspaceId: string) => Promise<WorkspaceStats>;
+  
+  // State management
+  setCurrentWorkspace: (workspace: Workspace | null) => void;
+  refreshWorkspaces: (organizationId?: string) => Promise<void>;
+  refreshWorkspaceMembers: (workspaceId: string) => Promise<void>;
+  clearError: () => void;
+  
+  // Helper methods
+  isUserWorkspaceMember: (workspaceId: string, userId: string) => boolean;
+  getUserWorkspaceRole: (workspaceId: string, userId: string) => WorkspaceRole | null;
+  getCurrentOrganizationId: () => string | null;
 }
 
-export const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
+const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
-function WorkspaceProvider({ children }: { children: React.ReactNode }) {
-  // Add caching state
-  const [workspacesCache, setWorkspacesCache] = useState<any[]>([]);
-  const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
-  const [isCacheValid, setIsCacheValid] = useState(false);
-  
-  // Cache duration: 5 minutes
-  const CACHE_DURATION = 5 * 60 * 1000;
-  
-  const getOrganizationId = () => {
-    if (typeof window !== 'undefined') {
-      const orgId = localStorage.getItem('currentOrganizationId');
-      // console.log('🏢 getOrganizationId:', {
-      //   orgId,
-      //   type: typeof orgId,
-      //   length: orgId?.length || 0,
-      //   isUUID: orgId ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgId) : false
-      // });
-      return orgId;
-    }
-    return null;
-  };
+export const useWorkspace = (): WorkspaceContextType => {
+  const context = useContext(WorkspaceContext);
+  if (!context) {
+    throw new Error('useWorkspace must be used within a WorkspaceProvider');
+  }
+  return context;
+};
 
-  const createWorkspace = async (workspaceData: WorkspaceData) => {
-    const ORGANIZATION_ID = getOrganizationId();
-    
-    const finalWorkspaceData = {
-      ...workspaceData,
-      slug: workspaceData.name.toLowerCase().replace(/\s+/g, '-'),
-      organizationId: ORGANIZATION_ID,
-    };
-    
-    // console.log('Final Workspace Data:', finalWorkspaceData);
+// For backward compatibility
+export const useWorkspaceContext = useWorkspace;
+
+interface WorkspaceProviderProps {
+  children: React.ReactNode;
+}
+
+export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
+  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({
+    workspaces: [],
+    currentWorkspace: null,
+    workspaceMembers: [],
+    workspaceStats: null,
+    isLoading: false,
+    error: null
+  });
+
+  // Cache for workspaces by organization
+  const [workspaceCache, setWorkspaceCache] = useState<{ [key: string]: { data: Workspace[]; timestamp: number } }>({});
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Helper to handle API operations with error handling
+  const handleApiOperation = useCallback(async function<T>(
+    operation: () => Promise<T>,
+    loadingState: boolean = true
+  ): Promise<T> {
     try {
-      const response = await authFetch(`${BASE_URL}/workspaces`, {
-        method: 'POST',
-        body: JSON.stringify(finalWorkspaceData),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create workspace');
+      if (loadingState) {
+        setWorkspaceState(prev => ({ ...prev, isLoading: true, error: null }));
       }
       
-      const data = await response.json();
-      // console.log('Workspace created successfully:', data);
-      return data;
+      const result = await operation();
+      
+      if (loadingState) {
+        setWorkspaceState(prev => ({ ...prev, isLoading: false }));
+      }
+      
+      return result;
     } catch (error) {
-      console.error('Create workspace error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      setWorkspaceState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        error: errorMessage 
+      }));
       throw error;
     }
-  };
+  }, []);
 
-  const getWorkspaces = async () => {
-    // Check cache
-    const currentTime = Date.now();
-    if (isCacheValid && workspacesCache.length > 0 && (currentTime - cacheTimestamp) < CACHE_DURATION) {
-      return workspacesCache;
+  const getCurrentOrganizationId = useCallback((): string | null => {
+    return workspaceApi.getCurrentOrganization();
+  }, []);
+
+  // Cache management for workspaces by organization
+  const getCachedWorkspaces = useCallback((organizationId: string): Workspace[] | null => {
+    const cached = workspaceCache[organizationId];
+    if (!cached) return null;
+    
+    const now = Date.now();
+    if (now - cached.timestamp > CACHE_DURATION) {
+      // Cache expired
+      setWorkspaceCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[organizationId];
+        return newCache;
+      });
+      return null;
     }
     
-    try {
-      const response = await authFetch(`${BASE_URL}/workspaces`, {
-        method: 'GET',
-      });
-      // console.log('Fetching workspaces');
-      if (!response.ok) {
-        throw new Error('Failed to get workspaces');
+    return cached.data;
+  }, [workspaceCache, CACHE_DURATION]);
+
+  const setCachedWorkspaces = useCallback((organizationId: string, data: Workspace[]) => {
+    setWorkspaceCache(prev => ({
+      ...prev,
+      [organizationId]: {
+        data,
+        timestamp: Date.now()
       }
+    }));
+  }, []);
+
+  // Memoized context value
+  const contextValue = useMemo(() => ({
+    ...workspaceState,
+
+    // Workspace methods with state management
+    createWorkspace: async (workspaceData: WorkspaceData): Promise<Workspace> => {
+      const organizationId = getCurrentOrganizationId();
+      if (!organizationId) {
+        throw new Error('No organization selected. Please select an organization first.');
+      }
+
+      const createData: CreateWorkspaceData = {
+        ...workspaceData,
+        organizationId
+      };
+
+      const result = await handleApiOperation(() => workspaceApi.createWorkspace(createData));
       
-      const data = await response.json();
+      // Add new workspace to state and clear cache
+      setWorkspaceState(prev => ({ 
+        ...prev, 
+        workspaces: [...prev.workspaces, result] 
+      }));
+      
+      // Clear cache for the organization
+      setWorkspaceCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[organizationId];
+        return newCache;
+      });
+      
+      return result;
+    },
+
+    getWorkspaces: async (): Promise<Workspace[]> => {
+      const result = await handleApiOperation(() => workspaceApi.getWorkspaces());
+      
+      setWorkspaceState(prev => ({ 
+        ...prev, 
+        workspaces: result 
+      }));
+      
+      return result;
+    },
+
+    getWorkspacesByOrganization: async (organizationId?: string): Promise<Workspace[]> => {
+      const orgId = organizationId || getCurrentOrganizationId();
+      if (!orgId) {
+        throw new Error('No organization selected. Please select an organization first.');
+      }
+
+      // Check cache first
+      const cachedData = getCachedWorkspaces(orgId);
+      if (cachedData) {
+        console.log('Using cached workspaces for organization:', orgId);
+        setWorkspaceState(prev => ({ 
+          ...prev, 
+          workspaces: cachedData 
+        }));
+        return cachedData;
+      }
+
+      const result = await handleApiOperation(() => workspaceApi.getWorkspacesByOrganization(orgId));
+      
+      setWorkspaceState(prev => ({ 
+        ...prev, 
+        workspaces: result 
+      }));
+      
       // Update cache
-      setWorkspacesCache(data);
-      setCacheTimestamp(Date.now());
-      setIsCacheValid(true);
+      setCachedWorkspaces(orgId, result);
       
-      // console.log('Workspaces fetched successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('Get workspaces error:', error);
-      throw error;
-    }
-  };
+      return result;
+    },
 
-  // Add cache for organization workspaces
-  const [orgWorkspacesCache, setOrgWorkspacesCache] = useState<{[key: string]: any}>({});
-  const [orgCacheTimestamp, setOrgCacheTimestamp] = useState<{[key: string]: number}>({});
-  const ORG_CACHE_DURATION = 30000; // 30 seconds
-
-  const getWorkspacesByOrganization = async (organizationId?: string) => {
-    const ORGANIZATION_ID = organizationId || getOrganizationId();
-    const cacheKey = `${ORGANIZATION_ID}`;
-    
-    // Validate organizationId format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (ORGANIZATION_ID && !uuidRegex.test(ORGANIZATION_ID)) {
-      console.error('❌ Invalid organizationId format:', ORGANIZATION_ID);
-      console.error('Expected UUID format like: 12345678-1234-1234-1234-123456789012');
-      throw new Error(`Invalid organizationId format: ${ORGANIZATION_ID}. Expected UUID format.`);
-    }
-    
-    if (!ORGANIZATION_ID) {
-      console.error('❌ No organizationId found in localStorage');
-      throw new Error('No organization selected. Please select an organization first.');
-    }
-    
-    // Check cache first
-    const currentTime = Date.now();
-    const cachedData = orgWorkspacesCache[cacheKey];
-    const cacheTime = orgCacheTimestamp[cacheKey];
-    
-    if (cachedData && cacheTime && (currentTime - cacheTime) < ORG_CACHE_DURATION) {
-
-      return cachedData;
-    }
-    
-
-    
-    // Debug: Check what tokens are available
-    const taskosourToken = typeof window !== 'undefined' ? document.cookie.split('; ').find(row => row.startsWith('taskosourtoken='))?.split('=')[1] : null;
-    const localToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
-    
-    try {
-      const response = await authFetch(`${BASE_URL}/workspaces?organizationId=${ORGANIZATION_ID}`, {
-        method: 'GET',
-      });
+    getWorkspaceById: async (workspaceId: string): Promise<Workspace> => {
+      const result = await handleApiOperation(() => workspaceApi.getWorkspaceById(workspaceId), false);
       
-
+      // Update current workspace if it's the same ID
+      setWorkspaceState(prev => ({
+        ...prev,
+        currentWorkspace: prev.currentWorkspace?.id === workspaceId ? result : prev.currentWorkspace
+      }));
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Response error details:', errorText);
-        throw new Error('Failed to get workspaces by organization');
+      return result;
+    },
+
+    getWorkspaceBySlug: async (slug: string, organizationId?: string): Promise<Workspace> => {
+      const orgId = organizationId || getCurrentOrganizationId();
+      if (!orgId) {
+        throw new Error('No organization selected. Please select an organization first.');
+      }
+
+      const result = await handleApiOperation(() => workspaceApi.getWorkspaceBySlug(slug, orgId), false);
+      return result;
+    },
+
+    updateWorkspace: async (workspaceId: string, workspaceData: Partial<WorkspaceData>): Promise<Workspace> => {
+      const result = await handleApiOperation(() => workspaceApi.updateWorkspace(workspaceId, workspaceData), false);
+      
+      // Update workspace in state
+      setWorkspaceState(prev => ({
+        ...prev,
+        workspaces: prev.workspaces.map(workspace => 
+          workspace.id === workspaceId ? { ...workspace, ...result } : workspace
+        ),
+        currentWorkspace: prev.currentWorkspace?.id === workspaceId 
+          ? { ...prev.currentWorkspace, ...result }
+          : prev.currentWorkspace
+      }));
+      
+      // Clear cache since workspace was updated
+      const orgId = getCurrentOrganizationId();
+      if (orgId) {
+        setWorkspaceCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[orgId];
+          return newCache;
+        });
       }
       
-      const data = await response.json();
-      
-      // Update cache
-      setOrgWorkspacesCache(prev => ({ ...prev, [cacheKey]: data }));
-      setOrgCacheTimestamp(prev => ({ ...prev, [cacheKey]: currentTime }));
-      
+      return result;
+    },
 
-      return data;
-    } catch (error) {
-      console.error('Get workspaces by organization error:', error);
-      throw error;
-    }
-  };
-
-  const getWorkspaceById = async (workspaceId: string) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspaces/${workspaceId}`, {
-        method: 'GET',
-      });
+    deleteWorkspace: async (workspaceId: string): Promise<{ success: boolean; message: string }> => {
+      const result = await handleApiOperation(() => workspaceApi.deleteWorkspace(workspaceId), false);
       
-      if (!response.ok) {
-        throw new Error('Failed to get workspace by ID');
+      // Remove workspace from state
+      setWorkspaceState(prev => ({
+        ...prev,
+        workspaces: prev.workspaces.filter(workspace => workspace.id !== workspaceId),
+        currentWorkspace: prev.currentWorkspace?.id === workspaceId ? null : prev.currentWorkspace
+      }));
+      
+      // Clear cache since workspace was deleted
+      const orgId = getCurrentOrganizationId();
+      if (orgId) {
+        setWorkspaceCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[orgId];
+          return newCache;
+        });
       }
       
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Get workspace by ID error:', error);
-      throw error;
-    }
-  };
+      return result;
+    },
 
-  const getWorkspaceBySlug = async (slug: string, organizationId?: string) => {
-    const ORGANIZATION_ID = organizationId || getOrganizationId();
-    try {
-      const response = await authFetch(`${BASE_URL}/workspaces/organization/${ORGANIZATION_ID}/slug/${slug}`, {
-        method: 'GET',
-      });
+    // Workspace member methods
+    getWorkspaceMembers: async (workspaceId: string): Promise<WorkspaceMember[]> => {
+      const result = await handleApiOperation(() => workspaceApi.getWorkspaceMembers(workspaceId), false);
       
-      if (!response.ok) {
-        throw new Error('Failed to get workspace by slug');
+      setWorkspaceState(prev => ({ 
+        ...prev, 
+        workspaceMembers: result 
+      }));
+      
+      return result;
+    },
+
+    addMemberToWorkspace: async (memberData: AddMemberToWorkspaceData): Promise<WorkspaceMember> => {
+      const result = await handleApiOperation(() => workspaceApi.addMemberToWorkspace(memberData), false);
+      
+      // Add new member to state if it's for the current workspace's members
+      if (workspaceState.workspaceMembers.length > 0 && 
+          workspaceState.workspaceMembers.some(m => m.workspaceId === memberData.workspaceId)) {
+        setWorkspaceState(prev => ({
+          ...prev,
+          workspaceMembers: [...prev.workspaceMembers, result]
+        }));
       }
       
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Get workspace by slug error:', error);
-      throw error;
-    }
-  };
+      return result;
+    },
 
-  const updateWorkspace = async (workspaceId: string, workspaceData: WorkspaceData) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspaces/${workspaceId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(workspaceData),
-      });
+    inviteMemberToWorkspace: (inviteData: InviteMemberToWorkspaceData): Promise<any> => 
+      handleApiOperation(() => workspaceApi.inviteMemberToWorkspace(inviteData), false),
+
+    updateMemberRole: async (memberId: string, updateData: UpdateMemberRoleData, requestUserId: string): Promise<WorkspaceMember> => {
+      const result = await handleApiOperation(() => workspaceApi.updateMemberRole(memberId, updateData, requestUserId), false);
       
-      if (!response.ok) {
-        throw new Error('Failed to update workspace');
+      // Update member in state
+      setWorkspaceState(prev => ({
+        ...prev,
+        workspaceMembers: prev.workspaceMembers.map(member => 
+          member.id === memberId ? { ...member, ...result } : member
+        )
+      }));
+      
+      return result;
+    },
+
+    removeMemberFromWorkspace: async (memberId: string, requestUserId: string): Promise<{ success: boolean; message: string }> => {
+      const result = await handleApiOperation(() => workspaceApi.removeMemberFromWorkspace(memberId, requestUserId), false);
+      
+      // Remove member from state
+      setWorkspaceState(prev => ({
+        ...prev,
+        workspaceMembers: prev.workspaceMembers.filter(member => member.id !== memberId)
+      }));
+      
+      return result;
+    },
+
+    // Stats and utility methods
+    getWorkspaceStats: async (workspaceId: string): Promise<WorkspaceStats> => {
+      const result = await handleApiOperation(() => workspaceApi.getWorkspaceStats(workspaceId), false);
+      
+      setWorkspaceState(prev => ({ 
+        ...prev, 
+        workspaceStats: result 
+      }));
+      
+      return result;
+    },
+
+    // State management methods
+    setCurrentWorkspace: (workspace: Workspace | null): void => {
+      setWorkspaceState(prev => ({ ...prev, currentWorkspace: workspace }));
+    },
+
+    refreshWorkspaces: async (organizationId?: string): Promise<void> => {
+      if (organizationId) {
+        // Clear cache first
+        setWorkspaceCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[organizationId];
+          return newCache;
+        });
+        await contextValue.getWorkspacesByOrganization(organizationId);
+      } else {
+        await contextValue.getWorkspaces();
       }
-      
-      const data = await response.json();
-      // console.log('Workspace updated successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('Update workspace error:', error);
-      throw error;
-    }
-  };
+    },
 
-  const deleteWorkspace = async (workspaceId: string) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspaces/${workspaceId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete workspace');
-      }
-      
-      // console.log('Workspace deleted successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('Delete workspace error:', error);
-      throw error;
-    }
-  };
+    refreshWorkspaceMembers: async (workspaceId: string): Promise<void> => {
+      await contextValue.getWorkspaceMembers(workspaceId);
+    },
 
-  // Workspace member APIs - No caching for real-time data
-  const getWorkspaceMembers = async (workspaceId: string): Promise<WorkspaceMember[]> => {
-    try {
-      // console.log('🔍 getWorkspaceMembers called for:', { workspaceId, timestamp: new Date().toISOString() });
-      
-      const response = await authFetch(`${BASE_URL}/workspace-members?workspaceId=${workspaceId}`, {
-        method: 'GET',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get workspace members');
-      }
-      
-      const data = await response.json();
-      
-      // console.log('✅ Workspace members fetched successfully:', { workspaceId, count: data?.length || 0 });
-      return data || [];
-    } catch (error) {
-      console.error('Get workspace members error:', error);
-      throw error;
-    }
-  };
+    clearError: (): void => {
+      setWorkspaceState(prev => ({ ...prev, error: null }));
+    },
 
-  const addMemberToWorkspace = async (memberData: AddMemberToWorkspaceData): Promise<WorkspaceMember> => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspace-members`, {
-        method: 'POST',
-        body: JSON.stringify(memberData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to add member to workspace');
-      }
-      
-      const data = await response.json();
-      
-      // console.log('Member added to workspace successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('Add member to workspace error:', error);
-      throw error;
-    }
-  };
+    // Helper methods
+    isUserWorkspaceMember: (workspaceId: string, userId: string): boolean => {
+      return workspaceState.workspaceMembers.some(member => 
+        member.workspaceId === workspaceId && member.userId === userId
+      );
+    },
 
-  const inviteMemberToWorkspace = async (inviteData: InviteMemberToWorkspaceData) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspace-members/invite`, {
-        method: 'POST',
-        body: JSON.stringify(inviteData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to invite member to workspace');
-      }
-      
-      const data = await response.json();
-      
-      // console.log('Member invited to workspace successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('Invite member to workspace error:', error);
-      throw error;
-    }
-  };
+    getUserWorkspaceRole: (workspaceId: string, userId: string): WorkspaceRole | null => {
+      const member = workspaceState.workspaceMembers.find(member => 
+        member.workspaceId === workspaceId && member.userId === userId
+      );
+      return member?.role || null;
+    },
 
-  const updateMemberRole = async (memberId: string, updateData: UpdateMemberRoleData, requestUserId: string): Promise<WorkspaceMember> => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspace-members/${memberId}?requestUserId=${requestUserId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updateData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update member role');
-      }
-      
-      const data = await response.json();
-      
-      // console.log('Member role updated successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('Update member role error:', error);
-      throw error;
-    }
-  };
+    getCurrentOrganizationId
 
-  const removeMemberFromWorkspace = async (memberId: string, requestUserId: string): Promise<{ success: boolean }> => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspace-members/${memberId}?requestUserId=${requestUserId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to remove member from workspace');
-      }
-      
-      // console.log('Member removed from workspace successfully');
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Remove member from workspace error:', error);
-      throw error;
-    }
-  };
-
-  const getWorkspaceStats = async (workspaceId: string): Promise<WorkspaceStats> => {
-    try {
-      const response = await authFetch(`${BASE_URL}/workspace-members/workspace/${workspaceId}/stats`, {
-        method: 'GET',
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to get workspace stats');
-      }
-      
-      const data = await response.json();
-      // console.log('Workspace stats fetched successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('Get workspace stats error:', error);
-      throw error;
-    }
-  };
-
-  const value: WorkspaceContextType = {
-    createWorkspace,
-    getWorkspaces,
-    getWorkspacesByOrganization,
-    getWorkspaceById,
-    getWorkspaceBySlug,
-    updateWorkspace,
-    deleteWorkspace,
-    getWorkspaceMembers,
-    addMemberToWorkspace,
-    inviteMemberToWorkspace,
-    updateMemberRole,
-    removeMemberFromWorkspace,
-    getWorkspaceStats,
-  };
+  }), [workspaceState, handleApiOperation, getCurrentOrganizationId, getCachedWorkspaces, setCachedWorkspaces]);
 
   return (
-    <WorkspaceContext.Provider value={value}>
+    <WorkspaceContext.Provider value={contextValue}>
       {children}
     </WorkspaceContext.Provider>
   );

@@ -149,32 +149,31 @@ export default function Sidebar() {
   }, [currentWorkspaceSlug, currentProjectSlug, globalNavItems, workspaceNavItems]);
 
   const getSidebarColor = () => {
-    return "bg-stone-50 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800";
+    return "bg-[var(--sidebar)]";
   };
   
   const renderSkeleton = () => (
     <div className="hidden md:flex h-screen">
-      <div className="w-12 bg-stone-900 dark:bg-stone-950 h-screen flex-col pt-3 items-center overflow-y-auto border-r border-stone-800 fixed left-0 top-0 z-40 hidden md:flex">
-        <div className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-stone-400">
+      <div className="w-12 bg-[var(--sidebar)] h-screen flex-col pt-3 items-center overflow-y-auto border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40 hidden md:flex">
+        <div className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--muted-foreground)]">
           <HiMenu size={16} />
         </div>
         <div className="flex-grow flex flex-col items-center gap-4"></div>
       </div>
-      
       <div className="w-full md:ml-12">
-        <div className="w-full md:w-64 bg-stone-50 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 h-screen flex flex-col p-4 overflow-y-auto">
+        <div className="w-full md:w-64 bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] h-screen flex flex-col p-4 overflow-y-auto">
           <div className="flex flex-col h-full">
-            <div className="h-12 mb-6 pb-4 border-b border-stone-200 dark:border-stone-800 flex items-center">
-              <div className="w-8 h-8 rounded-lg bg-stone-300 dark:bg-stone-700 animate-pulse"></div>
-              <div className="ml-3 h-4 w-32 bg-stone-300 dark:bg-stone-700 rounded animate-pulse"></div>
+            <div className="h-12 mb-6 pb-4 border-b border-[var(--sidebar-border)] flex items-center">
+              <div className="w-8 h-8 rounded-lg bg-[var(--sidebar-accent)] animate-pulse"></div>
+              <div className="ml-3 h-4 w-32 bg-[var(--sidebar-accent)] rounded animate-pulse"></div>
             </div>
             <div className="flex-grow">
               <ul className="space-y-1 mb-6">
                 {[...Array(5)].map((_, i) => (
                   <li key={i}>
                     <div className="flex items-center gap-3 px-3 py-2 rounded-lg">
-                      <div className="w-4 h-4 rounded bg-stone-300 dark:bg-stone-700 animate-pulse"></div>
-                      <div className="h-3 w-16 bg-stone-300 dark:bg-stone-700 rounded animate-pulse"></div>
+                      <div className="w-4 h-4 rounded bg-[var(--sidebar-accent)] animate-pulse"></div>
+                      <div className="h-3 w-16 bg-[var(--sidebar-accent)] rounded animate-pulse"></div>
                     </div>
                   </li>
                 ))}
@@ -188,36 +187,32 @@ export default function Sidebar() {
   
   const renderFullSidebar = () => (
     <div className={`w-full transition-colors ${getSidebarColor()} h-screen flex flex-col p-4 overflow-y-auto`}>
-      <div className="h-12 mb-6 pb-4 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between relative">
+      <div className="h-12 mb-6 pb-4 border-b border-[var(--sidebar-border)] flex items-center justify-between relative">
         {!currentWorkspaceSlug && (
           <div className="flex items-center">
-            <div className="flex-shrink-0 w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center text-white">
+            <div className="flex-shrink-0 w-8 h-8 bg-[var(--sidebar-primary)] rounded-lg flex items-center justify-center text-[var(--sidebar-primary-foreground)]">
               <HiHome size={16} />
             </div>
-            <span className="ml-3 text-sm font-medium text-stone-700 dark:text-stone-300 truncate">Dashboard</span>
+            <span className="ml-3 text-sm font-medium text-[var(--sidebar-foreground)] truncate">Dashboard</span>
           </div>
         )}
-        
         {currentWorkspaceSlug && (
           <div className="flex items-center overflow-hidden">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center text-white text-xs font-medium">
-                {currentWorkspaceSlug.charAt(0).toUpperCase()}
-              </div>
-              <span className="ml-3 text-sm font-medium text-stone-700 dark:text-stone-300 flex items-center truncate">
-                <span className="truncate">{currentWorkspaceSlug}</span>
-                {currentProjectSlug && (
-                  <>
-                    <span className="mx-1 text-stone-400">/</span>
-                    <span className="truncate">{currentProjectSlug}</span>
-                  </>
-                )}
-              </span>
+            <div className="flex-shrink-0 w-8 h-8 bg-[var(--sidebar-primary)] rounded-lg flex items-center justify-center text-[var(--sidebar-primary-foreground)] text-xs font-medium">
+              {currentWorkspaceSlug.charAt(0).toUpperCase()}
             </div>
+            <span className="ml-3 text-sm font-medium text-[var(--sidebar-foreground)] flex items-center truncate">
+              <span className="truncate">{currentWorkspaceSlug}</span>
+              {currentProjectSlug && (
+                <span>
+                  <span className="mx-1 text-[var(--muted-foreground)]">/</span>
+                  <span className="truncate">{currentProjectSlug}</span>
+                </span>
+              )}
+            </span>
           </div>
         )}
       </div>
-      
       <nav className="flex-grow">
         <ul className="space-y-1 mb-6">
           {navigationItems.map((item) => (
@@ -226,8 +221,8 @@ export default function Sidebar() {
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                   pathname === item.href
-                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200'
-                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
+                    ? 'bg-[var(--sidebar-accent)] text-[var(--sidebar-accent-foreground)]'
+                    : 'text-[var(--sidebar-foreground)] hover:text-[var(--sidebar-primary)] hover:bg-[var(--sidebar-accent)]'
                 }`}
               >
                 {item.icon}
@@ -243,8 +238,8 @@ export default function Sidebar() {
   const renderMiniSidebar = () => {
     if (!isMounted) {
       return (
-        <div className="w-12 bg-stone-900 dark:bg-stone-950 h-screen flex-col py-3 items-center overflow-y-auto border-r border-stone-800 fixed left-0 top-0 z-40 hidden md:flex">
-          <div className="mb-6 w-8 h-8 flex items-center justify-center rounded-lg text-stone-400">
+        <div className="w-12 bg-[var(--sidebar)] h-screen flex-col py-3 items-center overflow-y-auto border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40 hidden md:flex">
+          <div className="mb-6 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--muted-foreground)]">
             <HiMenu size={16} />
           </div>
           <div className="flex-grow flex flex-col items-center gap-4"></div>
@@ -253,10 +248,10 @@ export default function Sidebar() {
     }
     
     return (
-      <div className="w-12 bg-stone-900 dark:bg-stone-950 h-screen flex-col pt-3 items-center overflow-y-auto border-r border-stone-800 fixed left-0 top-0 z-40 hidden md:flex">
+      <div className="w-12 bg-[var(--sidebar)] h-screen flex-col pt-3 items-center overflow-y-auto border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40 hidden md:flex">
         <button 
           onClick={() => toggleSidebar(true)}
-          className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors"
+          className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--sidebar-foreground)] hover:text-[var(--sidebar-primary)] hover:bg-[var(--sidebar-accent)] transition-colors"
           title="Toggle navigation"
         >
           <HiMenu size={16} />
@@ -269,8 +264,8 @@ export default function Sidebar() {
               href={item.href}
               className={`w-8 h-8 flex items-center justify-center rounded-lg relative group transition-colors ${
                 pathname === item.href 
-                  ? 'bg-amber-600 text-white' 
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                  ? 'bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]' 
+                  : 'text-[var(--sidebar-foreground)] hover:text-[var(--sidebar-primary)] hover:bg-[var(--sidebar-accent)]'
               }`}
               title={item.title || item.name}
             >
@@ -291,8 +286,7 @@ export default function Sidebar() {
       {isSidebarCollapsed && (
         <button 
           onClick={() => toggleSidebar(false)}
-          className="sidebar-toggle-button fixed top-4 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-lg bg-stone-900 text-stone-200 shadow-lg md:hidden"
-          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+          className="fixed top-4 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--background)] text-[var(--foreground)] border border-[var(--border)] shadow-lg md:hidden hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)] transition-colors"
           title="Show navigation"
         >
           <HiMenu size={20} />

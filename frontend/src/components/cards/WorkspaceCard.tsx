@@ -2,7 +2,15 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Card, IconButton } from '@/components/ui';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   HiFolder, 
   HiDotsVertical,
@@ -10,7 +18,7 @@ import {
   HiTrash,
   HiUsers,
   HiCog,
-  HiExternalLink,
+  HiClock,
 } from 'react-icons/hi';
 
 interface Workspace {
@@ -21,7 +29,6 @@ interface Workspace {
   organizationId: string;
   memberCount?: number;
   projectCount?: number;
-  isStarred?: boolean;
   color?: string;
   lastActivity?: string;
 }
@@ -83,134 +90,116 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     );
   }
 
-  // Detailed variant (for workspaces list page)
+  // Detailed variant using shadcn components
   return (
-    <Card className={`relative p-4 group ${className}`}>
-      {/* Menu */}
-      {(onEdit || onDelete || onShowMembers) && (
-        <div className="absolute top-3 right-3 z-20">
-          <div className="relative">
-            <IconButton
-              icon={<HiDotsVertical size={12} />}
-              size="xs"
-              onClick={() => setShowMenu(!showMenu)}
-            />
-
-            {showMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowMenu(false)}
-                />
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700 py-1 z-20 shadow-lg">
-                  {onEdit && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onEdit(workspace);
-                        setShowMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
-                    >
-                      <HiPencil size={12} />
-                      Edit Workspace
-                    </button>
-                  )}
-                  {onShowMembers && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onShowMembers(workspace);
-                        setShowMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
-                    >
-                      <HiUsers size={12} />
-                      Manage Members
-                    </button>
-                  )}
-                  <Link
-                    href={`/${workspace.slug}/settings`}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
+    <Card className={`relative group border-[var(--border)] bg-[var(--card)] hover:shadow-lg transition-all duration-200 hover:scale-105 ${className}`}>
+      <CardContent className="p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <Link href={`/${workspace.slug}`} className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/25 flex-shrink-0">
+              {workspace.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-[var(--foreground)] truncate group-hover:text-[var(--primary)] transition-colors">
+                {workspace.name}
+              </h3>
+              <p className="text-sm text-[var(--muted-foreground)] truncate">
+                /{workspace.slug}
+              </p>
+            </div>
+          </Link>
+          
+          {/* Actions Menu */}
+          {(onEdit || onDelete || onShowMembers) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-8 h-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <HiDotsVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onEdit && (
+                  <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowMenu(false);
+                      onEdit(workspace);
                     }}
                   >
-                    <HiCog size={12} />
+                    <HiPencil className="w-4 h-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {onShowMembers && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShowMembers(workspace);
+                    }}
+                  >
+                    <HiUsers className="w-4 h-4 mr-2" />
+                    Members
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link
+                    href={`/${workspace.slug}/settings`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <HiCog className="w-4 h-4 mr-2" />
                     Settings
                   </Link>
-                  {onDelete && (
-                    <button
+                </DropdownMenuItem>
+                {onDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
                       onClick={(e) => {
-                        e.preventDefault();
                         e.stopPropagation();
                         onDelete(workspace.id);
-                        setShowMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="text-destructive focus:text-destructive"
                     >
-                      <HiTrash size={12} />
+                      <HiTrash className="w-4 h-4 mr-2" />
                       Delete
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Card Content */}
-      <Link href={`/${workspace.slug}`} className="block">
-        {/* Workspace Icon */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
-            {workspace.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
-              {workspace.name}
-            </h3>
-            <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
-              /{workspace.slug}
-            </p>
-          </div>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Description */}
         {workspace.description && (
-          <p className="text-xs text-stone-600 dark:text-stone-400 mb-3 line-clamp-2">
+          <p className="text-sm text-[var(--muted-foreground)] mb-3 line-clamp-2">
             {workspace.description}
           </p>
         )}
 
         {/* Stats */}
-        <div className="flex items-center gap-4 text-xs text-stone-500 dark:text-stone-400 mb-3">
+        <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
           <div className="flex items-center gap-1">
-            <HiUsers size={12} />
-            <span>{workspace.memberCount || 0} members</span>
+            <HiUsers className="w-3 h-3" />
+            <span className="font-medium">{workspace.memberCount || 0}</span>
           </div>
           <div className="flex items-center gap-1">
-            <HiFolder size={12} />
-            <span>{workspace.projectCount || 0} projects</span>
+            <HiFolder className="w-3 h-3" />
+            <span className="font-medium">{workspace.projectCount || 0}</span>  
           </div>
+          {workspace.lastActivity && (
+            <div className="flex items-center gap-1">
+              <HiClock className="w-3 h-3" />
+              <span className="font-medium">{workspace.lastActivity}</span>
+            </div>
+          )}
         </div>
-
-        {/* Last Activity */}
-        {workspace.lastActivity && (
-          <p className="text-xs text-stone-500 dark:text-stone-400">
-            Last activity: {workspace.lastActivity}
-          </p>
-        )}
-
-        {/* External Link Icon */}
-        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          <HiExternalLink size={12} />
-        </div>
-      </Link>
+      </CardContent>
     </Card>
   );
 };

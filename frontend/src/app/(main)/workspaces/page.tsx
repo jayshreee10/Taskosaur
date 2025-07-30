@@ -1,17 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import MembersManager from "@/components/shared/MembersManager";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  Button,
-  IconButton,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   EmptyState,
   WorkspaceCardSkeleton,
   WorkspaceCard,
-  Modal,
 } from "@/components/ui";
 import {
   HiPlus,
@@ -20,8 +26,8 @@ import {
   HiExclamation,
   HiRefresh,
   HiSearch,
+  HiX,
 } from "react-icons/hi";
-import "@/styles/workspace.css";
 
 interface Workspace {
   id: string;
@@ -31,7 +37,6 @@ interface Workspace {
   organizationId: string;
   memberCount?: number;
   projectCount?: number;
-  isStarred?: boolean;
   color?: string;
   lastActivity?: string;
 }
@@ -43,7 +48,6 @@ interface Organization {
   description?: string;
 }
 
-// Error State Component
 const ErrorState = ({
   error,
   onRetry,
@@ -52,13 +56,13 @@ const ErrorState = ({
   onRetry: () => void;
 }) => (
   <div className="text-center py-16">
-    <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center mx-auto mb-6 text-red-500">
+    <div className="w-16 h-16 bg-[var(--destructive)]/10 rounded-lg flex items-center justify-center mx-auto mb-6 text-[var(--destructive)]">
       <HiExclamation size={24} />
     </div>
-    <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-2">
+    <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
       Something went wrong
     </h3>
-    <p className="text-sm text-stone-600 dark:text-stone-400 mb-6 max-w-md mx-auto">
+    <p className="text-sm text-[var(--muted-foreground)] mb-6 max-w-md mx-auto">
       {error}
     </p>
     <Button variant="secondary" onClick={onRetry}>
@@ -74,21 +78,22 @@ export default function WorkspacesPage() {
   const [filteredWorkspaces, setFilteredWorkspaces] = useState<Workspace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrganization, setSelectedOrganization] =
-    useState<Organization | null>(null);
+  const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [mounted, setMounted] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
 
+  // Use refs to prevent infinite loops
+  const currentOrgRef = useRef<string | null>(null);
+  const contextFunctionsRef = useRef({ getWorkspacesByOrganization });
+
+  // Update context functions ref when they change
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    contextFunctionsRef.current = { getWorkspacesByOrganization };
+  }, [getWorkspacesByOrganization]);
 
   useEffect(() => {
-    if (!mounted) return;
-
     const getOrganizationId = () => {
       try {
         const orgId = localStorage.getItem("currentOrganizationId");
@@ -115,113 +120,55 @@ export default function WorkspacesPage() {
           });
         }
       } catch (error) {
-        console.error("Error getting organization from localStorage:", error);
+        setError("Error accessing organization data");
       }
     };
 
     getOrganizationId();
 
     const handleStorageChange = (e: StorageEvent) => {
-      if (
-        e.key === "currentOrganizationId" ||
-        e.key === "currentOrganization"
-      ) {
+      if (e.key === "currentOrganizationId" || e.key === "currentOrganization") {
         getOrganizationId();
       }
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, [mounted]);
-
-  // NEW: Add event listener for organization changes
-  useEffect(() => {
-    if (!mounted) return;
-
     const handleOrganizationChange = () => {
-      // Re-fetch organization data when organization changes
-      const getOrganizationId = () => {
-        try {
-          const orgId = localStorage.getItem("currentOrganizationId");
-          const currentOrg = localStorage.getItem("currentOrganization");
-
-          setOrganizationId(orgId);
-
-          if (currentOrg) {
-            try {
-              const parsedOrg = JSON.parse(currentOrg);
-              setSelectedOrganization(parsedOrg);
-            } catch {
-              if (orgId) {
-                setSelectedOrganization({
-                  id: orgId,
-                  name: "Selected Organization",
-                });
-              }
-            }
-          } else if (orgId) {
-            setSelectedOrganization({
-              id: orgId,
-              name: "Selected Organization",
-            });
-          }
-        } catch (error) {
-          console.error("Error getting organization from localStorage:", error);
-        }
-      };
-
       getOrganizationId();
     };
 
+    window.addEventListener("storage", handleStorageChange);
     window.addEventListener("organizationChanged", handleOrganizationChange);
 
     return () => {
-      window.removeEventListener(
-        "organizationChanged",
-        handleOrganizationChange
-      );
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("organizationChanged", handleOrganizationChange);
     };
-  }, [mounted]);
+  }, []);
+
+  const loadWorkspaces = useCallback(async (orgId: string) => {
+    if (currentOrgRef.current === orgId) return; // Prevent duplicate calls
+    
+    currentOrgRef.current = orgId;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const workspacesData = await contextFunctionsRef.current.getWorkspacesByOrganization(orgId);
+      
+      setWorkspaces(workspacesData || []);
+      setFilteredWorkspaces(workspacesData || []);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to load workspaces");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!mounted || !selectedOrganization) return;
-
-    const loadWorkspaces = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const workspacesData = await getWorkspacesByOrganization(
-          selectedOrganization.id
-        );
-
-        const enhancedWorkspaces = workspacesData.map((workspace: any) => ({
-          ...workspace,
-          organizationId: selectedOrganization.id, // Ensure organizationId is included
-          memberCount: Math.floor(Math.random() * 20) + 1,
-          projectCount: Math.floor(Math.random() * 10) + 1,
-          isStarred: Math.random() > 0.7,
-          lastActivity: `${Math.floor(Math.random() * 30) + 1} days ago`,
-        }));
-
-        setWorkspaces(enhancedWorkspaces);
-        setFilteredWorkspaces(enhancedWorkspaces);
-      } catch (error) {
-        console.error("Error loading workspaces:", error);
-        setError(
-          error instanceof Error ? error.message : "Failed to load workspaces"
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadWorkspaces();
-  }, [selectedOrganization, getWorkspacesByOrganization, mounted]);
-
-  useEffect(() => {
-    setSearchQuery("");
-  }, [selectedOrganization?.id]);
+    if (!selectedOrganization?.id) return;
+    loadWorkspaces(selectedOrganization.id);
+  }, [selectedOrganization?.id, loadWorkspaces]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -230,9 +177,7 @@ export default function WorkspacesPage() {
       const filtered = workspaces.filter(
         (workspace) =>
           workspace.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          workspace.description
-            ?.toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
+          workspace.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           workspace.slug.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredWorkspaces(filtered);
@@ -240,11 +185,11 @@ export default function WorkspacesPage() {
   }, [searchQuery, workspaces]);
 
   const handleEdit = (workspace: Workspace) => {
-
+    // Edit functionality
   };
 
   const handleDelete = (id: string) => {
-
+    // Delete functionality
   };
 
   const handleShowMembers = (workspace: Workspace) => {
@@ -256,32 +201,14 @@ export default function WorkspacesPage() {
     window.location.reload();
   };
 
-  if (!mounted) {
-    return (
-      <div className="workspaces-container">
-        <div className="workspaces-main">
-          <div className="animate-pulse">
-            <div className="h-6 bg-stone-200 dark:bg-stone-700 rounded w-1/4 mb-3"></div>
-            <div className="h-4 bg-stone-200 dark:bg-stone-700 rounded w-1/2 mb-6"></div>
-            <div className="workspaces-grid">
-              {[...Array(6)].map((_, i) => (
-                <WorkspaceCardSkeleton key={i} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (isLoading) {
     return (
-      <div className="workspaces-container">
-        <div className="workspaces-main">
+      <div className="min-h-screen bg-[var(--background)] p-6">
+        <div className="max-w-7xl mx-auto">
           <div className="animate-pulse">
-            <div className="h-6 bg-stone-200 dark:bg-stone-700 rounded w-1/4 mb-3"></div>
-            <div className="h-4 bg-stone-200 dark:bg-stone-700 rounded w-1/2 mb-6"></div>
-            <div className="workspaces-grid">
+            <div className="h-6 bg-[var(--muted)] rounded w-1/4 mb-3"></div>
+            <div className="h-4 bg-[var(--muted)] rounded w-1/2 mb-6"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {[...Array(6)].map((_, i) => (
                 <WorkspaceCardSkeleton key={i} />
               ))}
@@ -294,7 +221,7 @@ export default function WorkspacesPage() {
 
   if (!selectedOrganization) {
     return (
-      <div className="workspaces-container flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <EmptyState
           icon={<HiFolder size={24} />}
           title="No organization selected"
@@ -306,37 +233,46 @@ export default function WorkspacesPage() {
 
   if (error) {
     return (
-      <div className="workspaces-container flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <ErrorState error={error} onRetry={handleRetry} />
       </div>
     );
   }
 
   return (
-    <div className="workspaces-container">
-      <div className="workspaces-main">
-        {/* Header */}
-        <div className="workspaces-header">
-          {/* Search Bar */}
-          <div className="workspaces-search">
-            <HiSearch size={15} className="workspaces-search-icon" />
-            <input
-              type="text"
-              placeholder="Search workspaces..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="workspaces-search-input"
-            />
+    <div className="min-h-screen bg-[var(--background)]">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">
+              {selectedOrganization.name} Workspaces
+            </h1>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Manage your team workspaces and collaborate on projects
+            </p>
           </div>
-          <Link href="/workspaces/new">
-            <Button variant="primary" className="flex items-center gap-2 text-xs py-2">
-              <HiPlus size={16} />
-              <span>Create Workspace</span>
-            </Button>
-          </Link>
+          
+          <div className="flex items-center gap-4">
+            <div className="relative max-w-xs w-full">
+              <HiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+              <Input
+                type="text"
+                placeholder="Search workspaces..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Link href="/workspaces/new">
+              <Button className="flex items-center gap-2">
+                <HiPlus size={16} />
+                <span>Create Workspace</span>
+              </Button>
+            </Link>
+          </div>
         </div>
 
-        {/* Workspaces Grid */}
         {filteredWorkspaces.length === 0 ? (
           searchQuery ? (
             <EmptyState
@@ -349,50 +285,104 @@ export default function WorkspacesPage() {
               icon={<HiFolder size={24} />}
               title="No workspaces found"
               description={`Create your first workspace in ${selectedOrganization.name} to get started with organizing your projects and collaborating with your team.`}
+              action={
+                <Link href="/workspaces/new">
+                  <Button>
+                    <HiPlus size={16} className="mr-2" />
+                    Create Workspace
+                  </Button>
+                </Link>
+              }
             />
           )
         ) : (
-          <div className="workspaces-grid">
-            {filteredWorkspaces.map((workspace) => (
-              <WorkspaceCard
-                key={workspace.id}
-                workspace={workspace}
-                variant="detailed"
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onShowMembers={handleShowMembers}
-              />
-            ))}
-          </div>
-        )}
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredWorkspaces.map((workspace) => (
+                <Card key={workspace.id} className="group hover:shadow-lg transition-all duration-200 border-[var(--border)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[var(--primary)] flex items-center justify-center text-[var(--primary-foreground)] font-semibold">
+                          {workspace.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <CardTitle className="text-base font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">
+                            <Link href={`/${workspace.slug}`}>
+                              {workspace.name}
+                            </Link>
+                          </CardTitle>
+                          <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                            {workspace.slug}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-[var(--muted-foreground)] mb-4 line-clamp-2">
+                      {workspace.description || "No description provided"}
+                    </p>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
+                        <span className="flex items-center gap-1">
+                          <HiFolder size={12} />
+                          {workspace.projectCount || 0} projects
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <HiUsers size={12} />
+                          {workspace.memberCount || 0} members
+                        </span>
+                      </div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleShowMembers(workspace)}
+                        className="text-xs"
+                      >
+                        <HiUsers size={14} className="mr-1" />
+                        Members
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-        {/* Results Count */}
-        {filteredWorkspaces.length > 0 && (
-          <div className="workspaces-results-count">
-            Showing {filteredWorkspaces.length} of {workspaces.length} workspace
-            {workspaces.length !== 1 ? "s" : ""}
-            {searchQuery && ` matching "${searchQuery}"`}
-          </div>
+            {filteredWorkspaces.length > 0 && (
+              <div className="mt-8 text-center">
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Showing {filteredWorkspaces.length} of {workspaces.length} workspace
+                  {workspaces.length !== 1 ? "s" : ""}
+                  {searchQuery && ` matching "${searchQuery}"`}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Members Management Modal */}
-      <Modal
-        isOpen={showMembersModal && !!selectedWorkspace && !!selectedOrganization}
-        onClose={() => setShowMembersModal(false)}
-        title={`Manage Members - ${selectedWorkspace?.name || ''}`}
-        className="sm:max-w-2xl"
-      >
-        {selectedWorkspace && selectedOrganization && (
-          <MembersManager
-            type="workspace"
-            entityId={selectedWorkspace.id}
-            organizationId={selectedOrganization.id}
-            className="border-none"
-            title={`${selectedWorkspace.name} Members`}
-          />
-        )}
-      </Modal>
+      <Dialog open={showMembersModal} onOpenChange={setShowMembersModal}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Manage Members - {selectedWorkspace?.name || ''}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedWorkspace && selectedOrganization && (
+            <MembersManager
+              type="workspace"
+              entityId={selectedWorkspace.id}
+              organizationId={selectedOrganization.id}
+              className="border-none"
+              title={`${selectedWorkspace.name} Members`}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

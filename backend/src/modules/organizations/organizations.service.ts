@@ -252,4 +252,86 @@ export class OrganizationsService {
       throw error;
     }
   }
+
+  async getOrganizationStats(organizationId: string) {
+  const organization = await this.prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, slug: true },
+  });
+
+  if (!organization) {
+    throw new Error('Organization not found');
+  }
+  const activeProjects = await this.prisma.project.count({
+    where: {
+      workspace: {
+        organizationId,
+      },
+      status: 'ACTIVE',
+    },
+  });
+
+  // Get total workspaces count
+  const totalWorkspaces = await this.prisma.workspace.count({
+    where: { organizationId },
+  });
+  const taskStats = await this.prisma.task.groupBy({
+    by: ['statusId'],
+    where: {
+      project: {
+        workspace: {
+          organizationId,
+        },
+      },
+    },
+    _count: {
+      id: true,
+    },
+  });
+  const statusCategories = await this.prisma.taskStatus.findMany({
+    where: {
+      workflow: {
+        organizationId,
+      },
+    },
+    select: {
+      id: true,
+      category: true,
+    },
+  });
+  const statusCategoryMap = new Map(
+    statusCategories.map(status => [status.id, status.category])
+  );
+
+  // Calculate task counts
+  let totalTasks = 0;
+  let openTasks = 0;
+  let completedTasks = 0;
+
+  taskStats.forEach(stat => {
+    const count = stat._count.id;
+    totalTasks += count;
+
+    const category = statusCategoryMap.get(stat.statusId);
+    if (category === 'DONE') {
+      completedTasks += count;
+    } else {
+      openTasks += count;
+    }
+  });
+
+  return {
+    organizationId: organization.id,
+    organizationName: organization.name,
+    organizationSlug: organization.slug,
+    statistics: {
+      totalTasks,
+      openTasks,
+      completedTasks,
+      activeProjects,
+      totalWorkspaces,
+    },
+  };
+}
+
 }

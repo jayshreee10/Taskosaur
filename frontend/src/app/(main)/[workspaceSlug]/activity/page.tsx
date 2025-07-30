@@ -11,12 +11,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import {
   HiClock,
   HiExclamationTriangle,
@@ -25,6 +26,9 @@ import {
   HiChatBubbleLeft,
   HiClipboardDocumentCheck,
   HiUserPlus,
+  HiFunnel,
+  HiCheckCircle,
+  HiXMark,
 } from 'react-icons/hi2';
 
 interface Activity {
@@ -69,7 +73,7 @@ const UserAvatar = ({
   
   return (
     <Avatar className={sizes[size]}>
-      <AvatarFallback className="bg-primary text-primary-foreground font-medium">
+      <AvatarFallback className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 text-[var(--primary-foreground)] font-bold shadow-lg">
         {getInitials(name)}
       </AvatarFallback>
     </Avatar>
@@ -85,40 +89,40 @@ const ActivityIcon = ({ type }: { type: Activity['type'] }) => {
     general: HiClock
   };
   
-  const variants = {
-    task: "default",
-    comment: "secondary", 
-    status: "outline",
-    assignment: "secondary",
-    general: "outline"
-  } as const;
+  const colors = {
+    task: 'bg-green-500/20 border-green-500/30 text-green-600',
+    comment: 'bg-blue-500/20 border-blue-500/30 text-blue-600',
+    status: 'bg-orange-500/20 border-orange-500/30 text-orange-600',
+    assignment: 'bg-purple-500/20 border-purple-500/30 text-purple-600',
+    general: 'bg-[var(--muted)]/50 border-[var(--border)] text-[var(--muted-foreground)]'
+  };
   
   const Icon = icons[type];
   
   return (
-    <div className="flex items-center justify-center h-6 w-6 rounded-full bg-[var(--background)] border-2 border-border">
-      <Icon size={12} className="text-muted-foreground" />
+    <div className={`flex items-center justify-center h-7 w-7 rounded-full border-2 shadow-sm transition-all duration-200 ${colors[type]}`}>
+      <Icon size={14} className="font-medium" />
     </div>
   );
 };
 
 const LoadingSkeleton = () => (
-  <div className="min-h-screen bg-[var(--background)]">
-    <div className="max-w-7xl mx-auto p-6">
+  <div className="min-h-screen bg-background transition-colors duration-200">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
       <div className="animate-pulse">
-        <div className="flex justify-between items-center mb-6">
-          <div className="h-6 bg-muted rounded w-1/4"></div>
-          <div className="h-10 bg-muted rounded w-32"></div>
+        <div className="flex justify-between items-center mb-6 lg:mb-8">
+          <div className="h-8 bg-[var(--muted)] rounded w-1/3"></div>
+          <div className="h-10 bg-[var(--muted)] rounded w-40"></div>
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-6">
+        <Card className="border-[var(--border)] bg-[var(--card)]">
+          <CardContent className="p-6 lg:p-8">
+            <div className="space-y-8">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex items-start gap-4">
-                  <div className="h-10 w-10 bg-muted rounded-full"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-muted rounded w-3/4"></div>
-                    <div className="h-3 bg-muted rounded w-1/4"></div>
+                  <div className="h-12 w-12 bg-[var(--muted)] rounded-full"></div>
+                  <div className="flex-1 space-y-3">
+                    <div className="h-4 bg-[var(--muted)] rounded w-3/4"></div>
+                    <div className="h-3 bg-[var(--muted)] rounded w-1/3"></div>
                   </div>
                 </div>
               ))}
@@ -141,14 +145,16 @@ const EmptyState = ({
   description: string;
   action?: React.ReactNode;
 }) => (
-  <Card>
-    <CardContent className="p-6 text-center">
-      <div className="py-10">
-        <Icon size={48} className="mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-sm font-medium text-foreground mb-2">
+  <Card className="border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-lg transition-all duration-200">
+    <CardContent className="p-8 lg:p-12 text-center">
+      <div className="py-8">
+        <div className="w-16 h-16 rounded-full bg-[var(--muted)]/30 flex items-center justify-center mx-auto mb-6">
+          <Icon size={32} className="text-[var(--muted-foreground)]" />
+        </div>
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-3">
           {title}
         </h3>
-        <p className="text-xs text-muted-foreground mb-6">
+        <p className="text-sm text-[var(--muted-foreground)] mb-8 leading-relaxed max-w-md mx-auto">
           {description}
         </p>
         {action}
@@ -176,12 +182,14 @@ export default function WorkspaceActivityPage() {
   const currentSlugRef = useRef<string>('');
 
   const filterOptions = [
-    { value: 'all', label: 'All Activity' },
-    { value: 'comment', label: 'Comments' },
-    { value: 'task', label: 'Tasks' },
-    { value: 'status', label: 'Status Changes' },
-    { value: 'assignment', label: 'Assignments' },
+    { value: 'all', label: 'All Activity', icon: HiClock, color: 'bg-gray-500/10 text-gray-700' },
+    { value: 'comment', label: 'Comments', icon: HiChatBubbleLeft, color: 'bg-blue-500/10 text-blue-700' },
+    { value: 'task', label: 'Tasks', icon: HiClipboardDocumentCheck, color: 'bg-green-500/10 text-green-700' },
+    { value: 'status', label: 'Status Changes', icon: HiDocumentText, color: 'bg-orange-500/10 text-orange-700' },
+    { value: 'assignment', label: 'Assignments', icon: HiUserPlus, color: 'bg-purple-500/10 text-purple-700' },
   ];
+  
+  const currentFilter = filterOptions.find(f => f.value === activityFilter) || filterOptions[0];
 
   const fetchData = useCallback(async () => {
     try {
@@ -330,26 +338,23 @@ export default function WorkspaceActivityPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
-          <Alert variant="destructive">
-            <HiExclamationTriangle className="h-4 w-4" />
-            <AlertTitle>Error loading workspace activity</AlertTitle>
-            <AlertDescription>
-              {error}
-              <div className="mt-4">
-                <Button 
-                  onClick={() => retryFetch()}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <HiArrowPath size={16} />
-                  Try again
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
+      <div className="min-h-screen bg-background transition-colors duration-200">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <HiExclamationTriangle className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Something went wrong</h3>
+              <p className="text-[var(--muted-foreground)] mb-6 max-w-md mx-auto leading-relaxed">{error}</p>
+              <Button 
+                onClick={() => retryFetch()}
+                variant="outline"
+                className="border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)] transition-all duration-200 hover:border-[var(--primary)]/50 flex items-center gap-2"
+              >
+                <HiArrowPath size={16} />
+                Try again
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -357,15 +362,17 @@ export default function WorkspaceActivityPage() {
 
   if (!workspace) {
     return (
-      <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
+      <div className="min-h-screen bg-background transition-colors duration-200">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           <EmptyState
             icon={HiDocumentText}
             title="Workspace not found"
             description="The workspace you're looking for doesn't exist or you don't have access to it."
             action={
               <Link href="/workspaces">
-                <Button>Back to Workspaces</Button>
+                <Button className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-lg shadow-[var(--primary)]/25 hover:shadow-[var(--primary)]/40 transition-all duration-200">
+                  Back to Workspaces
+                </Button>
               </Link>
             }
           />
@@ -375,90 +382,229 @@ export default function WorkspaceActivityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-lg font-semibold text-foreground mb-1">
-                {workspace.name} Activity
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Recent activity and updates in this workspace
-              </p>
+    <div className="min-h-screen bg-background transition-colors duration-200">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        {/* Enhanced Header */}
+        <div className="mb-6 lg:mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+            {/* Left: Title and Description */}
+            <div className="flex-1">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 flex items-center justify-center text-white font-bold shadow-lg">
+                  {workspace.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h1 className="text-2xl lg:text-3xl font-bold text-[var(--foreground)]">
+                    {workspace.name} Activity
+                  </h1>
+                  <p className="text-sm lg:text-base text-[var(--muted-foreground)] mt-1 leading-relaxed">
+                    Recent activity and updates in this workspace
+                  </p>
+                  
+                  {/* Activity Count */}
+                  <div className="mt-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-[var(--primary)]" />
+                    <span className="text-sm font-medium text-[var(--foreground)]">
+                      {filteredActivities.length} {activityFilter === 'all' ? 'activities' : filterOptions.find(f => f.value === activityFilter)?.label.toLowerCase()}
+                      {activities.length !== filteredActivities.length && (
+                        <span className="text-[var(--muted-foreground)] ml-1">of {activities.length} total</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Select value={activityFilter} onValueChange={setActivityFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter activity" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filterOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            {/* Right: Filter Controls */}
+            <div className="flex items-center gap-3">
+              {/* Active Filter Tag */}
+              {activityFilter !== 'all' && (
+                <div className="flex items-center gap-2 animate-in slide-in-from-right-2 duration-200">
+                  <Badge 
+                    variant="secondary"
+                    className={`flex items-center gap-2 px-3 py-1.5 ${currentFilter.color} border border-current/20 hover:bg-current/20 transition-all duration-200`}
+                  >
+                    <currentFilter.icon className="w-3 h-3" />
+                    <span className="text-xs font-medium">{currentFilter.label}</span>
+                    <button
+                      onClick={() => setActivityFilter('all')}
+                      className="ml-1 hover:bg-current/20 rounded-full p-0.5 transition-colors"
+                      aria-label="Clear filter"
+                    >
+                      <HiXMark className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Filter Trigger */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-9 h-9 p-0 border-[var(--border)] hover:bg-[var(--accent)] hover:border-[var(--primary)]/50 transition-all duration-200 relative"
+                    aria-label="Filter activities"
+                  >
+                    <HiFunnel className="w-4 h-4" />
+                    {activityFilter !== 'all' && (
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--primary)] rounded-full animate-pulse" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 border-[var(--border)] bg-[var(--background)] shadow-lg">
+                  <DropdownMenuLabel className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider px-3 py-2">
+                    Filter Activity
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-[var(--border)]" />
+                  {filterOptions.map((option) => {
+                    const Icon = option.icon;
+                    const isActive = activityFilter === option.value;
+                    return (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => setActivityFilter(option.value)}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all duration-200 ${
+                          isActive 
+                            ? 'bg-[var(--accent)] text-[var(--accent-foreground)] font-medium' 
+                            : 'hover:bg-[var(--accent)]/50'
+                        }`}
+                      >
+                        <div className={`flex items-center justify-center w-6 h-6 rounded-full transition-colors ${
+                          isActive ? option.color : 'bg-[var(--muted)]/30'
+                        }`}>
+                          <Icon className="w-3 h-3" />
+                        </div>
+                        <span className="flex-1">{option.label}</span>
+                        {isActive && (
+                          <HiCheckCircle className="w-4 h-4 text-[var(--primary)] animate-in zoom-in-50 duration-200" />
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  {activityFilter !== 'all' && (
+                    <>
+                      <DropdownMenuSeparator className="bg-[var(--border)]" />
+                      <DropdownMenuItem
+                        onClick={() => setActivityFilter('all')}
+                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-[var(--accent)]/50 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all duration-200"
+                      >
+                        <HiXMark className="w-4 h-4" />
+                        <span>Clear Filter</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
 
         {/* Activity List */}
         {filteredActivities.length > 0 ? (
-          <Card>
-            <CardContent className="p-6">
+          <Card className="border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-lg transition-all duration-200">
+            <CardContent className="p-6 lg:p-8">
               <div className="flow-root">
                 <ul role="list" className="-mb-8">
                   {filteredActivities.map((activity, activityIdx) => (
                     <li key={activity.id}>
                       <div className="relative pb-8">
                         {activityIdx !== filteredActivities.length - 1 && (
-                          <span 
-                            className="absolute top-8 left-6 -ml-px h-full w-0.5 bg-border" 
-                            aria-hidden="true" 
+                          <div
+                            className="absolute top-12 left-6 -ml-px h-full w-px bg-gradient-to-b from-[var(--border)] via-[var(--border)]/50 to-transparent"
+                            aria-hidden="true"
                           />
                         )}
                         <div className="relative flex items-start gap-4">
                           <div className="relative flex-shrink-0">
                             <UserAvatar name={activity.user} size="lg" />
-                            <div className="absolute -bottom-1 -right-1">
+                            <div className="absolute -bottom-1 -right-1 transform translate-x-1 translate-y-1">
                               <ActivityIcon type={activity.type} />
                             </div>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div>
-                              <div className="text-sm text-muted-foreground">
-                                <span className="font-medium text-foreground">
-                                  {activity.user}
-                                </span>{' '}
-                                {activity.action}{' '}
-                                <span className="font-medium text-foreground">
-                                  {activity.target}
-                                </span>
-                                {activity.project && (
-                                  <span className="text-muted-foreground">
-                                    {' '}in project{' '}
-                                    <Link 
-                                      href={`/${workspaceSlug}/${activity.project}`} 
-                                      className="text-primary hover:text-primary/80 font-medium"
+                            <div className="space-y-3">
+                              {/* Activity Header */}
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="text-sm leading-relaxed">
+                                    <Link
+                                      href="#"
+                                      className="font-bold text-[var(--foreground)] hover:text-[var(--primary)] transition-colors duration-200"
                                     >
-                                      {activity.project}
+                                      {activity.user}
                                     </Link>
-                                  </span>
-                                )}
+                                    <span className="text-[var(--muted-foreground)] mx-1">
+                                      {activity.action}
+                                    </span>
+                                    <Link
+                                      href="#"
+                                      className="font-semibold text-[var(--foreground)] hover:text-[var(--primary)] transition-colors duration-200 underline decoration-[var(--primary)]/30 underline-offset-2 hover:decoration-[var(--primary)]"
+                                    >
+                                      {activity.target}
+                                    </Link>
+                                    {activity.project && (
+                                      <span className="text-[var(--muted-foreground)]">
+                                        {' in project '}
+                                        <Link 
+                                          href={`/${workspaceSlug}/${activity.project}`} 
+                                          className="text-[var(--primary)] hover:text-[var(--primary)]/80 font-semibold transition-colors duration-200"
+                                        >
+                                          {activity.project}
+                                        </Link>
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Time and metadata */}
+                                  <div className="flex items-center gap-3 mt-2">
+                                    <div className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+                                      <HiClock className="w-3 h-3" />
+                                      <span className="font-medium">{activity.time}</span>
+                                    </div>
+                                    <Badge 
+                                      variant={activity.type === 'task' ? 'default' : 'secondary'}
+                                      className={`text-xs capitalize transition-colors ${
+                                        activity.type === 'task' ? 'bg-green-500/10 text-green-700 hover:bg-green-500/20' :
+                                        activity.type === 'comment' ? 'bg-blue-500/10 text-blue-700 hover:bg-blue-500/20' :
+                                        activity.type === 'status' ? 'bg-orange-500/10 text-orange-700 hover:bg-orange-500/20' :
+                                        activity.type === 'assignment' ? 'bg-purple-500/10 text-purple-700 hover:bg-purple-500/20' :
+                                        'bg-[var(--accent)]/30 text-[var(--accent-foreground)] hover:bg-[var(--accent)]/50'
+                                      }`}
+                                    >
+                                      {activity.type}
+                                    </Badge>
+                                  </div>
+                                </div>
                               </div>
-                              <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-                                <HiClock size={12} />
-                                {activity.time}
-                              </p>
                             </div>
                             {activity.comment && (
-                              <div className="mt-3 text-sm text-foreground p-3 bg-muted rounded-lg border border-border">
-                                <div className="flex items-start gap-2">
-                                  <HiChatBubbleLeft size={16} className="text-muted-foreground mt-0.5 flex-shrink-0" />
-                                  <span>{activity.comment}</span>
+                              <div className="mt-4 p-5 rounded-xl border bg-gradient-to-r from-[var(--accent)]/20 to-[var(--accent)]/10 border-[var(--border)]/50 shadow-sm hover:shadow-md transition-all duration-200">
+                                <div className="flex items-start gap-4">
+                                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--primary)]/10 flex-shrink-0 border border-[var(--primary)]/20">
+                                    <HiChatBubbleLeft className="w-5 h-5 text-[var(--primary)]" />
+                                  </div>
+                                  <div className="flex-1 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-[var(--primary)] uppercase tracking-wider">
+                                          Comment
+                                        </span>
+                                        <div className="w-1 h-1 rounded-full bg-[var(--muted-foreground)]" />
+                                        <span className="text-xs text-[var(--muted-foreground)] font-medium">
+                                          {activity.time}
+                                        </span>
+                                      </div>
+                                      <Button variant="ghost" size="sm" className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                                        Reply
+                                      </Button>
+                                    </div>
+                                    <div className="bg-[var(--background)]/50 rounded-lg p-3 border border-[var(--border)]/30">
+                                      <p className="text-sm text-[var(--foreground)] leading-relaxed">
+                                        {activity.comment}
+                                      </p>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             )}

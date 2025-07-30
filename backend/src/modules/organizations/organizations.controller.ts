@@ -9,9 +9,8 @@ import {
   ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { OrganizationsService } from './organizations.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -23,11 +22,8 @@ export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
   @Post()
-  create(
-    @Body() createOrganizationDto: CreateOrganizationDto,
-    @CurrentUser() user: any,
-  ) {
-    return this.organizationsService.create(createOrganizationDto, user.id);
+  create(@Body() createOrganizationDto: CreateOrganizationDto, userId: string) {
+    return this.organizationsService.create(createOrganizationDto, userId);
   }
 
   @Get()
@@ -39,7 +35,11 @@ export class OrganizationsController {
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.organizationsService.findOne(id);
   }
-
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Get organization statistics' })
+  getOrganizationStats(@Param('id', ParseUUIDPipe) id: string) {
+    return this.organizationsService.getOrganizationStats(id);
+  }
   @Get('slug/:slug')
   findBySlug(@Param('slug') slug: string) {
     return this.organizationsService.findBySlug(slug);
@@ -48,10 +48,9 @@ export class OrganizationsController {
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateOrganizationDto: UpdateOrganizationDto,
-    @CurrentUser() user: any,
+    @Body() updateOrganizationDto: UpdateOrganizationDto, userId: string
   ) {
-    return this.organizationsService.update(id, updateOrganizationDto, user.id);
+    return this.organizationsService.update(id, updateOrganizationDto, userId);
   }
 
   @Delete(':id')

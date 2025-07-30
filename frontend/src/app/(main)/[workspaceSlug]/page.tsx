@@ -87,7 +87,7 @@ export default function WorkspaceDetailPage() {
     switch (status.toLowerCase()) {
       case "in progress":
       case "active":
-        return "secondary";
+        return "primary";
       case "completed":
         return "default";
       default:
@@ -224,9 +224,9 @@ export default function WorkspaceDetailPage() {
           <div className="workspace-actions">
             <Link href={`/${workspaceSlug}/settings`}>
               <Button
-                variant="secondary"
+                variant="outline"
                 size="sm"
-                className="flex items-center gap-2 whitespace-nowrap"
+                className="flex items-center gap-2 whitespace-nowrap hover:bg-[var(--primary)]"
               >
                 <HiCog size={14} />
                 <span>Settings</span>
@@ -236,7 +236,7 @@ export default function WorkspaceDetailPage() {
               <Button
                 variant="primary"
                 size="sm"
-                className="flex items-center gap-2 whitespace-nowrap"
+                className="flex items-center gap-2 whitespace-nowrap bg-[var(--primary)] "
               >
                 <HiPlus size={14} />
                 <span>New Project</span>
@@ -256,7 +256,7 @@ export default function WorkspaceDetailPage() {
                 <CardAction>
                   <Link
                     href={`/${workspaceSlug}/projects`}
-                    className="project-link flex items-center gap-1"
+                    className="project-link flex items-center gap-1 text-foreground"
                   >
                     View All <HiExternalLink size={12} />
                   </Link>

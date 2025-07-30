@@ -316,11 +316,12 @@ model TaskStatus {
   color           String
   category        StatusCategory
   position        Int
-  workflowId      String             @db.Uuid @map("workflow_id")
+  isDefault       Boolean            @default(false)  // ✅ Add this field
+  workflowId      String             @db.Uuid
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
   createdBy       String?            @db.Uuid @map("created_by_id")
   updatedBy       String?            @db.Uuid @map("updated_by_id")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
   fromTransitions StatusTransition[] @relation("FromStatus")
   toTransitions   StatusTransition[] @relation("ToStatus")
   workflow        Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)

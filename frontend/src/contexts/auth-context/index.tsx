@@ -1,360 +1,217 @@
 "use client";
-import React, { createContext, useContext } from 'react';
-import { 
-  getAccessToken, 
-  setAccessToken, 
-  removeAccessToken,
-  getRefreshToken,
-  setRefreshToken,
-  removeRefreshToken,
-  clearAllTokens,
-  hasValidTokens,
-  authFetch
-} from '../../utils/authFetch';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+import { authApi, LoginData, User, UserData } from "@/utils/api/authApi";
+import { userApi, UpdateEmailData, UpdateUserData } from "@/utils/api/userApi";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 
-interface UserData {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  username: string;
+interface AuthState {
+  user: User | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
-interface LoginData {
-  email: string;
-  password: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  username: string;
-  role: string;
-}
-
-interface UpdateUserData {
-  firstName?: string;
-  lastName?: string;
-  bio?: string;
-  timezone?: string;
-  language?: string;
-  status?: string;
-  emailVerified?: boolean;
-  preferences?: {
-    theme?: string;
-    notifications?: {
-      email?: boolean;
-      push?: boolean;
-    };
-  };
-}
-
-interface UpdateEmailData {
-  email: string;
-}
-
-interface AuthContextType {
+interface AuthContextType extends AuthState {
+  // Auth methods
   register: (userData: UserData) => Promise<any>;
   login: (loginData: LoginData) => Promise<any>;
-  logout: () => Promise<any>;
+  logout: () => Promise<void>;
+
+  // User methods
   getAllUsers: () => Promise<any>;
   getUserById: (userId: string) => Promise<any>;
   updateUser: (userId: string, userData: UpdateUserData) => Promise<any>;
   updateUserEmail: (userId: string, emailData: UpdateEmailData) => Promise<any>;
-  deleteUser: (userId: string) => Promise<any>;
+  deleteUser: (userId: string) => Promise<void>;
+
+  // Utility methods
   getCurrentUser: () => User | null;
   isAuthenticated: () => boolean;
+  checkOrganizationAndRedirect: () => boolean | string; // Returns true if organization exists, otherwise redirect path
+  clearError: () => void;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
-  const register = async (userData: UserData) => {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    isLoading: true,
+    error: null,
+  });
+
+  // Initialize auth state
+  useEffect(() => {
+    const initializeAuth = () => {
+      try {
+        const user = authApi.getCurrentUser();
+        const isAuth = authApi.isAuthenticated();
+
+        if (user && isAuth) {
+          setAuthState((prev) => ({ ...prev, user }));
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+        setAuthState((prev) => ({
+          ...prev,
+          error: "Failed to initialize authentication",
+        }));
+      } finally {
+        setAuthState((prev) => ({ ...prev, isLoading: false }));
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Helper to handle API operations with error handling
+  const handleApiOperation = useCallback(async function <T>(
+    operation: () => Promise<T>,
+    updateUserState: boolean = false
+  ): Promise<T> {
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
+      setAuthState((prev) => ({ ...prev, error: null }));
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
+      const result = await operation();
+
+      // Update user state if needed (for auth operations)
+      if (
+        updateUserState &&
+        typeof result === "object" &&
+        result &&
+        "user" in result
+      ) {
+        const authResponse = result as any;
+        if (authResponse.user) {
+          setAuthState((prev) => ({ ...prev, user: authResponse.user }));
+        }
       }
 
-      const data = await response.json();
-      // console.log('Registration successful:', data);
-
-      // Store refresh token (backend should set httpOnly cookie, but fallback to localStorage)
-      if (data.refresh_token) {
-        setRefreshToken(data.refresh_token);
-      }
-      
-      // Store access token in sessionStorage
-      if (data.access_token) {
-        setAccessToken(data.access_token);
-      }
-      
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-        // console.log('User stored in localStorage:', data.user);
-      }
-
-      return data;
+      return result;
     } catch (error) {
-      console.error('Registration error:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An error occurred";
+      setAuthState((prev) => ({ ...prev, error: errorMessage }));
       throw error;
     }
-  };
+  },
+  []);
 
-  const login = async (loginData: LoginData) => {
-    try {
-      const response = await fetch(`${BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      
-        body: JSON.stringify(loginData),
-      });
+  // Memoized context value
+  const contextValue = useMemo(
+    () => ({
+      ...authState,
 
-      if (!response.ok) {
-        throw new Error('Login failed');
-      }
+      // Auth methods
+      register: async (userData: UserData) => {
+        const result = await handleApiOperation(
+          () => authApi.register(userData),
+          true
+        );
+        return result;
+      },
+      checkOrganizationAndRedirect: () => {
+        if (typeof window === "undefined") return false;
 
-      const data = await response.json();
+        const currentOrganizationId = localStorage.getItem(
+          "currentOrganizationId"
+        );
 
+        console.log("Organization check:", {
+          hasOrganizationId: !!currentOrganizationId,
+          organizationId: currentOrganizationId,
+        });
 
-      // Store refresh token as taskosourtoken cookie
-      if (data.refresh_token) {
-        setRefreshToken(data.refresh_token);
+        if (currentOrganizationId) {
+          return true; // or '/main' - your main app route
+        } else {
+          return false; // your organization selection page
+        }
+      },
+      login: async (loginData: LoginData) => {
+        const result = await handleApiOperation(
+          () => authApi.login(loginData),
+          true
+        );
+        return result;
+      },
 
-      }
-      
-      // Store access token in sessionStorage (expires in 15 minutes)
-      if (data.access_token) {
-        setAccessToken(data.access_token);
+      logout: async () => {
+        await handleApiOperation(async () => {
+          await authApi.logout();
+          setAuthState((prev) => ({ ...prev, user: null }));
+        });
+      },
 
-      }
-      
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
+      // User methods - direct API calls
+      getAllUsers: () => handleApiOperation(() => userApi.getAllUsers()),
+      getUserById: (userId: string) =>
+        handleApiOperation(() => userApi.getUserById(userId)),
 
-      return data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  };
+      updateUser: async (userId: string, userData: UpdateUserData) => {
+        const result = await handleApiOperation(() =>
+          userApi.updateUser(userId, userData)
+        );
 
-  const logout = async () => {
-    try {
-      const accessToken = getAccessToken();
-      const response = await fetch(`${BASE_URL}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          "Authorization": `Bearer ${accessToken}`,
-        },
-      });
+        // Update context state if it's the current user
+        if (authState.user && authState.user.id === userId) {
+          setAuthState((prev) => ({
+            ...prev,
+            user: { ...prev.user!, ...result },
+          }));
+        }
 
-      if (!response.ok) {
-        throw new Error('Logout failed');
-      } else {
-        // Clear all tokens and user data
-        clearAllTokens();
-        localStorage.removeItem('user');
-        localStorage.removeItem('currentOrganizationId');
-        // Dispatch event to notify other components
-        window.dispatchEvent(new CustomEvent('organizationChanged'));
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Clear tokens even if logout request fails
-      clearAllTokens();
-      localStorage.removeItem('user');
-      localStorage.removeItem('currentOrganizationId');
-      // Dispatch event to notify other components
-      window.dispatchEvent(new CustomEvent('organizationChanged'));
-      throw error;
-    }
-  };
+        return result;
+      },
 
-  const getAllUsers = async () => {
-    try {
-      const response = await authFetch(`${BASE_URL}/users`);
+      updateUserEmail: async (userId: string, emailData: UpdateEmailData) => {
+        const result = await handleApiOperation(() =>
+          userApi.updateUserEmail(userId, emailData)
+        );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
+        // Update context state if it's the current user
+        if (authState.user && authState.user.id === userId) {
+          setAuthState((prev) => ({
+            ...prev,
+            user: { ...prev.user!, ...result },
+          }));
+        }
 
-      const data = await response.json();
-      // console.log('Users fetched successfully:', data);
-      return data;
-    } catch (error) {
-      console.error('Get users error:', error);
-      throw error;
-    }
-  };
+        return result;
+      },
 
-  const getUserById = async (userId: string) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/users/${userId}`);
+      deleteUser: (userId: string) =>
+        handleApiOperation(() => userApi.deleteUser(userId)),
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch user by ID');
-      }
+      // Utility methods
+      getCurrentUser: authApi.getCurrentUser,
+      isAuthenticated: authApi.isAuthenticated,
 
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Get user by ID error:', error);
-      throw error;
-    }
-  };
-
-  const updateUser = async (userId: string, userData: UpdateUserData) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/users/${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update user');
-      }
-
-      const data = await response.json();
-
-      
-      const currentUser = getCurrentUser();
-      if (currentUser && currentUser.id === userId) {
-        const updatedUser = { ...currentUser, ...data };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Update user error:', error);
-      throw error;
-    }
-  };
-
-  const updateUserEmail = async (userId: string, emailData: UpdateEmailData) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/users/${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(emailData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update user email');
-      }
-
-      const data = await response.json();
-
-      
-      const currentUser = getCurrentUser();
-      if (currentUser && currentUser.id === userId) {
-        const updatedUser = { ...currentUser, ...data };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Update user email error:', error);
-      throw error;
-    }
-  };
-
-  const deleteUser = async (userId: string) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/users/${userId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete user');
-      }
-
-
-      
-      const currentUser = getCurrentUser();
-      if (currentUser && currentUser.id === userId) {
-        clearAllTokens();
-        localStorage.removeItem('user');
-        localStorage.removeItem('currentOrganizationId'); 
-
-      }
-      
-      return {};
-    } catch (error) {
-      console.error('Delete user error:', error);
-      throw error;
-    }
-  };
-
-  const getCurrentUser = (): User | null => {
-    try {
-      if (typeof window === 'undefined') {
-        return null;
-      }
-      
-      const userString = localStorage.getItem('user');
-      if (userString) {
-        return JSON.parse(userString) as User;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error parsing user from localStorage:', error);
-      return null;
-    }
-  };
-
-  const isAuthenticated = (): boolean => {
-    // Check if we're running in the browser
-    if (typeof window === 'undefined') {
-      return false;
-    }
-    
-    const user = getCurrentUser();
-    const hasTokens = hasValidTokens();
-    return !!(hasTokens && user);
-  };
-
-  const value: AuthContextType = {
-    register,
-    login,
-    logout,
-    getAllUsers,
-    getUserById,
-    updateUser,
-    updateUserEmail,
-    deleteUser,
-    getCurrentUser,
-    isAuthenticated,
-  };
+      clearError: () => {
+        setAuthState((prev) => ({ ...prev, error: null }));
+      },
+    }),
+    [authState, handleApiOperation]
+  );
 
   return (
-    
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }
 

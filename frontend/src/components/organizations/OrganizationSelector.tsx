@@ -1,14 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useOrganization } from '@/contexts/organization-context';
-import {
-  HiChevronDown,
-  HiCheck,
-  HiCog
-} from 'react-icons/hi2';
-import { HiOfficeBuilding } from 'react-icons/hi';
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useOrganization } from "@/contexts/organization-context";
+import { HiChevronDown, HiCheck, HiCog } from "react-icons/hi2";
+import { HiOfficeBuilding } from "react-icons/hi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/auth-context";
 
 interface Organization {
   id: string;
@@ -49,30 +46,37 @@ interface OrganizationSelectorProps {
   onOrganizationChange?: (organization: Organization) => void;
 }
 
-export default function OrganizationSelector({ 
-  onOrganizationChange
+export default function OrganizationSelector({
+  onOrganizationChange,
 }: OrganizationSelectorProps) {
   const router = useRouter();
   const { getOrganizationsByUser } = useOrganization();
-  
+  const { getCurrentUser } = useAuth();
+
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [currentOrganization, setCurrentOrganization] =
+    useState<Organization | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const currentUser = getCurrentUser();
+  if (!currentUser?.id) {
+    throw new Error("User not authenticated");
+  }
+
+  const [userId, setUserId] = useState<string | null>(currentUser?.id);
 
   // Get user ID from localStorage
   useEffect(() => {
     try {
-      const userString = localStorage.getItem('user');
+      const userString = localStorage.getItem("user");
       if (userString) {
         const user: User = JSON.parse(userString);
         const { id } = user;
         setUserId(id);
       } else {
-        console.error('No user found in localStorage');
+        console.error("No user found in localStorage");
       }
     } catch (error) {
-      console.error('Error parsing user from localStorage:', error);
+      console.error("Error parsing user from localStorage:", error);
     }
   }, []);
 
@@ -84,54 +88,57 @@ export default function OrganizationSelector({
       try {
         setIsLoading(true);
 
-        const organizations: Organization[] = await getOrganizationsByUser(userId);
+        const organizations: Organization[] = await getOrganizationsByUser(
+          userId
+        );
         setOrganizations(organizations);
-        
+
         // Check if there's a saved organization ID in localStorage
-        const savedOrgId = localStorage.getItem('currentOrganizationId');
+        const savedOrgId = localStorage.getItem("currentOrganizationId");
         let selectedOrg: Organization | null = null;
-        
+
         if (savedOrgId) {
           // Find the organization that matches the saved ID
-          selectedOrg = organizations.find(org => org.id === savedOrgId) || null;
+          selectedOrg =
+            organizations.find((org) => org.id === savedOrgId) || null;
         }
-        
+
         // If no saved org or saved org not found, use first organization
         if (!selectedOrg && organizations.length > 0) {
           selectedOrg = organizations[0];
           // Save the first organization ID to localStorage
           if (selectedOrg) {
-            localStorage.setItem('currentOrganizationId', selectedOrg.id);
+            localStorage.setItem("currentOrganizationId", selectedOrg.id);
             // Dispatch event to notify other components
-            window.dispatchEvent(new CustomEvent('organizationChanged'));
+            window.dispatchEvent(new CustomEvent("organizationChanged"));
           }
         }
-        
+
         setCurrentOrganization(selectedOrg);
       } catch (error) {
-        console.error('Error fetching organizations:', error);
+        console.error("Error fetching organizations:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchOrganizations();
-  }, [userId, getOrganizationsByUser]);
+  }, []);
 
   const handleOrganizationSelect = (organization: Organization) => {
     setCurrentOrganization(organization);
-    
-    localStorage.setItem('currentOrganizationId', organization.id);
-    
-    window.dispatchEvent(new CustomEvent('organizationChanged'));
-    
+
+    localStorage.setItem("currentOrganizationId", organization.id);
+
+    window.dispatchEvent(new CustomEvent("organizationChanged"));
+
     if (onOrganizationChange) {
       onOrganizationChange(organization);
     }
   };
 
   const getInitials = (name: string) => {
-    return name?.charAt(0)?.toUpperCase() || '?';
+    return name?.charAt(0)?.toUpperCase() || "?";
   };
 
   if (isLoading || !userId) {
@@ -149,8 +156,8 @@ export default function OrganizationSelector({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="flex items-center gap-3 px-3 py-2 h-9 min-w-[180px] bg-[var(--background)] hover:bg-[var(--accent)]/50 transition-all duration-200 rounded-lg"
         >
           {currentOrganization ? (
@@ -173,7 +180,10 @@ export default function OrganizationSelector({
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Avatar className="h-6 w-6 flex-shrink-0">
                 <AvatarFallback className="bg-[var(--muted)]">
-                  <HiOfficeBuilding size={14} className="text-[var(--muted-foreground)]" />
+                  <HiOfficeBuilding
+                    size={14}
+                    className="text-[var(--muted-foreground)]"
+                  />
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm text-[var(--muted-foreground)] truncate">
@@ -181,12 +191,15 @@ export default function OrganizationSelector({
               </span>
             </div>
           )}
-          
-          <HiChevronDown size={14} className="text-[var(--muted-foreground)] flex-shrink-0" />
+
+          <HiChevronDown
+            size={14}
+            className="text-[var(--muted-foreground)] flex-shrink-0"
+          />
         </Button>
       </DropdownMenuTrigger>
-      
-      <DropdownMenuContent 
+
+      <DropdownMenuContent
         className="w-80 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm"
         align="start"
         sideOffset={8}
@@ -199,12 +212,15 @@ export default function OrganizationSelector({
             {organizations.length} total
           </span>
         </div>
-        
+
         <div className="p-2">
           {organizations.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center mx-auto mb-4">
-                <HiOfficeBuilding size={20} className="text-[var(--muted-foreground)]" />
+                <HiOfficeBuilding
+                  size={20}
+                  className="text-[var(--muted-foreground)]"
+                />
               </div>
               <p className="text-sm font-medium text-[var(--foreground)] mb-2">
                 No organizations found
@@ -221,8 +237,8 @@ export default function OrganizationSelector({
                   onClick={() => handleOrganizationSelect(organization)}
                   className={`flex items-center gap-4 px-4 py-4 rounded-lg cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200 ${
                     currentOrganization?.id === organization.id
-                      ? 'bg-[var(--primary)]/10 border border-[var(--primary)]/20'
-                      : ''
+                      ? "bg-[var(--primary)]/10 border border-[var(--primary)]/20"
+                      : ""
                   }`}
                 >
                   <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-[var(--primary)]/20">
@@ -235,29 +251,37 @@ export default function OrganizationSelector({
                       {organization.name}
                     </p>
                     <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                      {organization._count?.members || 0} members • {organization._count?.workspaces || 0} workspaces
+                      {organization._count?.members || 0} members •{" "}
+                      {organization._count?.workspaces || 0} workspaces
                     </p>
                   </div>
                   {currentOrganization?.id === organization.id && (
                     <div className="w-6 h-6 rounded-full bg-[var(--primary)] flex items-center justify-center flex-shrink-0">
-                      <HiCheck size={14} className="text-[var(--primary-foreground)]" />
+                      <HiCheck
+                        size={14}
+                        className="text-[var(--primary-foreground)]"
+                      />
                     </div>
                   )}
                 </DropdownMenuItem>
               ))}
-              
+
               <DropdownMenuSeparator className="my-2" />
-              
+
               <DropdownMenuItem
-                onClick={() => router.push('/settings/organizations')}
+                onClick={() => router.push("/settings/organizations")}
                 className="flex items-center gap-4 px-4 py-4 rounded-lg cursor-pointer text-[var(--primary)] hover:bg-[var(--primary)]/10 transition-all duration-200"
               >
                 <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
                   <HiCog size={16} className="text-[var(--primary)]" />
                 </div>
                 <div className="text-left flex-1">
-                  <div className="text-sm font-semibold">Manage Organizations</div>
-                  <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">Settings and preferences</div>
+                  <div className="text-sm font-semibold">
+                    Manage Organizations
+                  </div>
+                  <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                    Settings and preferences
+                  </div>
                 </div>
               </DropdownMenuItem>
             </>

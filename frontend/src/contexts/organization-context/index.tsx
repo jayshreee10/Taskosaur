@@ -1,136 +1,294 @@
 "use client";
-import React, { createContext, useContext } from 'react';
-import { authFetch } from '@/utils/authFetch';
 
-const BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000');
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import {
+  organizationApi,
+  Organization,
+  CreateOrganizationData,
+} from "@/utils/api/organizationApi";
 
-interface OrganizationSettings {
-  allowInvites: boolean;
-  requireEmailVerification: boolean;
-  defaultRole: string;
-  features: {
-    timeTracking: boolean;
-    customFields: boolean;
-    automation: boolean;
-    integrations: boolean;
-  };
+interface OrganizationState {
+  organizations: Organization[];
+  currentOrganization: Organization | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
-interface CreateOrganizationData {
-  name: string;
-  slug?: string;
-  description?: string;
-  website?: string;
-  settings?: OrganizationSettings;
+interface OrganizationContextType extends OrganizationState {
+  // Organization methods
+  getOrganizationsByUser: (userId: string) => Promise<Organization[]>;
+  createOrganization: (
+    organizationData: CreateOrganizationData
+  ) => Promise<Organization>;
+  getOrganizationById: (organizationId: string) => Promise<Organization>;
+  updateOrganization: (
+    organizationId: string,
+    updateData: Partial<CreateOrganizationData>
+  ) => Promise<Organization>;
+  deleteOrganization: (organizationId: string) => Promise<void>;
+
+  // State management
+  setCurrentOrganization: (organization: Organization | null) => void;
+  refreshOrganizations: (userId: string) => Promise<void>;
+  clearError: () => void;
+
+  // Helper methods
+  checkOrganizationAndRedirect: () => string;
+  isUserInOrganization: (organizationId: string) => boolean;
 }
 
-interface OrganizationContextType {
-  getOrganizationsByUser: (userId: string) => Promise<any>;
-  createOrganization: (organizationData: CreateOrganizationData) => Promise<any>;
-}
+const OrganizationContext = createContext<OrganizationContextType | undefined>(
+  undefined
+);
 
-export const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
-
-export const useOrganization = () => {
+export const useOrganization = (): OrganizationContextType => {
   const context = useContext(OrganizationContext);
   if (!context) {
-    throw new Error('useOrganization must be used within an OrganizationProvider');
+    throw new Error(
+      "useOrganization must be used within an OrganizationProvider"
+    );
   }
   return context;
 };
 
-function OrganizationProvider({ children }: { children: React.ReactNode }) {
-  const getCurrentUser = () => {
-    try {
-      const userString = localStorage.getItem('user');
-      if (userString) {
-        return JSON.parse(userString);
-      }
-      return null;
-    } catch (error) {
-      console.error('Error parsing user from localStorage:', error);
-      return null;
+interface OrganizationProviderProps {
+  children: React.ReactNode;
+}
+
+export function OrganizationProvider({ children }: OrganizationProviderProps) {
+  const [organizationState, setOrganizationState] = useState<OrganizationState>(
+    {
+      organizations: [],
+      currentOrganization: null,
+      isLoading: false,
+      error: null,
     }
-  };
+  );
 
-  const getOrganizationsByUser = async (userId: string) => {
+  // Initialize current organization from localStorage
+  useEffect(() => {
+    const initializeCurrentOrganization = () => {
+      try {
+        if (typeof window === "undefined") return;
+
+        const currentOrgId = localStorage.getItem("currentOrganizationId");
+        if (currentOrgId) {
+          // Find organization in state or fetch it
+          const existingOrg = organizationState.organizations.find(
+            (org) => org.id === currentOrgId
+          );
+          if (existingOrg) {
+            setOrganizationState((prev) => ({
+              ...prev,
+              currentOrganization: existingOrg,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing current organization:", error);
+      }
+    };
+
+    initializeCurrentOrganization();
+  }, [organizationState.organizations]);
+
+  // Fixed: Helper to handle API operations with error handling
+  const handleApiOperation = useCallback(async function <T>(
+    operation: () => Promise<T>,
+    loadingState: boolean = true
+  ): Promise<T> {
     try {
-      const response = await authFetch(`${BASE_URL}/organization-members/user/${userId}/organizations`);
-
-      if (!response.ok) {
-        throw new Error('Failed to get organizations by user');
+      if (loadingState) {
+        setOrganizationState((prev) => ({
+          ...prev,
+          isLoading: true,
+          error: null,
+        }));
       }
 
-      const data = await response.json();
-      // console.log('User organizations fetched successfully:', data);
-      return data;
+      const result = await operation();
+
+      if (loadingState) {
+        setOrganizationState((prev) => ({ ...prev, isLoading: false }));
+      }
+
+      return result;
     } catch (error) {
-      console.error('Get organizations by user error:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An error occurred";
+      setOrganizationState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
       throw error;
     }
-  };
+  },
+  []);
 
-  const createOrganization = async (organizationData: CreateOrganizationData) => {
+  // Helper function for organization redirect logic
+  const checkOrganizationAndRedirect = useCallback((): string => {
     try {
-      const currentUser = getCurrentUser();
-      
-      if (!currentUser?.id) {
-        throw new Error('User not authenticated or user ID not found');
-      }
+      if (typeof window === "undefined") return "/login";
 
-      // Generate slug from name if not provided
-      const slug = organizationData.slug || organizationData.name.toLowerCase().replace(/\s+/g, '-');
+      const currentOrganizationId = localStorage.getItem(
+        "currentOrganizationId"
+      );
 
-      // Default settings if not provided
-      const defaultSettings: OrganizationSettings = {
-        allowInvites: true,
-        requireEmailVerification: false,
-        defaultRole: "MEMBER",
-        features: {
-          timeTracking: true,
-          customFields: true,
-          automation: true,
-          integrations: true
-        }
-      };
-
-      const finalOrganizationData = {
-        name: organizationData.name,
-        slug: slug,
-        description: organizationData.description || "",
-        website: organizationData.website || "",
-        ownerId: currentUser.id,
-        settings: organizationData.settings || defaultSettings,
-      };
-
-
-
-      const response = await authFetch(`${BASE_URL}/organizations`, {
-        method: 'POST',
-        body: JSON.stringify(finalOrganizationData),
+      console.log("Organization redirect check:", {
+        hasOrganizationId: !!currentOrganizationId,
+        organizationId: currentOrganizationId,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create organization');
+      if (currentOrganizationId) {
+        return "/dashboard"; // User has organization, go to main app
+      } else {
+        return "/organizations"; // User needs to select/create organization
       }
-
-      const data = await response.json();
-
-      return data;
     } catch (error) {
-      console.error('Create organization error:', error);
-      throw error;
+      console.error("Error determining redirect path:", error);
+      return "/organizations";
     }
-  };
+  }, []);
 
-  const value: OrganizationContextType = {
-    getOrganizationsByUser,
-    createOrganization,
-  };
+  // Memoized context value
+  const contextValue = useMemo(
+    () => ({
+      ...organizationState,
+      getOrganizationsByUser: async (
+        userId: string
+      ): Promise<Organization[]> => {
+        const result = await handleApiOperation(() =>
+          organizationApi.getOrganizationsByUser(userId)
+        );
+        setOrganizationState((prev) => ({
+          ...prev,
+          organizations: result,
+        }));
+
+        return result;
+      },
+
+      createOrganization: async (
+        organizationData: CreateOrganizationData
+      ): Promise<Organization> => {
+        const result = await handleApiOperation(() =>
+          organizationApi.createOrganization(organizationData)
+        );
+        setOrganizationState((prev) => ({
+          ...prev,
+          organizations: [...prev.organizations, result],
+        }));
+
+        return result;
+      },
+
+      getOrganizationById: (organizationId: string): Promise<Organization> =>
+        handleApiOperation(
+          () => organizationApi.getOrganizationById(organizationId),
+          false
+        ),
+
+      updateOrganization: async (
+        organizationId: string,
+        updateData: Partial<CreateOrganizationData>
+      ): Promise<Organization> => {
+        const result = await handleApiOperation(
+          () => organizationApi.updateOrganization(organizationId, updateData),
+          false
+        );
+        setOrganizationState((prev) => ({
+          ...prev,
+          organizations: prev.organizations.map((org) =>
+            org.id === organizationId ? { ...org, ...result } : org
+          ),
+          currentOrganization:
+            prev.currentOrganization?.id === organizationId
+              ? { ...prev.currentOrganization, ...result }
+              : prev.currentOrganization,
+        }));
+
+        return result;
+      },
+
+      deleteOrganization: async (organizationId: string): Promise<void> => {
+        await handleApiOperation(
+          () => organizationApi.deleteOrganization(organizationId),
+          false
+        );
+
+        // Remove organization from state
+        setOrganizationState((prev) => ({
+          ...prev,
+          organizations: prev.organizations.filter(
+            (org) => org.id !== organizationId
+          ),
+          currentOrganization:
+            prev.currentOrganization?.id === organizationId
+              ? null
+              : prev.currentOrganization,
+        }));
+
+        // Clear from localStorage if it was the current organization
+        if (typeof window !== "undefined") {
+          const currentOrgId = localStorage.getItem("currentOrganizationId");
+          if (currentOrgId === organizationId) {
+            localStorage.removeItem("currentOrganizationId");
+            window.dispatchEvent(new CustomEvent("organizationChanged"));
+          }
+        }
+      },
+
+      // State management methods
+      setCurrentOrganization: (organization: Organization | null): void => {
+        setOrganizationState((prev) => ({
+          ...prev,
+          currentOrganization: organization,
+        }));
+
+        if (typeof window !== "undefined") {
+          if (organization) {
+            localStorage.setItem("currentOrganizationId", organization.id);
+          } else {
+            localStorage.removeItem("currentOrganizationId");
+          }
+          window.dispatchEvent(new CustomEvent("organizationChanged"));
+        }
+      },
+
+      refreshOrganizations: async (userId: string): Promise<void> => {
+        const result = await handleApiOperation(() =>
+          organizationApi.getOrganizationsByUser(userId)
+        );
+        setOrganizationState((prev) => ({
+          ...prev,
+          organizations: result,
+        }));
+      },
+
+      clearError: (): void => {
+        setOrganizationState((prev) => ({ ...prev, error: null }));
+      },
+      checkOrganizationAndRedirect,
+
+      isUserInOrganization: (organizationId: string): boolean => {
+        return organizationState.organizations.some(
+          (org) => org.id === organizationId
+        );
+      },
+    }),
+    [organizationState, handleApiOperation, checkOrganizationAndRedirect]
+  );
 
   return (
-    <OrganizationContext.Provider value={value}>
+    <OrganizationContext.Provider value={contextValue}>
       {children}
     </OrganizationContext.Provider>
   );

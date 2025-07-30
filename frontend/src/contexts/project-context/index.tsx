@@ -1,508 +1,342 @@
 "use client";
-import React, { createContext, useContext } from "react";
-import { authFetch } from '../../utils/authFetch';
 
-const BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000');
+import React, { 
+  createContext, 
+  useContext, 
+  useState, 
+  useEffect, 
+  useMemo, 
+  useCallback 
+} from 'react';
+import { 
+  projectApi, 
+  Project, 
+  ProjectData, 
+  ProjectMember,
+  InviteMemberData,
+  AddMemberData,
+  OrganizationMember,
+  ProjectStats
+} from '@/utils/api/projectApi';
 
-interface ProjectSettings {
-  methodology: string;
-  defaultTaskType: string;
-  enableTimeTracking: boolean;
-  allowSubtasks: boolean;
-  workflowId: string;
+interface ProjectState {
+  projects: Project[];
+  currentProject: Project | null;
+  projectMembers: ProjectMember[];
+  organizationMembers: OrganizationMember[];
+  projectStats: ProjectStats | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
-interface ProjectData {
-  name: string;
-  key: string;
-  description: string;
-  color: string;
-  status: string;
-  priority: string;
-  startDate: string;
-  endDate: string;
-  workspaceId: string;
-  settings: ProjectSettings;
+interface ProjectContextType extends ProjectState {
+  // Project methods
+  listProjects: () => Promise<Project[]>;
+  createProject: (projectData: ProjectData) => Promise<Project>;
+  getProjectById: (projectId: string) => Promise<Project>;
+  getProjectsByWorkspace: (workspaceId: string) => Promise<Project[]>;
+  updateProject: (projectId: string, projectData: Partial<ProjectData>) => Promise<Project>;
+  deleteProject: (projectId: string) => Promise<{ success: boolean; message: string }>;
+  getProjectsByUserId: (userId: string) => Promise<Project[]>;
+  
+  // Project member methods
+  inviteMemberToProject: (inviteData: InviteMemberData) => Promise<ProjectMember>;
+  addMemberToProject: (memberData: AddMemberData) => Promise<ProjectMember>;
+  getProjectMembers: (projectId: string) => Promise<ProjectMember[]>;
+  getOrganizationMembers: (organizationId: string) => Promise<OrganizationMember[]>;
+  getProjectMembersByWorkspace: (workspaceId: string) => Promise<ProjectMember[]>;
+  updateProjectMemberRole: (memberId: string, requestUserId: string, role: string) => Promise<ProjectMember>;
+  removeProjectMember: (memberId: string, requestUserId: string) => Promise<{ success: boolean; message: string }>;
+  
+  // Stats and utility methods
+  getProjectStats: (projectId: string) => Promise<ProjectStats>;
+  
+  // State management
+  setCurrentProject: (project: Project | null) => void;
+  refreshProjects: (workspaceId?: string) => Promise<void>;
+  refreshProjectMembers: (projectId: string) => Promise<void>;
+  clearError: () => void;
+  
+  // Helper methods
+  isUserProjectMember: (projectId: string, userId: string) => boolean;
+  getProjectMemberRole: (projectId: string, userId: string) => string | null;
 }
 
-interface InviteMemberData {
-  email: string;
-  projectId: string;
-  role: string;
-}
+const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-interface AddMemberData {
-  userId: string;
-  projectId: string;
-  role: string;
-}
-
-interface OrganizationMember {
-  id: string;
-  email: string;
-  role: string;
-  organizationId: string;
-}
-
-interface ProjectContextType {
-  listProjects: (token: string) => Promise<any>;
-  createProject: (projectData: ProjectData) => Promise<any>;
-  getProjectById: (projectId: string, token: string) => Promise<any>;
-  getProjectsByWorkspace: (workspaceId: string) => Promise<any>;
-  updateProject: (
-    projectId: string,
-    projectData: ProjectData,
-    token: string
-  ) => Promise<any>;
-  deleteProject: (projectId: string, token: string) => Promise<any>;
-  inviteMemberToProject: (
-    inviteData: InviteMemberData
-  ) => Promise<any>;
-  addMemberToProject: (
-    memberData: AddMemberData
-  ) => Promise<any>;
-  getProjectMembers: (
-    projectId: string
-  ) => Promise<any>;
-  getOrganizationMembers: (
-    organizationId: string
-  ) => Promise<any>;
-  getProjectMembersByWorkspace: (
-    workspaceId: string,
-    token: string
-  ) => Promise<any>;
-  getProjectsByUserId: (
-    userId: string,
-    token: string
-  ) => Promise<any>;
-  updateProjectMemberRole: (
-    memberId: string,
-    requestUserId: string,
-    role: string
-  ) => Promise<any>;
-  removeProjectMember: (
-    memberId: string,
-    requestUserId: string
-  ) => Promise<any>;
-  getProjectStats: (
-    projectId: string,
-    token: string
-  ) => Promise<any>;
-}
-
-export const useProjectContext = () => {
+export const useProject = (): ProjectContextType => {
   const context = useContext(ProjectContext);
   if (!context) {
-    throw new Error("useProjectContext must be used within a ProjectProvider");
+    throw new Error('useProject must be used within a ProjectProvider');
   }
   return context;
 };
 
-export const ProjectContext = createContext<ProjectContextType | undefined>(
-  undefined
-);
+// For backward compatibility
+export const useProjectContext = useProject;
 
-function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const listProjects = async (token: string) => {
+interface ProjectProviderProps {
+  children: React.ReactNode;
+}
+
+export function ProjectProvider({ children }: ProjectProviderProps) {
+  const [projectState, setProjectState] = useState<ProjectState>({
+    projects: [],
+    currentProject: null,
+    projectMembers: [],
+    organizationMembers: [],
+    projectStats: null,
+    isLoading: false,
+    error: null
+  });
+
+  // Helper to handle API operations with error handling
+  const handleApiOperation = useCallback(async function<T>(
+    operation: () => Promise<T>,
+    loadingState: boolean = true
+  ): Promise<T> {
     try {
-      const response = await fetch(`${BASE_URL}/projects`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get projects");
+      if (loadingState) {
+        setProjectState(prev => ({ ...prev, isLoading: true, error: null }));
       }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get projects error:", error);
-      throw error;
-    }
-  };
-
-  const createProject = async (projectData: ProjectData) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/projects`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(projectData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create project");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Create project error:", error);
-      throw error;
-    }
-  };
-
-  const getProjectById = async (projectId: string, token: string) => {
-    try {
-      const response = await fetch(`${BASE_URL}/projects/${projectId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get project by ID");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get project by ID error:", error);
-      throw error;
-    }
-  };
-
-  const getProjectsByWorkspace = async (workspaceId: string) => {
-    try {
-      const response = await authFetch(
-        `${BASE_URL}/projects?workspaceId=${workspaceId}`,
-        {
-          method: "GET",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to get projects by workspace");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get projects by workspace error:", error);
-      throw error;
-    }
-  };
-
-  const updateProject = async (
-    projectId: string,
-    projectData: ProjectData,
-    token: string
-  ) => {
-    try {
-      const response = await fetch(`${BASE_URL}/projects/${projectId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(projectData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update project");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Update project error:", error);
-      throw error;
-    }
-  };
-
- const deleteProject = async (projectId: string, token: string) => {
-  try {
-    const response = await fetch(`${BASE_URL}/projects/${projectId}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to delete project");
-    }
-
-    const contentType = response.headers.get('content-type');
-    const contentLength = response.headers.get('content-length');
-    
-    if (contentLength === '0' || response.status === 204) {
-      return { success: true, message: 'Project deleted successfully' };
-    }
-
-    if (contentType && contentType.includes('application/json')) {
-      const data = await response.json();
-      return data;
-    } else {
-      return { success: true, message: 'Project deleted successfully' };
-    }
-  } catch (error) {
-    console.error("Delete project error:", error);
-    throw error;
-  }
-};
-
-  const inviteMemberToProject = async (
-    inviteData: InviteMemberData
-  ) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/project-members/invite`, {
-        method: "POST",
-        body: JSON.stringify(inviteData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to invite member to project");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Invite member to project error:", error);
-      throw error;
-    }
-  };
-
-  const addMemberToProject = async (
-    memberData: AddMemberData
-  ) => {
-    try {
-      const response = await authFetch(`${BASE_URL}/project-members`, {
-        method: "POST",
-        body: JSON.stringify(memberData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to add member to project");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Add member to project error:", error);
-      throw error;
-    }
-  };
-
-  const getProjectMembers = async (
-    projectId: string
-  ) => {
-    try {
-      const response = await authFetch(
-        `${BASE_URL}/project-members?projectId=${projectId}`,
-        {
-          method: "GET",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to get project members");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get project members error:", error);
-      throw error;
-    }
-  };
-
-  const getOrganizationMembers = async (
-    organizationId: string
-  ) => {
-    try {
-      const response = await authFetch(
-        `${BASE_URL}/organization-members?organizationId=${organizationId}`,
-        {
-          method: "GET",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to get organization members");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get organization members error:", error);
-      throw error;
-    }
-  };
-
-  const getProjectMembersByWorkspace = async (
-    workspaceId: string,
-    token: string
-  ) => {
-    try {
-      const response = await fetch(
-        `${BASE_URL}/project-members/workspace/${workspaceId}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to get project members by workspace");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get project members by workspace error:", error);
-      throw error;
-    }
-  };
-
-  const getProjectsByUserId = async (
-    userId: string,
-    token: string
-  ) => {
-    try {
-      const response = await fetch(
-        `${BASE_URL}/project-members/user/${userId}/projects`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to get projects by user ID");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get projects by user ID error:", error);
-      throw error;
-    }
-  };
-
-  const updateProjectMemberRole = async (
-    memberId: string,
-    requestUserId: string,
-    role: string
-  ) => {
-    try {
-      const response = await authFetch(
-        `${BASE_URL}/project-members/${memberId}?requestUserId=${requestUserId}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ role }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update project member role");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Update project member role error:", error);
-      throw error;
-    }
-  };
-
-  const removeProjectMember = async (
-    memberId: string,
-    requestUserId: string
-  ) => {
-    try {
-      const response = await authFetch(
-        `${BASE_URL}/project-members/${memberId}?requestUserId=${requestUserId}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to remove project member");
-      }
-
-      const contentType = response.headers.get('content-type');
-      const contentLength = response.headers.get('content-length');
       
-      if (contentLength === '0' || response.status === 204) {
-        return { success: true, message: 'Project member removed successfully' };
+      const result = await operation();
+      
+      if (loadingState) {
+        setProjectState(prev => ({ ...prev, isLoading: false }));
       }
+      
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      setProjectState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        error: errorMessage 
+      }));
+      throw error;
+    }
+  }, []);
 
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        return data;
+  // Memoized context value
+  const contextValue = useMemo(() => ({
+    ...projectState,
+
+    // Project methods with state management
+    listProjects: async (): Promise<Project[]> => {
+      const result = await handleApiOperation(() => projectApi.listProjects());
+      
+      setProjectState(prev => ({ 
+        ...prev, 
+        projects: result 
+      }));
+      
+      return result;
+    },
+
+    createProject: async (projectData: ProjectData): Promise<Project> => {
+      const result = await handleApiOperation(() => projectApi.createProject(projectData));
+      
+      // Add new project to state
+      setProjectState(prev => ({ 
+        ...prev, 
+        projects: [...prev.projects, result] 
+      }));
+      
+      return result;
+    },
+
+    getProjectById: async (projectId: string): Promise<Project> => {
+      const result = await handleApiOperation(() => projectApi.getProjectById(projectId), false);
+      
+      // Update current project if it's the same ID
+      setProjectState(prev => ({
+        ...prev,
+        currentProject: prev.currentProject?.id === projectId ? result : prev.currentProject
+      }));
+      
+      return result;
+    },
+
+    getProjectsByWorkspace: async (workspaceId: string): Promise<Project[]> => {
+      const result = await handleApiOperation(() => projectApi.getProjectsByWorkspace(workspaceId));
+      
+      setProjectState(prev => ({ 
+        ...prev, 
+        projects: result 
+      }));
+      
+      return result;
+    },
+
+    updateProject: async (projectId: string, projectData: Partial<ProjectData>): Promise<Project> => {
+      const result = await handleApiOperation(() => projectApi.updateProject(projectId, projectData), false);
+      
+      // Update project in state
+      setProjectState(prev => ({
+        ...prev,
+        projects: prev.projects.map(project => 
+          project.id === projectId ? { ...project, ...result } : project
+        ),
+        currentProject: prev.currentProject?.id === projectId 
+          ? { ...prev.currentProject, ...result }
+          : prev.currentProject
+      }));
+      
+      return result;
+    },
+
+    deleteProject: async (projectId: string): Promise<{ success: boolean; message: string }> => {
+      const result = await handleApiOperation(() => projectApi.deleteProject(projectId), false);
+      
+      // Remove project from state
+      setProjectState(prev => ({
+        ...prev,
+        projects: prev.projects.filter(project => project.id !== projectId),
+        currentProject: prev.currentProject?.id === projectId ? null : prev.currentProject
+      }));
+      
+      return result;
+    },
+
+    getProjectsByUserId: (userId: string): Promise<Project[]> => 
+      handleApiOperation(() => projectApi.getProjectsByUserId(userId), false),
+
+    // Project member methods
+    inviteMemberToProject: async (inviteData: InviteMemberData): Promise<ProjectMember> => {
+      const result = await handleApiOperation(() => projectApi.inviteMemberToProject(inviteData), false);
+      
+      // Add new member to state if it's for the current project's members
+      if (projectState.projectMembers.length > 0 && 
+          projectState.projectMembers.some(m => m.projectId === inviteData.projectId)) {
+        setProjectState(prev => ({
+          ...prev,
+          projectMembers: [...prev.projectMembers, result]
+        }));
+      }
+      
+      return result;
+    },
+
+    addMemberToProject: async (memberData: AddMemberData): Promise<ProjectMember> => {
+      const result = await handleApiOperation(() => projectApi.addMemberToProject(memberData), false);
+      
+      // Add new member to state if it's for the current project's members
+      if (projectState.projectMembers.length > 0 && 
+          projectState.projectMembers.some(m => m.projectId === memberData.projectId)) {
+        setProjectState(prev => ({
+          ...prev,
+          projectMembers: [...prev.projectMembers, result]
+        }));
+      }
+      
+      return result;
+    },
+
+    getProjectMembers: async (projectId: string): Promise<ProjectMember[]> => {
+      const result = await handleApiOperation(() => projectApi.getProjectMembers(projectId), false);
+      
+      setProjectState(prev => ({ 
+        ...prev, 
+        projectMembers: result 
+      }));
+      
+      return result;
+    },
+
+    getOrganizationMembers: async (organizationId: string): Promise<OrganizationMember[]> => {
+      const result = await handleApiOperation(() => projectApi.getOrganizationMembers(organizationId), false);
+      
+      setProjectState(prev => ({ 
+        ...prev, 
+        organizationMembers: result 
+      }));
+      
+      return result;
+    },
+
+    getProjectMembersByWorkspace: (workspaceId: string): Promise<ProjectMember[]> => 
+      handleApiOperation(() => projectApi.getProjectMembersByWorkspace(workspaceId), false),
+
+    updateProjectMemberRole: async (memberId: string, requestUserId: string, role: string): Promise<ProjectMember> => {
+      const result = await handleApiOperation(() => projectApi.updateProjectMemberRole(memberId, requestUserId, role), false);
+      
+      // Update member in state
+      setProjectState(prev => ({
+        ...prev,
+        projectMembers: prev.projectMembers.map(member => 
+          member.id === memberId ? { ...member, ...result } : member
+        )
+      }));
+      
+      return result;
+    },
+
+    removeProjectMember: async (memberId: string, requestUserId: string): Promise<{ success: boolean; message: string }> => {
+      const result = await handleApiOperation(() => projectApi.removeProjectMember(memberId, requestUserId), false);
+      
+      // Remove member from state
+      setProjectState(prev => ({
+        ...prev,
+        projectMembers: prev.projectMembers.filter(member => member.id !== memberId)
+      }));
+      
+      return result;
+    },
+
+    // Stats and utility methods
+    getProjectStats: async (projectId: string): Promise<ProjectStats> => {
+      const result = await handleApiOperation(() => projectApi.getProjectStats(projectId), false);
+      
+      setProjectState(prev => ({ 
+        ...prev, 
+        projectStats: result 
+      }));
+      
+      return result;
+    },
+
+    // State management methods
+    setCurrentProject: (project: Project | null): void => {
+      setProjectState(prev => ({ ...prev, currentProject: project }));
+    },
+
+    refreshProjects: async (workspaceId?: string): Promise<void> => {
+      if (workspaceId) {
+        await contextValue.getProjectsByWorkspace(workspaceId);
       } else {
-        return { success: true, message: 'Project member removed successfully' };
+        await contextValue.listProjects();
       }
-    } catch (error) {
-      console.error("Remove project member error:", error);
-      throw error;
-    }
-  };
+    },
 
-  const getProjectStats = async (
-    projectId: string,
-    token: string
-  ) => {
-    try {
-      const response = await fetch(
-        `${BASE_URL}/project-members/project/${projectId}/stats`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+    refreshProjectMembers: async (projectId: string): Promise<void> => {
+      await contextValue.getProjectMembers(projectId);
+    },
+
+    clearError: (): void => {
+      setProjectState(prev => ({ ...prev, error: null }));
+    },
+
+    // Helper methods
+    isUserProjectMember: (projectId: string, userId: string): boolean => {
+      return projectState.projectMembers.some(member => 
+        member.projectId === projectId && member.userId === userId
       );
+    },
 
-      if (!response.ok) {
-        throw new Error("Failed to get project stats");
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Get project stats error:", error);
-      throw error;
+    getProjectMemberRole: (projectId: string, userId: string): string | null => {
+      const member = projectState.projectMembers.find(member => 
+        member.projectId === projectId && member.userId === userId
+      );
+      return member?.role || null;
     }
-  };
 
-  const value: ProjectContextType = {
-    listProjects,
-    createProject,
-    getProjectById,
-    getProjectsByWorkspace,
-    updateProject,
-    deleteProject,
-    inviteMemberToProject,
-    addMemberToProject,
-    getProjectMembers,
-    getOrganizationMembers,
-    getProjectMembersByWorkspace,
-    getProjectsByUserId,
-    updateProjectMemberRole,
-    removeProjectMember,
-    getProjectStats,
-  };
+  }), [projectState, handleApiOperation]);
 
   return (
-    <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>
+    <ProjectContext.Provider value={contextValue}>
+      {children}
+    </ProjectContext.Provider>
   );
 }
 

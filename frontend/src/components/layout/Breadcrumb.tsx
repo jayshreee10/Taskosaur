@@ -1,23 +1,61 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { getWorkspaces, getProjects } from '@/utils/apiUtils';
 import { useGlobalFetchPrevention } from '@/hooks/useGlobalFetchPrevention';
+import {
+  Breadcrumb as ShadcnBreadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import { 
+  HiHome,
+  HiRectangleGroup,
+  HiCog6Tooth,
+  HiClipboardDocumentList,
+  HiClock,
+  HiFolder,
+  HiUsers,
+} from 'react-icons/hi2';
 // import { Workspace, Project } from '@/types';
 
-interface BreadcrumbItem {
+interface BreadcrumbItemType {
   name: string;
   href: string;
   current: boolean;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 export default function Breadcrumb() {
   const pathname = usePathname();
-  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
+  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItemType[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { shouldPreventFetch, markFetchStart, markFetchComplete, getCachedData } = useGlobalFetchPrevention();
+
+  const getSectionIcon = (section: string) => {
+    switch (section.toLowerCase()) {
+      case 'activity':
+        return HiClock;
+      case 'tasks':
+        return HiClipboardDocumentList;
+      case 'projects':
+        return HiFolder;
+      case 'members':
+        return HiUsers;
+      case 'settings':
+        return HiCog6Tooth;
+      case 'analytics':
+        return HiClipboardDocumentList;
+      default:
+        return undefined;
+    }
+  };
 
   // Set mounted state once component mounts on client
   useEffect(() => {
@@ -29,13 +67,14 @@ export default function Breadcrumb() {
 
     const generateBreadcrumbs = async () => {
       const segments = pathname.split('/').filter(Boolean);
-      const items: BreadcrumbItem[] = [];
+      const items: BreadcrumbItemType[] = [];
 
       // Always add home
       items.push({
         name: 'Home',
         href: '/dashboard',
-        current: pathname === '/dashboard' || pathname === '/'
+        current: pathname === '/dashboard' || pathname === '/',
+        icon: HiHome
       });
 
       if (segments.length === 0 || (segments.length === 1 && segments[0] === 'dashboard')) {
@@ -48,7 +87,8 @@ export default function Breadcrumb() {
         items.push({
           name: 'Workspaces',
           href: '/workspaces',
-          current: pathname === '/workspaces'
+          current: pathname === '/workspaces',
+          icon: HiRectangleGroup
         });
         setBreadcrumbs(items);
         return;
@@ -58,7 +98,30 @@ export default function Breadcrumb() {
         items.push({
           name: 'Settings',
           href: '/settings',
-          current: pathname === '/settings'
+          current: pathname === '/settings',
+          icon: HiCog6Tooth
+        });
+        setBreadcrumbs(items);
+        return;
+      }
+
+      if (segments[0] === 'activity') {
+        items.push({
+          name: 'Activity',
+          href: '/activity',
+          current: pathname === '/activity',
+          icon: HiClock
+        });
+        setBreadcrumbs(items);
+        return;
+      }
+
+      if (segments[0] === 'tasks') {
+        items.push({
+          name: 'Tasks',
+          href: '/tasks',
+          current: pathname === '/tasks',
+          icon: HiClipboardDocumentList
         });
         setBreadcrumbs(items);
         return;
@@ -87,7 +150,8 @@ export default function Breadcrumb() {
             items.push({
               name: workspace.name,
               href: `/${workspace.slug}`,
-              current: pathname === `/${workspace.slug}`
+              current: pathname === `/${workspace.slug}`,
+              icon: HiRectangleGroup
             });
             
             // Handle project level
@@ -113,7 +177,8 @@ export default function Breadcrumb() {
                 items.push({
                   name: project.name,
                   href: `/${workspace.slug}/${project.slug}`,
-                  current: pathname === `/${workspace.slug}/${project.slug}`
+                  current: pathname === `/${workspace.slug}/${project.slug}`,
+                  icon: HiFolder
                 });
                 
                 // Handle deeper levels
@@ -122,18 +187,30 @@ export default function Breadcrumb() {
                   items.push({
                     name: segments[2].charAt(0).toUpperCase() + segments[2].slice(1),
                     href: `/${workspace.slug}/${project.slug}/${segments[2]}`,
-                    current: pathname === `/${workspace.slug}/${project.slug}/${segments[2]}` || segments.length > 3
+                    current: pathname === `/${workspace.slug}/${project.slug}/${segments[2]}` || segments.length > 3,
+                    icon: getSectionIcon(segments[2])
                   });
                   
                   // Can add more levels if needed
                 }
-              } else if (['projects', 'members', 'activity', 'settings'].includes(segments[1])) {
+              } else if (['projects', 'members', 'activity', 'settings', 'tasks', 'analytics'].includes(segments[1])) {
                 // Handle workspace sections
                 items.push({
                   name: segments[1].charAt(0).toUpperCase() + segments[1].slice(1),
                   href: `/${workspace.slug}/${segments[1]}`,
-                  current: pathname === `/${workspace.slug}/${segments[1]}`
+                  current: pathname === `/${workspace.slug}/${segments[1]}` || segments.length > 2,
+                  icon: getSectionIcon(segments[1])
                 });
+                
+                // Handle deeper levels for workspace sections
+                if (segments.length >= 3) {
+                  items.push({
+                    name: segments[2].charAt(0).toUpperCase() + segments[2].slice(1),
+                    href: `/${workspace.slug}/${segments[1]}/${segments[2]}`,
+                    current: pathname === `/${workspace.slug}/${segments[1]}/${segments[2]}` || segments.length > 3,
+                    icon: getSectionIcon(segments[2])
+                  });
+                }
               }
             }
           }
@@ -153,29 +230,40 @@ export default function Breadcrumb() {
   }
 
   return (
-    <nav className="hidden md:block px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-      <ol className="flex items-center space-x-2 text-sm">
-        {breadcrumbs.map((breadcrumb, index) => (
-          <li key={breadcrumb.href} className="flex items-center">
-            {index > 0 && (
-              <svg className="h-4 w-4 text-gray-400 mx-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            )}
-            <Link
-              href={breadcrumb.href}
-              className={`${
-                breadcrumb.current
-                  ? 'text-gray-700 dark:text-gray-300 font-medium'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-              aria-current={breadcrumb.current ? 'page' : undefined}
-            >
-              {breadcrumb.name}
-            </Link>
-          </li>
-        ))}
-      </ol>
-    </nav>
+    <div className="hidden md:block px-4 sm:px-6 lg:px-8 py-4 bg-[var(--background)] border-b border-[var(--border)] shadow-sm">
+      <div className="max-w-7xl mx-auto">
+        <ShadcnBreadcrumb>
+          <BreadcrumbList>
+            {breadcrumbs.map((breadcrumb, index) => (
+              <React.Fragment key={breadcrumb.href}>
+                <BreadcrumbItem>
+                  {breadcrumb.current ? (
+                    <BreadcrumbPage className="flex items-center gap-2 font-normal text-[var(--muted-foreground)]">
+                      {breadcrumb.icon && (
+                        <breadcrumb.icon className="w-4 h-4" />
+                      )}
+                      {breadcrumb.name}
+                    </BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link
+                        href={breadcrumb.href}
+                        className="flex items-center gap-2 hover:text-[var(--foreground)] transition-colors duration-200"
+                      >
+                        {breadcrumb.icon && (
+                          <breadcrumb.icon className="w-4 h-4" />
+                        )}
+                        {breadcrumb.name}
+                      </Link>
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+                {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+              </React.Fragment>
+            ))}
+          </BreadcrumbList>
+        </ShadcnBreadcrumb>
+      </div>
+    </div>
   );
 }

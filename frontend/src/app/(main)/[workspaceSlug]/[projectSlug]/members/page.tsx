@@ -320,53 +320,72 @@ export default function ProjectMembersPage() {
           </CardHeader>
 
           <CardContent>
-            <div className="members-list">
-              {filteredMembers.length === 0 ? (
-                <div className="empty-state">
-                  <HiUserPlus className="empty-icon" />
-                  <h3>No members found</h3>
-                  <p>
-                    {searchTerm 
-                      ? 'Try adjusting your search terms'
-                      : 'This project doesn\'t have any members yet.'
-                    }
-                  </p>
+            {filteredMembers.length === 0 ? (
+              <div className="empty-state">
+                <HiUserPlus className="empty-icon" />
+                <h3>No members found</h3>
+                <p>
+                  {searchTerm 
+                    ? 'Try adjusting your search terms'
+                    : 'This project doesn\'t have any members yet.'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="rounded-md border border-[var(--border)] bg-[var(--card)]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-[var(--muted)] text-[var(--muted-foreground)]">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-semibold">Avatar</th>
+                        <th className="px-4 py-2 text-left font-semibold">Name</th>
+                        <th className="px-4 py-2 text-left font-semibold">Email</th>
+                        <th className="px-4 py-2 text-left font-semibold">Role</th>
+                        <th className="px-4 py-2 text-left font-semibold">Joined</th>
+                        <th className="px-4 py-2 text-left font-semibold">Last Active</th>
+                        <th className="px-4 py-2 text-left font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredMembers.map((member) => (
+                        <tr key={member.id} className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--muted)]">
+                          <td className="px-4 py-2">
+                            <UserAvatar
+                              user={{
+                                name: `${member.firstName} ${member.lastName}`,
+                                firstName: member.firstName,
+                                lastName: member.lastName
+                              }}
+                              size="md"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-[var(--foreground)] font-medium">
+                            {member.firstName} {member.lastName}
+                          </td>
+                          <td className="px-4 py-2 text-[var(--muted-foreground)]">
+                            {member.email}
+                          </td>
+                          <td className="px-4 py-2">
+                            {member.role}
+                          </td>
+                          <td className="px-4 py-2">
+                            {formatDate(member.joinedAt)}
+                          </td>
+                          <td className="px-4 py-2">
+                            {member.lastActive ? formatRelativeTime(member.lastActive) : "-"}
+                          </td>
+                          <td className="px-4 py-2">
+                            <Button variant="ghost" size="sm" className="member-menu-button">
+                              <HiEllipsisVertical />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ) : (
-                filteredMembers.map((member) => (
-                  <div key={member.id} className="member-item">
-                    <div className="member-info">
-                      <UserAvatar
-                        user={{
-                          name: `${member.firstName} ${member.lastName}`,
-                          firstName: member.firstName,
-                          lastName: member.lastName
-                        }}
-                        size="md"
-                      />
-                      <div className="member-details">
-                        <div className="member-name">
-                          {member.firstName} {member.lastName}
-                        </div>
-                        <div className="member-email">{member.email}</div>
-                        <div className="member-meta">
-                          Joined {formatDate(member.joinedAt)}
-                          {member.lastActive && (
-                            <span> • Active {formatRelativeTime(member.lastActive)}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="member-actions">
-                      <div className="member-role">{member.role}</div>
-                      <Button variant="ghost" size="sm" className="member-menu-button">
-                        <HiEllipsisVertical />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

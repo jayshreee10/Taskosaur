@@ -16,7 +16,7 @@ export default function TaskListView({
   projects
 }: TaskListViewProps) {
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800 overflow-hidden">
+    <div className="bg-white dark:bg-stone-900 rounded-lg  overflow-hidden">
       <TaskTable
         tasks={tasks}
         workspaceSlug={workspaceSlug}

@@ -23,7 +23,10 @@ export class TaskStatusSeederService {
     // Create task statuses for each workflow
     for (const workflow of workflows) {
       const statusesData = this.getStatusesDataForWorkflow(workflow);
-
+      if (!statusesData || statusesData.length === 0) {
+        console.log(`⚠ No statuses defined for workflow: ${workflow.name}`);
+        continue;
+      }
       for (const statusData of statusesData) {
         try {
           // Find workflow creator or use first user as default
@@ -81,48 +84,28 @@ export class TaskStatusSeederService {
           color: '#6b7280',
           category: StatusCategory.TODO,
           position: 1,
-        },
-        {
-          name: 'Ready for Development',
-          color: '#3b82f6',
-          category: StatusCategory.TODO,
-          position: 2,
+          isDefault: true, // ✅ Default status
         },
         {
           name: 'In Development',
           color: '#f59e0b',
           category: StatusCategory.IN_PROGRESS,
-          position: 3,
-        },
-        {
-          name: 'Code Review',
-          color: '#8b5cf6',
-          category: StatusCategory.IN_PROGRESS,
-          position: 4,
+          position: 2,
+          isDefault: false,
         },
         {
           name: 'Testing',
           color: '#ec4899',
           category: StatusCategory.IN_PROGRESS,
-          position: 5,
-        },
-        {
-          name: 'Ready for Deploy',
-          color: '#06b6d4',
-          category: StatusCategory.IN_PROGRESS,
-          position: 6,
+          position: 3,
+          isDefault: false,
         },
         {
           name: 'Done',
           color: '#10b981',
           category: StatusCategory.DONE,
-          position: 7,
-        },
-        {
-          name: 'Rejected',
-          color: '#ef4444',
-          category: StatusCategory.DONE,
-          position: 8,
+          position: 4,
+          isDefault: false,
         },
       ];
     } else if (workflow.name.includes('Design & Creative')) {
@@ -132,42 +115,28 @@ export class TaskStatusSeederService {
           color: '#6b7280',
           category: StatusCategory.TODO,
           position: 1,
+          isDefault: true, // ✅ Default status
         },
         {
-          name: 'Research',
-          color: '#3b82f6',
-          category: StatusCategory.IN_PROGRESS,
-          position: 2,
-        },
-        {
-          name: 'Concept Design',
+          name: 'In Design',
           color: '#8b5cf6',
           category: StatusCategory.IN_PROGRESS,
-          position: 3,
+          position: 2,
+          isDefault: false,
         },
         {
-          name: 'Design Review',
+          name: 'Review',
           color: '#f59e0b',
           category: StatusCategory.IN_PROGRESS,
-          position: 4,
-        },
-        {
-          name: 'Revisions',
-          color: '#ec4899',
-          category: StatusCategory.IN_PROGRESS,
-          position: 5,
-        },
-        {
-          name: 'Final Approval',
-          color: '#06b6d4',
-          category: StatusCategory.IN_PROGRESS,
-          position: 6,
+          position: 3,
+          isDefault: false,
         },
         {
           name: 'Delivered',
           color: '#10b981',
           category: StatusCategory.DONE,
-          position: 7,
+          position: 4,
+          isDefault: false,
         },
       ];
     } else if (workflow.name.includes('Marketing Campaign')) {
@@ -177,42 +146,21 @@ export class TaskStatusSeederService {
           color: '#6b7280',
           category: StatusCategory.TODO,
           position: 1,
+          isDefault: true, // ✅ Default status
         },
         {
-          name: 'Planning',
-          color: '#3b82f6',
-          category: StatusCategory.IN_PROGRESS,
-          position: 2,
-        },
-        {
-          name: 'Content Creation',
+          name: 'In Progress',
           color: '#f59e0b',
           category: StatusCategory.IN_PROGRESS,
-          position: 3,
-        },
-        {
-          name: 'Review & Approval',
-          color: '#8b5cf6',
-          category: StatusCategory.IN_PROGRESS,
-          position: 4,
-        },
-        {
-          name: 'Scheduled',
-          color: '#06b6d4',
-          category: StatusCategory.IN_PROGRESS,
-          position: 5,
+          position: 2,
+          isDefault: false,
         },
         {
           name: 'Published',
           color: '#10b981',
           category: StatusCategory.DONE,
-          position: 6,
-        },
-        {
-          name: 'Cancelled',
-          color: '#ef4444',
-          category: StatusCategory.DONE,
-          position: 7,
+          position: 3,
+          isDefault: false,
         },
       ];
     } else if (workflow.name.includes('Client Project')) {
@@ -222,48 +170,21 @@ export class TaskStatusSeederService {
           color: '#6b7280',
           category: StatusCategory.TODO,
           position: 1,
-        },
-        {
-          name: 'Under Review',
-          color: '#3b82f6',
-          category: StatusCategory.IN_PROGRESS,
-          position: 2,
+          isDefault: true, // ✅ Default status
         },
         {
           name: 'In Progress',
           color: '#f59e0b',
           category: StatusCategory.IN_PROGRESS,
-          position: 3,
-        },
-        {
-          name: 'Waiting for Client',
-          color: '#8b5cf6',
-          category: StatusCategory.IN_PROGRESS,
-          position: 4,
-        },
-        {
-          name: 'Testing/QA',
-          color: '#ec4899',
-          category: StatusCategory.IN_PROGRESS,
-          position: 5,
-        },
-        {
-          name: 'Client Review',
-          color: '#06b6d4',
-          category: StatusCategory.IN_PROGRESS,
-          position: 6,
+          position: 2,
+          isDefault: false,
         },
         {
           name: 'Completed',
           color: '#10b981',
           category: StatusCategory.DONE,
-          position: 7,
-        },
-        {
-          name: 'Cancelled',
-          color: '#ef4444',
-          category: StatusCategory.DONE,
-          position: 8,
+          position: 3,
+          isDefault: false,
         },
       ];
     } else if (workflow.name.includes('Support & Maintenance')) {
@@ -273,61 +194,24 @@ export class TaskStatusSeederService {
           color: '#ef4444',
           category: StatusCategory.TODO,
           position: 1,
+          isDefault: true, // ✅ Default status
         },
         {
           name: 'In Progress',
           color: '#f59e0b',
           category: StatusCategory.IN_PROGRESS,
           position: 2,
-        },
-        {
-          name: 'Waiting for Response',
-          color: '#8b5cf6',
-          category: StatusCategory.IN_PROGRESS,
-          position: 3,
+          isDefault: false,
         },
         {
           name: 'Resolved',
           color: '#10b981',
           category: StatusCategory.DONE,
-          position: 4,
-        },
-        {
-          name: 'Closed',
-          color: '#6b7280',
-          category: StatusCategory.DONE,
-          position: 5,
+          position: 3,
+          isDefault: false,
         },
       ];
     }
-
-    // Default simple workflow
-    return [
-      {
-        name: 'To Do',
-        color: '#6b7280',
-        category: StatusCategory.TODO,
-        position: 1,
-      },
-      {
-        name: 'In Progress',
-        color: '#f59e0b',
-        category: StatusCategory.IN_PROGRESS,
-        position: 2,
-      },
-      {
-        name: 'In Review',
-        color: '#8b5cf6',
-        category: StatusCategory.IN_PROGRESS,
-        position: 3,
-      },
-      {
-        name: 'Done',
-        color: '#10b981',
-        category: StatusCategory.DONE,
-        position: 4,
-      },
-    ];
   }
 
   private async createStatusTransitions(workflows: Workflow[], users: any[]) {

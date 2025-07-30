@@ -123,7 +123,7 @@ export default function UserAvatar({
           onError={() => setImageError(true)}
         />
       ) : (
-        initial
+        <span>{initial}</span>
       )}
     </div>
   );

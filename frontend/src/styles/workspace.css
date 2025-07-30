@@ -83,14 +83,15 @@
   gap: 1.5rem;
 }
 
+
 .project-link {
   font-size: 0.75rem;
-  color: var(--accent);
+  color: var(--foreground);
   transition: color 0.2s ease;
 }
 
 .project-link:hover {
-  color: var(--accent-hover);
+  color: var(--primary);
 }
 
 /* Workspace page container */

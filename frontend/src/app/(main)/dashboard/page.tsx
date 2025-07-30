@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { getProjects, getWorkspaces, getTasks, getOrganizations } from "@/utils/apiUtils";
-import { StatusCategory } from "@/types/tasks";
+import { useOrganization } from "@/contexts/organization-context";
+import { useWorkspace } from "@/contexts/workspace-context";
+import { useProject } from "@/contexts/project-context";
+import { Task, useTask } from "@/contexts/task-context";
 import { useTheme } from "next-themes";
 
 // Import shadcn/ui components
@@ -54,7 +56,8 @@ import {
 interface Project {
   id: string;
   name: string;
-  slug: string;
+  key: string;
+  workspaceId: string;
 }
 
 interface Workspace {
@@ -73,10 +76,32 @@ interface Organization {
   workspaces?: Workspace[];
 }
 
+
 export default function Dashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const { getCurrentUser, isAuthenticated } = useAuth();
+  const { 
+    currentOrganization, 
+    organizations, 
+    isLoading: orgLoading,
+    getOrganizationById
+  } = useOrganization();
+  const { 
+    workspaces, 
+    getWorkspacesByOrganization,
+    isLoading: workspaceLoading 
+  } = useWorkspace();
+  const { 
+    projects, 
+    getProjectsByUserId,
+    isLoading: projectLoading 
+  } = useProject();
+  const { 
+    tasks, 
+    getTasksByOrganization,
+    isLoading: taskLoading 
+  } = useTask();
   const { theme, systemTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -92,13 +117,15 @@ export default function Dashboard() {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("currentOrganizationId");
+      localStorage.removeItem("access_token");
       sessionStorage.removeItem("access_token");
     }
     router.push('/login');
   }, [router]);
 
   const [activeOrganization, setActiveOrganization] = useState<Organization | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [dashboardProjects, setDashboardProjects] = useState<Project[]>([]);
+  const [dashboardTasks, setDashboardTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState({
     totalTasks: 0,
     openTasks: 0,
@@ -163,64 +190,103 @@ export default function Dashboard() {
       return;
     }
 
+    if (!currentOrganizationId) {
+      console.log('No organization selected');
+      setActiveOrganization(null);
+      return;
+    }
+
     isFetchingRef.current = true;
     setIsLoading(true);
+
     try {
       const currentUser = getCurrentUser();
       if (!currentUser?.id) {
         throw new Error('User not authenticated');
       }
 
-      const projectsData = await getProjects();
-      setProjects(projectsData || []);
+      console.log('Fetching dashboard data for organization:', currentOrganizationId);
 
-      const tasksData = await getTasks();
-      const openTasks = tasksData?.filter(task => task.status.category !== StatusCategory.DONE) || [];
-      const completedTasks = tasksData?.filter(task => task.status.category === StatusCategory.DONE) || [];
-
-      if (currentOrganizationId && !isWorkspacesFetchingRef.current) {
-        try {
-          isWorkspacesFetchingRef.current = true;
-          const workspacesData = await getWorkspaces(currentOrganizationId);
-          
-          const organizations = await getOrganizations();
-          const currentOrg = organizations.find(org => org.id === currentOrganizationId);
-          
-          const organizationWithWorkspaces = {
-            id: currentOrganizationId,
-            name: currentOrg?.name || 'Current Organization',
-            slug: currentOrg?.slug || '',
-            workspaces: workspacesData || []
-          };
-          
-          setActiveOrganization(organizationWithWorkspaces);
-
-        } catch (error) {
-          console.error(`Error fetching workspaces for organization:`, error);
-          setActiveOrganization(null);
-        } finally {
-          isWorkspacesFetchingRef.current = false;
-        }
-      } else {
-        if (!currentOrganizationId) {
-          setActiveOrganization(null);
-        }
+      // Fetch organization details
+      let organizationData: Organization | null = null;
+      try {
+        const orgData = await getOrganizationById(currentOrganizationId);
+        organizationData = orgData;
+      } catch (error) {
+        console.error('Error fetching organization:', error);
       }
 
+      // Fetch workspaces for the organization
+      let workspacesData: Workspace[] = [];
+      try {
+        workspacesData = await getWorkspacesByOrganization(currentOrganizationId);
+      } catch (error) {
+        console.error('Error fetching workspaces:', error);
+      }
+
+      // Fetch projects for the current user
+      let projectsData: Project[] = [];
+      try {
+        projectsData = await getProjectsByUserId(currentUser.id);
+        setDashboardProjects(projectsData);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+
+      // Fetch tasks for the organization
+      let tasksData: Task[] = [];
+      try {
+        tasksData = await getTasksByOrganization(currentOrganizationId);
+        setDashboardTasks(tasksData);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      }
+
+      // Calculate stats
+      const openTasks = tasksData.filter(task => 
+        task.statusId !== 'completed' && task.statusId !== 'done'
+      );
+      const completedTasks = tasksData.filter(task => 
+        task.statusId === 'completed' || task.statusId === 'done'
+      );
+
       setStats({
-        totalTasks: tasksData?.length || 0,
+        totalTasks: tasksData.length,
         openTasks: openTasks.length,
         completedTasks: completedTasks.length,
-        totalProjects: projectsData?.length || 0,
+        totalProjects: projectsData.length,
       });
+
+      // Set active organization with workspaces
+      if (organizationData) {
+        setActiveOrganization({
+          ...organizationData,
+          workspaces: workspacesData
+        });
+      }
+
       setHasInitialized(true);
+      console.log('Dashboard data loaded successfully');
+
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [isHydrated, isLoading, hasInitialized, handleInvalidToken, isDashboardRoute, pathname]);
+  }, [
+    isHydrated, 
+    isLoading, 
+    hasInitialized, 
+    handleInvalidToken, 
+    isDashboardRoute,
+    getCurrentUser,
+    isAuthenticated,
+    getOrganizationById,
+    getWorkspacesByOrganization,
+    getProjectsByUserId,
+    getTasksByOrganization
+  ]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -232,7 +298,10 @@ export default function Dashboard() {
 
   const activeWorkspaces = activeOrganization?.workspaces || [];
   const defaultWorkspace = activeWorkspaces[0] || { slug: "default", id: "default" };
-  const defaultProject = projects[0] || { slug: "default", id: "default" };
+  const defaultProject = dashboardProjects[0] || { key: "default", id: "default" };
+
+  // Show loading state
+  const isAnyLoading = isLoading || orgLoading || workspaceLoading || projectLoading || taskLoading;
 
   // Helper functions for enhanced header
   const getTimeBasedGreeting = () => {
@@ -345,7 +414,11 @@ export default function Dashboard() {
                       Total Tasks
                     </p>
                     <p className="text-2xl font-bold text-[var(--foreground)]">
-                      {stats.totalTasks}
+                      {isAnyLoading ? (
+                        <span className="animate-pulse bg-[var(--muted)] h-8 w-12 rounded block"></span>
+                      ) : (
+                        stats.totalTasks
+                      )}
                     </p>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1">
@@ -373,7 +446,11 @@ export default function Dashboard() {
                       Open Tasks
                     </p>
                     <p className="text-2xl font-bold text-[var(--foreground)]">
-                      {stats.openTasks}
+                      {isAnyLoading ? (
+                        <span className="animate-pulse bg-[var(--muted)] h-8 w-12 rounded block"></span>
+                      ) : (
+                        stats.openTasks
+                      )}
                     </p>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1">
@@ -401,7 +478,11 @@ export default function Dashboard() {
                       Completed
                     </p>
                     <p className="text-2xl font-bold text-[var(--foreground)]">
-                      {stats.completedTasks}
+                      {isAnyLoading ? (
+                        <span className="animate-pulse bg-[var(--muted)] h-8 w-12 rounded block"></span>
+                      ) : (
+                        stats.completedTasks
+                      )}
                     </p>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1">
@@ -429,7 +510,11 @@ export default function Dashboard() {
                       Active Projects
                     </p>
                     <p className="text-2xl font-bold text-[var(--foreground)]">
-                      {stats.totalProjects}
+                      {isAnyLoading ? (
+                        <span className="animate-pulse bg-[var(--muted)] h-8 w-12 rounded block"></span>
+                      ) : (
+                        stats.totalProjects
+                      )}
                     </p>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1">
@@ -472,10 +557,35 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 lg:p-8">
-                {isLoading && !hasInitialized ? (
+                {isAnyLoading && !hasInitialized ? (
                   <div className="py-16 text-center">
                     <div className="animate-spin rounded-full h-10 w-10 border-2 border-[var(--primary)]/20 border-t-[var(--primary)] mx-auto mb-4"></div>
                     <p className="text-[var(--muted-foreground)]">Loading your tasks...</p>
+                  </div>
+                ) : dashboardTasks.length > 0 ? (
+                  <div className="space-y-4">
+                    {dashboardTasks.slice(0, 5).map((task) => (
+                      <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)]/50 transition-colors">
+                        <div className="w-2 h-2 rounded-full bg-[var(--primary)]" />
+                        <div className="flex-1">
+                          <p className="font-medium text-[var(--foreground)]">{task.title}</p>
+                          <p className="text-sm text-[var(--muted-foreground)] truncate">{task.description}</p>
+                        </div>
+                        <div className="text-xs text-[var(--muted-foreground)]">
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                    {dashboardTasks.length > 5 && (
+                      <div className="text-center pt-4">
+                        <Link 
+                          href="/tasks"
+                          className="text-sm text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors"
+                        >
+                          View {dashboardTasks.length - 5} more tasks
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <EmptyState
@@ -483,7 +593,7 @@ export default function Dashboard() {
                     title="Ready to get started?"
                     description="Create your first task and start organizing your work efficiently."
                     action={
-                      <Link href={`/${defaultWorkspace.slug}/${defaultProject.slug}/tasks/new`}>
+                      <Link href={`/${defaultWorkspace.slug}/${defaultProject.key}/tasks/new`}>
                         <Button className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)]">
                           <HiPlus className="w-4 h-4 mr-2" />
                           Create Task
@@ -545,7 +655,6 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
-
 
             {/* Recent Activity - Compact */}
             <Card className="border-[var(--border)] bg-[var(--card)] shadow-sm hover:shadow-md transition-shadow duration-200">
