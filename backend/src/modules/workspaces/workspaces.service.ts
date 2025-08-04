@@ -66,9 +66,37 @@ export class WorkspacesService {
     }
   }
 
-  async findAll(organizationId?: string): Promise<Workspace[]> {
-    const whereClause = organizationId ? { organizationId } : {};
+  async findAll(
+    organizationId?: string,
+    search?: string,
+  ): Promise<Workspace[]> {
+    const whereClause: any = {};
 
+    if (organizationId) {
+      whereClause.organizationId = organizationId;
+    }
+    if (search && search.trim()) {
+      whereClause.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive', // Case-insensitive search
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          slug: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
     return this.prisma.workspace.findMany({
       where: whereClause,
       include: {
@@ -91,6 +119,98 @@ export class WorkspacesService {
         createdAt: 'desc',
       },
     });
+  }
+  async findWithPagination(
+    organizationId?: string,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    workspaces: Workspace[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }> {
+    // Build where clause
+    const whereClause: any = {};
+
+    if (organizationId) {
+      whereClause.organizationId = organizationId;
+    }
+
+    // Add search filter
+    if (search && search.trim()) {
+      whereClause.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive', // Case-insensitive search
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          slug: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+
+    // Get total count for pagination
+    const totalCount = await this.prisma.workspace.count({
+      where: whereClause,
+    });
+
+    // Calculate pagination values
+    const totalPages = Math.ceil(totalCount / limit);
+    const skip = (page - 1) * limit;
+
+    // Get paginated workspaces
+    const workspaces = await this.prisma.workspace.findMany({
+      where: whereClause,
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            avatar: true,
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+            projects: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      skip,
+      take: limit,
+    });
+
+    return {
+      workspaces,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
   }
 
   async findOne(id: string): Promise<Workspace> {

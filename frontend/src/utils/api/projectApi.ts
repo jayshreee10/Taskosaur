@@ -1,6 +1,5 @@
 
 import api from '@/lib/api';
-import { authApi } from './authApi';
 
 export interface ProjectSettings {
   methodology: string;
@@ -37,6 +36,10 @@ export interface Project {
   settings: ProjectSettings;
   createdAt: string;
   updatedAt: string;
+  slug: string;
+  workspace:{
+    slug:string
+  };
   _count?: {
     tasks: number;
     members: number;

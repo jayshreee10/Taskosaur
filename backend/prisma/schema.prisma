@@ -9,84 +9,83 @@ datasource db {
 }
 
 model User {
-  id                     String               @id @default(uuid()) @db.Uuid
-  email                  String               @unique
-  username               String?              @unique
-  firstName              String               @map("first_name")
-  lastName               String               @map("last_name")
-  avatar                 String?
-  bio                    String?
-  timezone               String               @default("UTC")
-  language               String               @default("en")
-  role                   UserRole             @default(MEMBER)
-  status                 UserStatus           @default(ACTIVE)
-  lastLoginAt            DateTime?            @map("last_login_at")
-  emailVerified          Boolean              @default(false) @map("email_verified")
-  password               String?
-  refreshToken           String?              @map("refresh_token")
-  preferences            Json?
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-  resetToken             String?              @unique @map("reset_token")
-  resetTokenExpiry       DateTime?            @map("reset_token_expiry")
-  activityLogs           ActivityLog[]
-  createdAutomationRules AutomationRule[]     @relation("AutomationRuleCreatedBy")
-  updatedAutomationRules AutomationRule[]     @relation("AutomationRuleUpdatedBy")
-  notifications          Notification[]
-  organizationMembers    OrganizationMember[]
-  ownedOrganizations     Organization[]       @relation("OrganizationOwner")
-  createdOrganizations   Organization[]       @relation("OrganizationCreatedBy")
-  updatedOrganizations   Organization[]       @relation("OrganizationUpdatedBy")
-  createdWorkspaces      Workspace[]          @relation("WorkspaceCreatedBy")
-  updatedWorkspaces      Workspace[]          @relation("WorkspaceUpdatedBy")
-  createdProjects        Project[]            @relation("ProjectCreatedBy")
-  updatedProjects        Project[]            @relation("ProjectUpdatedBy")
-  createdWorkflows       Workflow[]           @relation("WorkflowCreatedBy")
-  updatedWorkflows       Workflow[]           @relation("WorkflowUpdatedBy")
-  createdTaskStatuses    TaskStatus[]         @relation("TaskStatusCreatedBy")
-  updatedTaskStatuses    TaskStatus[]         @relation("TaskStatusUpdatedBy")
-  createdStatusTransitions StatusTransition[] @relation("StatusTransitionCreatedBy")
-  updatedStatusTransitions StatusTransition[] @relation("StatusTransitionUpdatedBy")
-  createdSprints         Sprint[]             @relation("SprintCreatedBy")
-  updatedSprints         Sprint[]             @relation("SprintUpdatedBy")
-  createdLabels          Label[]              @relation("LabelCreatedBy")
-  updatedLabels          Label[]              @relation("LabelUpdatedBy")
-  createdCustomFields    CustomField[]        @relation("CustomFieldCreatedBy")
-  updatedCustomFields    CustomField[]        @relation("CustomFieldUpdatedBy")
-  projectMembers         ProjectMember[]
-  ruleExecutions         RuleExecution[]
-  taskComments           TaskComment[]
-  taskWatchers           TaskWatcher[]
-  assignedTasks          Task[]               @relation("TaskAssignee")
-  reportedTasks          Task[]               @relation("TaskReporter")
-  createdTasks           Task[]               @relation("TaskCreatedBy")
-  updatedTasks           Task[]               @relation("TaskUpdatedBy")
-  createdTaskComments    TaskComment[]        @relation("TaskCommentCreatedBy")
-  updatedTaskComments    TaskComment[]        @relation("TaskCommentUpdatedBy")
-  createdTaskAttachments TaskAttachment[]     @relation("TaskAttachmentCreatedBy")
-  updatedTaskAttachments TaskAttachment[]     @relation("TaskAttachmentUpdatedBy")
-  createdTimeEntries     TimeEntry[]          @relation("TimeEntryCreatedBy")
-  updatedTimeEntries     TimeEntry[]          @relation("TimeEntryUpdatedBy")
-  createdNotifications   Notification[]       @relation("NotificationCreatedBy")
-  updatedNotifications   Notification[]       @relation("NotificationUpdatedBy")
-  createdActivityLogs    ActivityLog[]        @relation("ActivityLogCreatedBy")
-  updatedActivityLogs    ActivityLog[]        @relation("ActivityLogUpdatedBy")
-  createdRuleExecutions  RuleExecution[]      @relation("RuleExecutionCreatedBy")
-  updatedRuleExecutions  RuleExecution[]      @relation("RuleExecutionUpdatedBy")
-  createdOrgMembers      OrganizationMember[] @relation("OrganizationMemberCreatedBy")
-  updatedOrgMembers      OrganizationMember[] @relation("OrganizationMemberUpdatedBy")
-  createdWorkspaceMembers WorkspaceMember[]   @relation("WorkspaceMemberCreatedBy")
-  updatedWorkspaceMembers WorkspaceMember[]   @relation("WorkspaceMemberUpdatedBy")
-  createdProjectMembers  ProjectMember[]      @relation("ProjectMemberCreatedBy")
-  updatedProjectMembers  ProjectMember[]      @relation("ProjectMemberUpdatedBy")
-  createdTaskLabels      TaskLabel[]          @relation("TaskLabelCreatedBy")
-  updatedTaskLabels      TaskLabel[]          @relation("TaskLabelUpdatedBy")
-  createdTaskWatchers    TaskWatcher[]        @relation("TaskWatcherCreatedBy")
-  updatedTaskWatchers    TaskWatcher[]        @relation("TaskWatcherUpdatedBy")
-  createdTaskDependencies TaskDependency[]    @relation("TaskDependencyCreatedBy")
-  updatedTaskDependencies TaskDependency[]    @relation("TaskDependencyUpdatedBy")
-  timeEntries            TimeEntry[]
-  workspaceMembers       WorkspaceMember[]
+  id                       String               @id @default(uuid()) @db.Uuid
+  email                    String               @unique
+  username                 String?              @unique
+  firstName                String               @map("first_name")
+  lastName                 String               @map("last_name")
+  avatar                   String?
+  bio                      String?
+  timezone                 String               @default("UTC")
+  language                 String               @default("en")
+  role                     UserRole             @default(MEMBER)
+  status                   UserStatus           @default(ACTIVE)
+  lastLoginAt              DateTime?            @map("last_login_at")
+  emailVerified            Boolean              @default(false) @map("email_verified")
+  password                 String?
+  refreshToken             String?              @map("refresh_token")
+  preferences              Json?
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
+  resetToken               String?              @unique @map("reset_token")
+  resetTokenExpiry         DateTime?            @map("reset_token_expiry")
+  activityLogs             ActivityLog[]
+  createdAutomationRules   AutomationRule[]     @relation("AutomationRuleCreatedBy")
+  updatedAutomationRules   AutomationRule[]     @relation("AutomationRuleUpdatedBy")
+  notifications            Notification[]
+  organizationMembers      OrganizationMember[]
+  ownedOrganizations       Organization[]       @relation("OrganizationOwner")
+  createdOrganizations     Organization[]       @relation("OrganizationCreatedBy")
+  updatedOrganizations     Organization[]       @relation("OrganizationUpdatedBy")
+  createdWorkspaces        Workspace[]          @relation("WorkspaceCreatedBy")
+  updatedWorkspaces        Workspace[]          @relation("WorkspaceUpdatedBy")
+  createdProjects          Project[]            @relation("ProjectCreatedBy")
+  updatedProjects          Project[]            @relation("ProjectUpdatedBy")
+  createdWorkflows         Workflow[]           @relation("WorkflowCreatedBy")
+  updatedWorkflows         Workflow[]           @relation("WorkflowUpdatedBy")
+  createdTaskStatuses      TaskStatus[]         @relation("TaskStatusCreatedBy")
+  updatedTaskStatuses      TaskStatus[]         @relation("TaskStatusUpdatedBy")
+  createdStatusTransitions StatusTransition[]   @relation("StatusTransitionCreatedBy")
+  updatedStatusTransitions StatusTransition[]   @relation("StatusTransitionUpdatedBy")
+  createdSprints           Sprint[]             @relation("SprintCreatedBy")
+  updatedSprints           Sprint[]             @relation("SprintUpdatedBy")
+  createdLabels            Label[]              @relation("LabelCreatedBy")
+  updatedLabels            Label[]              @relation("LabelUpdatedBy")
+  createdCustomFields      CustomField[]        @relation("CustomFieldCreatedBy")
+  updatedCustomFields      CustomField[]        @relation("CustomFieldUpdatedBy")
+  projectMembers           ProjectMember[]
+  ruleExecutions           RuleExecution[]
+  taskComments             TaskComment[]
+  taskWatchers             TaskWatcher[]
+  assignedTasks            Task[]               @relation("TaskAssignee")
+  reportedTasks            Task[]               @relation("TaskReporter")
+  createdTasks             Task[]               @relation("TaskCreatedBy")
+  updatedTasks             Task[]               @relation("TaskUpdatedBy")
+  createdTaskComments      TaskComment[]        @relation("TaskCommentCreatedBy")
+  updatedTaskComments      TaskComment[]        @relation("TaskCommentUpdatedBy")
+  createdTaskAttachments   TaskAttachment[]     @relation("TaskAttachmentCreatedBy")
+  updatedTaskAttachments   TaskAttachment[]     @relation("TaskAttachmentUpdatedBy")
+  createdTimeEntries       TimeEntry[]          @relation("TimeEntryCreatedBy")
+  updatedTimeEntries       TimeEntry[]          @relation("TimeEntryUpdatedBy")
+  createdNotifications     Notification[]       @relation("NotificationCreatedBy")
+  createdActivityLogs      ActivityLog[]        @relation("ActivityLogCreatedBy")
+  updatedActivityLogs      ActivityLog[]        @relation("ActivityLogUpdatedBy")
+  createdRuleExecutions    RuleExecution[]      @relation("RuleExecutionCreatedBy")
+  updatedRuleExecutions    RuleExecution[]      @relation("RuleExecutionUpdatedBy")
+  createdOrgMembers        OrganizationMember[] @relation("OrganizationMemberCreatedBy")
+  updatedOrgMembers        OrganizationMember[] @relation("OrganizationMemberUpdatedBy")
+  createdWorkspaceMembers  WorkspaceMember[]    @relation("WorkspaceMemberCreatedBy")
+  updatedWorkspaceMembers  WorkspaceMember[]    @relation("WorkspaceMemberUpdatedBy")
+  createdProjectMembers    ProjectMember[]      @relation("ProjectMemberCreatedBy")
+  updatedProjectMembers    ProjectMember[]      @relation("ProjectMemberUpdatedBy")
+  createdTaskLabels        TaskLabel[]          @relation("TaskLabelCreatedBy")
+  updatedTaskLabels        TaskLabel[]          @relation("TaskLabelUpdatedBy")
+  createdTaskWatchers      TaskWatcher[]        @relation("TaskWatcherCreatedBy")
+  updatedTaskWatchers      TaskWatcher[]        @relation("TaskWatcherUpdatedBy")
+  createdTaskDependencies  TaskDependency[]     @relation("TaskDependencyCreatedBy")
+  updatedTaskDependencies  TaskDependency[]     @relation("TaskDependencyUpdatedBy")
+  timeEntries              TimeEntry[]
+  workspaceMembers         WorkspaceMember[]
 
   @@map("users")
 }
@@ -99,9 +98,9 @@ model Organization {
   avatar          String?
   website         String?
   settings        Json?
-  ownerId         String               @db.Uuid @map("owner_id")
-  createdBy       String?              @db.Uuid @map("created_by_id")
-  updatedBy       String?              @db.Uuid @map("updated_by_id")
+  ownerId         String               @map("owner_id") @db.Uuid
+  createdBy       String?              @map("created_by_id") @db.Uuid
+  updatedBy       String?              @map("updated_by_id") @db.Uuid
   createdAt       DateTime             @default(now()) @map("created_at")
   updatedAt       DateTime             @updatedAt @map("updated_at")
   automationRules AutomationRule[]
@@ -112,6 +111,8 @@ model Organization {
   updatedByUser   User?                @relation("OrganizationUpdatedBy", fields: [updatedBy], references: [id])
   workflows       Workflow[]
   workspaces      Workspace[]
+  ActivityLog     ActivityLog[]
+  Notification    Notification[]
 
   @@map("organizations")
 }
@@ -120,10 +121,10 @@ model OrganizationMember {
   id             String           @id @default(uuid()) @db.Uuid
   role           OrganizationRole @default(MEMBER)
   joinedAt       DateTime         @default(now()) @map("joined_at")
-  userId         String           @db.Uuid @map("user_id")
-  organizationId String           @db.Uuid @map("organization_id")
-  createdBy      String?          @db.Uuid @map("created_by_id")
-  updatedBy      String?          @db.Uuid @map("updated_by_id")
+  userId         String           @map("user_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  createdBy      String?          @map("created_by_id") @db.Uuid
+  updatedBy      String?          @map("updated_by_id") @db.Uuid
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -143,9 +144,9 @@ model Workspace {
   avatar          String?
   color           String?
   settings        Json?
-  organizationId  String            @db.Uuid @map("organization_id")
-  createdBy       String?           @db.Uuid @map("created_by_id")
-  updatedBy       String?           @db.Uuid @map("updated_by_id")
+  organizationId  String            @map("organization_id") @db.Uuid
+  createdBy       String?           @map("created_by_id") @db.Uuid
+  updatedBy       String?           @map("updated_by_id") @db.Uuid
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
   automationRules AutomationRule[]
@@ -163,10 +164,10 @@ model WorkspaceMember {
   id            String        @id @default(uuid()) @db.Uuid
   role          WorkspaceRole @default(MEMBER)
   joinedAt      DateTime      @default(now()) @map("joined_at")
-  userId        String        @db.Uuid @map("user_id")
-  workspaceId   String        @db.Uuid @map("workspace_id")
-  createdBy     String?       @db.Uuid @map("created_by_id")
-  updatedBy     String?       @db.Uuid @map("updated_by_id")
+  userId        String        @map("user_id") @db.Uuid
+  workspaceId   String        @map("workspace_id") @db.Uuid
+  createdBy     String?       @map("created_by_id") @db.Uuid
+  updatedBy     String?       @map("updated_by_id") @db.Uuid
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -183,22 +184,24 @@ model Project {
   name            String
   slug            String           @unique
   description     String?
-  avatar          String?
-  color           String?
+  avatar          String? // Made required (removed ?)
+  color           String // Made required (removed ?)
   status          ProjectStatus    @default(PLANNING)
   priority        ProjectPriority  @default(MEDIUM)
   startDate       DateTime?        @map("start_date")
   endDate         DateTime?        @map("end_date")
   settings        Json?
-  workspaceId     String           @db.Uuid @map("workspace_id")
-  createdBy       String?          @db.Uuid @map("created_by_id")
-  updatedBy       String?          @db.Uuid @map("updated_by_id")
+  workflowId      String           @map("workflow_id") @db.Uuid
+  workspaceId     String           @map("workspace_id") @db.Uuid
+  createdBy       String?          @map("created_by_id") @db.Uuid
+  updatedBy       String?          @map("updated_by_id") @db.Uuid
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   automationRules AutomationRule[]
   labels          Label[]
   members         ProjectMember[]
   workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflow        Workflow?        @relation(fields: [workflowId], references: [id])
   createdByUser   User?            @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
   updatedByUser   User?            @relation("ProjectUpdatedBy", fields: [updatedBy], references: [id])
   sprints         Sprint[]
@@ -212,10 +215,10 @@ model ProjectMember {
   id            String      @id @default(uuid()) @db.Uuid
   role          ProjectRole @default(DEVELOPER)
   joinedAt      DateTime    @default(now()) @map("joined_at")
-  userId        String      @db.Uuid @map("user_id")
-  projectId     String      @db.Uuid @map("project_id")
-  createdBy     String?     @db.Uuid @map("created_by_id")
-  updatedBy     String?     @db.Uuid @map("updated_by_id")
+  userId        String      @map("user_id") @db.Uuid
+  projectId     String      @map("project_id") @db.Uuid
+  createdBy     String?     @map("created_by_id") @db.Uuid
+  updatedBy     String?     @map("updated_by_id") @db.Uuid
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -242,14 +245,14 @@ model Task {
   originalEstimate  Int?             @map("original_estimate")
   remainingEstimate Int?             @map("remaining_estimate")
   customFields      Json?            @map("custom_fields")
-  projectId         String           @db.Uuid @map("project_id")
-  assigneeId        String?          @db.Uuid @map("assignee_id")
-  reporterId        String           @db.Uuid @map("reporter_id")
-  statusId          String           @db.Uuid @map("status_id")
-  sprintId          String?          @db.Uuid @map("sprint_id")
-  parentTaskId      String?          @db.Uuid @map("parent_task_id")
-  createdBy         String?          @db.Uuid @map("created_by_id")
-  updatedBy         String?          @db.Uuid @map("updated_by_id")
+  projectId         String           @map("project_id") @db.Uuid
+  assigneeId        String?          @map("assignee_id") @db.Uuid
+  reporterId        String           @map("reporter_id") @db.Uuid
+  statusId          String           @map("status_id") @db.Uuid
+  sprintId          String?          @map("sprint_id") @db.Uuid
+  parentTaskId      String?          @map("parent_task_id") @db.Uuid
+  createdBy         String?          @map("created_by_id") @db.Uuid
+  updatedBy         String?          @map("updated_by_id") @db.Uuid
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
   attachments       TaskAttachment[]
@@ -276,10 +279,10 @@ model Task {
 model TaskDependency {
   id              String         @id @default(uuid()) @db.Uuid
   type            DependencyType @default(BLOCKS)
-  dependentTaskId String         @db.Uuid @map("dependent_task_id")
-  blockingTaskId  String         @db.Uuid @map("blocking_task_id")
-  createdBy       String?        @db.Uuid @map("created_by_id")
-  updatedBy       String?        @db.Uuid @map("updated_by_id")
+  dependentTaskId String         @map("dependent_task_id") @db.Uuid
+  blockingTaskId  String         @map("blocking_task_id") @db.Uuid
+  createdBy       String?        @map("created_by_id") @db.Uuid
+  updatedBy       String?        @map("updated_by_id") @db.Uuid
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
   blockingTask    Task           @relation("BlockingTask", fields: [blockingTaskId], references: [id], onDelete: Cascade)
@@ -296,9 +299,9 @@ model Workflow {
   name           String
   description    String?
   isDefault      Boolean            @default(false) @map("is_default")
-  organizationId String             @db.Uuid @map("organization_id")
-  createdBy      String?            @db.Uuid @map("created_by_id")
-  updatedBy      String?            @db.Uuid @map("updated_by_id")
+  organizationId String             @map("organization_id") @db.Uuid
+  createdBy      String?            @map("created_by_id") @db.Uuid
+  updatedBy      String?            @map("updated_by_id") @db.Uuid
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
   transitions    StatusTransition[]
@@ -306,6 +309,7 @@ model Workflow {
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByUser  User?              @relation("WorkflowCreatedBy", fields: [createdBy], references: [id])
   updatedByUser  User?              @relation("WorkflowUpdatedBy", fields: [updatedBy], references: [id])
+  Project        Project[]
 
   @@map("workflows")
 }
@@ -316,12 +320,12 @@ model TaskStatus {
   color           String
   category        StatusCategory
   position        Int
-  isDefault       Boolean            @default(false)  // ✅ Add this field
+  isDefault       Boolean            @default(false) // ✅ Add this field
   workflowId      String             @db.Uuid
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
-  createdBy       String?            @db.Uuid @map("created_by_id")
-  updatedBy       String?            @db.Uuid @map("updated_by_id")
+  createdBy       String?            @map("created_by_id") @db.Uuid
+  updatedBy       String?            @map("updated_by_id") @db.Uuid
   fromTransitions StatusTransition[] @relation("FromStatus")
   toTransitions   StatusTransition[] @relation("ToStatus")
   workflow        Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
@@ -334,70 +338,71 @@ model TaskStatus {
 }
 
 model StatusTransition {
-  id           String     @id @default(uuid()) @db.Uuid
-  name         String?
-  description  String?
-  workflowId   String     @db.Uuid @map("workflow_id")
-  fromStatusId String     @db.Uuid @map("from_status_id")
-  toStatusId   String     @db.Uuid @map("to_status_id")
-  createdBy    String?    @db.Uuid @map("created_by_id")
-  updatedBy    String?    @db.Uuid @map("updated_by_id")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
-  fromStatus   TaskStatus @relation("FromStatus", fields: [fromStatusId], references: [id])
-  toStatus     TaskStatus @relation("ToStatus", fields: [toStatusId], references: [id])
-  workflow     Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  createdByUser User?     @relation("StatusTransitionCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser User?     @relation("StatusTransitionUpdatedBy", fields: [updatedBy], references: [id])
+  id            String     @id @default(uuid()) @db.Uuid
+  name          String?
+  description   String?
+  workflowId    String     @map("workflow_id") @db.Uuid
+  fromStatusId  String     @map("from_status_id") @db.Uuid
+  toStatusId    String     @map("to_status_id") @db.Uuid
+  createdBy     String?    @map("created_by_id") @db.Uuid
+  updatedBy     String?    @map("updated_by_id") @db.Uuid
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  fromStatus    TaskStatus @relation("FromStatus", fields: [fromStatusId], references: [id])
+  toStatus      TaskStatus @relation("ToStatus", fields: [toStatusId], references: [id])
+  workflow      Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  createdByUser User?      @relation("StatusTransitionCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?      @relation("StatusTransitionUpdatedBy", fields: [updatedBy], references: [id])
 
   @@unique([workflowId, fromStatusId, toStatusId])
   @@map("status_transitions")
 }
 
 model Sprint {
-  id        String       @id @default(uuid()) @db.Uuid
-  name      String
-  goal      String?
-  status    SprintStatus @default(PLANNING)
-  startDate DateTime?    @map("start_date")
-  endDate   DateTime?    @map("end_date")
-  projectId String       @db.Uuid @map("project_id")
-  createdBy String?      @db.Uuid @map("created_by_id")
-  updatedBy String?      @db.Uuid @map("updated_by_id")
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
-  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdByUser User?     @relation("SprintCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser User?     @relation("SprintUpdatedBy", fields: [updatedBy], references: [id])
-  tasks     Task[]
+  id            String       @id @default(uuid()) @db.Uuid
+  name          String
+  goal          String?
+  status        SprintStatus @default(PLANNING)
+  isDefault     Boolean      @default(false) // ✅ Add this field
+  startDate     DateTime?    @map("start_date")
+  endDate       DateTime?    @map("end_date")
+  projectId     String       @map("project_id") @db.Uuid
+  createdBy     String?      @map("created_by_id") @db.Uuid
+  updatedBy     String?      @map("updated_by_id") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User?        @relation("SprintCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?        @relation("SprintUpdatedBy", fields: [updatedBy], references: [id])
+  tasks         Task[]
 
   @@map("sprints")
 }
 
 model Label {
-  id          String      @id @default(uuid()) @db.Uuid
-  name        String
-  color       String
-  description String?
-  projectId   String      @db.Uuid @map("project_id")
-  createdBy   String?     @db.Uuid @map("created_by_id")
-  updatedBy   String?     @db.Uuid @map("updated_by_id")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdByUser User?     @relation("LabelCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser User?     @relation("LabelUpdatedBy", fields: [updatedBy], references: [id])
-  taskLabels  TaskLabel[]
+  id            String      @id @default(uuid()) @db.Uuid
+  name          String
+  color         String
+  description   String?
+  projectId     String      @map("project_id") @db.Uuid
+  createdBy     String?     @map("created_by_id") @db.Uuid
+  updatedBy     String?     @map("updated_by_id") @db.Uuid
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User?       @relation("LabelCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?       @relation("LabelUpdatedBy", fields: [updatedBy], references: [id])
+  taskLabels    TaskLabel[]
 
   @@unique([projectId, name])
   @@map("labels")
 }
 
 model TaskLabel {
-  taskId        String   @db.Uuid @map("task_id")
-  labelId       String   @db.Uuid @map("label_id")
-  createdBy     String?  @db.Uuid @map("created_by_id")
-  updatedBy     String?  @db.Uuid @map("updated_by_id")
+  taskId        String   @map("task_id") @db.Uuid
+  labelId       String   @map("label_id") @db.Uuid
+  createdBy     String?  @map("created_by_id") @db.Uuid
+  updatedBy     String?  @map("updated_by_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   label         Label    @relation(fields: [labelId], references: [id], onDelete: Cascade)
@@ -411,10 +416,10 @@ model TaskLabel {
 
 model TaskWatcher {
   id            String   @id @default(uuid()) @db.Uuid
-  taskId        String   @db.Uuid @map("task_id")
-  userId        String   @db.Uuid @map("user_id")
-  createdBy     String?  @db.Uuid @map("created_by_id")
-  updatedBy     String?  @db.Uuid @map("updated_by_id")
+  taskId        String   @map("task_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  createdBy     String?  @map("created_by_id") @db.Uuid
+  updatedBy     String?  @map("updated_by_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -429,11 +434,11 @@ model TaskWatcher {
 model TaskComment {
   id              String        @id @default(uuid()) @db.Uuid
   content         String
-  taskId          String        @db.Uuid @map("task_id")
-  authorId        String        @db.Uuid @map("author_id")
-  parentCommentId String?       @db.Uuid @map("parent_comment_id")
-  createdBy       String?       @db.Uuid @map("created_by_id")
-  updatedBy       String?       @db.Uuid @map("updated_by_id")
+  taskId          String        @map("task_id") @db.Uuid
+  authorId        String        @map("author_id") @db.Uuid
+  parentCommentId String?       @map("parent_comment_id") @db.Uuid
+  createdBy       String?       @map("created_by_id") @db.Uuid
+  updatedBy       String?       @map("updated_by_id") @db.Uuid
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
   author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -447,14 +452,14 @@ model TaskComment {
 }
 
 model TaskAttachment {
-  id        String   @id @default(uuid()) @db.Uuid
-  fileName  String   @map("file_name")
-  filePath  String   @map("file_path")
-  fileSize  Int      @map("file_size")
+  id            String   @id @default(uuid()) @db.Uuid
+  fileName      String   @map("file_name")
+  filePath      String   @map("file_path")
+  fileSize      Int      @map("file_size")
   mimeType      String   @map("mime_type")
-  taskId        String   @db.Uuid @map("task_id")
-  createdBy     String?  @db.Uuid @map("created_by_id")
-  updatedBy     String?  @db.Uuid @map("updated_by_id")
+  taskId        String   @map("task_id") @db.Uuid
+  createdBy     String?  @map("created_by_id") @db.Uuid
+  updatedBy     String?  @map("updated_by_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -465,16 +470,16 @@ model TaskAttachment {
 }
 
 model TimeEntry {
-  id          String    @id @default(uuid()) @db.Uuid
-  description String?
-  timeSpent   Int       @map("time_spent")
-  startTime   DateTime? @map("start_time")
-  endTime     DateTime? @map("end_time")
+  id            String    @id @default(uuid()) @db.Uuid
+  description   String?
+  timeSpent     Int       @map("time_spent")
+  startTime     DateTime? @map("start_time")
+  endTime       DateTime? @map("end_time")
   date          DateTime  @default(now())
-  taskId        String    @db.Uuid @map("task_id")
-  userId        String    @db.Uuid @map("user_id")
-  createdBy     String?   @db.Uuid @map("created_by_id")
-  updatedBy     String?   @db.Uuid @map("updated_by_id")
+  taskId        String    @map("task_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  createdBy     String?   @map("created_by_id") @db.Uuid
+  updatedBy     String?   @map("updated_by_id") @db.Uuid
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -492,9 +497,9 @@ model CustomField {
   description    String?
   isRequired     Boolean         @default(false) @map("is_required")
   options        Json?
-  organizationId String          @db.Uuid @map("organization_id")
-  createdBy      String?         @db.Uuid @map("created_by_id")
-  updatedBy      String?         @db.Uuid @map("updated_by_id")
+  organizationId String          @map("organization_id") @db.Uuid
+  createdBy      String?         @map("created_by_id") @db.Uuid
+  updatedBy      String?         @map("updated_by_id") @db.Uuid
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -506,40 +511,54 @@ model CustomField {
 }
 
 model Notification {
-  id        String           @id @default(uuid()) @db.Uuid
-  type      NotificationType
-  title     String
-  message   String
-  isRead    Boolean          @default(false) @map("is_read")
-  data          Json?
-  userId        String           @db.Uuid @map("user_id")
-  createdBy     String?          @db.Uuid @map("created_by_id")
-  updatedBy     String?          @db.Uuid @map("updated_by_id")
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdByUser User?            @relation("NotificationCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser User?            @relation("NotificationUpdatedBy", fields: [updatedBy], references: [id])
+  id             String               @id @default(uuid()) @db.Uuid
+  title          String
+  message        String
+  type           NotificationType
+  priority       NotificationPriority @default(MEDIUM)
+  isRead         Boolean              @default(false)
+  entityType     String?              @map("entity_type") // Task, Project, etc.
+  entityId       String?              @map("entity_id") @db.Uuid
+  actionUrl      String?              @map("action_url")
+  userId         String               @map("user_id") @db.Uuid
+  organizationId String?              @map("organization_id") @db.Uuid
+  createdBy      String?              @map("created_by_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  readAt         DateTime?            @map("read_at")
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization  Organization? @relation(fields: [organizationId], references: [id])
+  createdByUser User?         @relation("NotificationCreatedBy", fields: [createdBy], references: [id])
 
   @@map("notifications")
 }
 
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 model ActivityLog {
-  id          String       @id @default(uuid()) @db.Uuid
-  type        ActivityType
-  description String
-  entityType  String       @map("entity_type")
-  entityId    String       @db.Uuid @map("entity_id")
-  oldValue    Json?        @map("old_value")
-  newValue      Json?        @map("new_value")
-  userId        String       @db.Uuid @map("user_id")
-  createdBy     String?      @db.Uuid @map("created_by_id")
-  updatedBy     String?      @db.Uuid @map("updated_by_id")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdByUser User?        @relation("ActivityLogCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser User?        @relation("ActivityLogUpdatedBy", fields: [updatedBy], references: [id])
+  id             String        @id @default(uuid()) @db.Uuid
+  type           ActivityType
+  description    String
+  entityType     String        @map("entity_type")
+  entityId       String        @map("entity_id") @db.Uuid
+  oldValue       Json?         @map("old_value")
+  newValue       Json?         @map("new_value")
+  userId         String        @map("user_id") @db.Uuid
+  organizationId String?       @map("organization_id") @db.Uuid
+  createdBy      String?       @map("created_by_id") @db.Uuid
+  updatedBy      String?       @map("updated_by_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  createdByUser  User?         @relation("ActivityLogCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser  User?         @relation("ActivityLogUpdatedBy", fields: [updatedBy], references: [id])
 
   @@map("activity_logs")
 }
@@ -553,13 +572,13 @@ model AutomationRule {
   triggerConfig  Json?           @map("trigger_config")
   actionType     ActionType      @map("action_type")
   actionConfig   Json?           @map("action_config")
-  organizationId String?         @db.Uuid @map("organization_id")
-  workspaceId    String?         @db.Uuid @map("workspace_id")
-  projectId      String?         @db.Uuid @map("project_id")
+  organizationId String?         @map("organization_id") @db.Uuid
+  workspaceId    String?         @map("workspace_id") @db.Uuid
+  projectId      String?         @map("project_id") @db.Uuid
   executionCount Int             @default(0) @map("execution_count")
   lastExecuted   DateTime?       @map("last_executed")
-  createdBy      String?         @db.Uuid @map("created_by_id")
-  updatedBy      String?         @db.Uuid @map("updated_by_id")
+  createdBy      String?         @map("created_by_id") @db.Uuid
+  updatedBy      String?         @map("updated_by_id") @db.Uuid
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   createdByUser  User?           @relation("AutomationRuleCreatedBy", fields: [createdBy], references: [id])
@@ -579,10 +598,10 @@ model RuleExecution {
   executionTime Int            @map("execution_time")
   triggerData   Json?          @map("trigger_data")
   actionResult  Json?          @map("action_result")
-  ruleId        String         @db.Uuid @map("rule_id")
-  triggeredById String?        @db.Uuid @map("triggered_by_id")
-  createdBy     String?        @db.Uuid @map("created_by_id")
-  updatedBy     String?        @db.Uuid @map("updated_by_id")
+  ruleId        String         @map("rule_id") @db.Uuid
+  triggeredById String?        @map("triggered_by_id") @db.Uuid
+  createdBy     String?        @map("created_by_id") @db.Uuid
+  updatedBy     String?        @map("updated_by_id") @db.Uuid
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   rule          AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
@@ -694,13 +713,14 @@ enum CustomFieldType {
 
 enum NotificationType {
   TASK_ASSIGNED
-  TASK_UPDATED
+  TASK_STATUS_CHANGED
   TASK_COMMENTED
-  TASK_COMPLETED
-  SPRINT_STARTED
-  SPRINT_COMPLETED
+  TASK_DUE_SOON
+  PROJECT_CREATED
   PROJECT_UPDATED
+  WORKSPACE_INVITED
   MENTION
+  SYSTEM
 }
 
 enum ActivityType {

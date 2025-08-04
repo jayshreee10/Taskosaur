@@ -150,7 +150,7 @@ export class AuthController {
   async verifyResetToken(
     @Param('token') token: string,
   ): Promise<VerifyResetTokenResponseDto> {
-    const isValid = await this.authService.verifyResetToken(token);
+    const {isValid} = await this.authService.verifyResetToken(token);
     return {
       valid: isValid,
       message: isValid ? 'Token is valid' : 'Invalid or expired token',

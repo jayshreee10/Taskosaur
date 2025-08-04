@@ -142,7 +142,36 @@ export class OrganizationMembersService {
       ],
     });
   }
-
+  async findAllByOrgSlug(slug?: string): Promise<OrganizationMember[]> {
+    return this.prisma.organizationMember.findMany({
+      where: { organization: { slug: slug } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            status: true,
+            lastLoginAt: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: [
+        { role: 'asc' }, // Admins first
+        { joinedAt: 'asc' },
+      ],
+    });
+  }
   async findOne(id: string): Promise<OrganizationMember> {
     const member = await this.prisma.organizationMember.findUnique({
       where: { id },

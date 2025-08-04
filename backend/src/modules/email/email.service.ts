@@ -414,4 +414,63 @@ export class EmailService {
       failed: failed.length,
     };
   }
+  async sendPasswordResetEmail(
+  email: string,
+  data: {
+    userName: string;
+    resetToken: string;
+    resetUrl: string;
+  },
+): Promise<void> {
+  try {
+    await this.sendEmail({
+      to: email,
+      subject: 'Reset Your Password',
+      template: EmailTemplate.PASSWORD_RESET, // Add this to your EmailTemplate enum if not exists
+      data: {
+        userName: data.userName,
+        resetToken: data.resetToken,
+        resetUrl: data.resetUrl,
+        // Add any other data your email template needs
+      },
+      priority: EmailPriority.HIGH, // Password reset is high priority
+    });
+
+    this.logger.log(`Password reset email queued for ${email}`);
+  } catch (error) {
+    this.logger.error(`Failed to send password reset email: ${error.message}`);
+    throw error; // Re-throw to handle at caller level
+  }
+}
+// src/modules/email/email.service.ts
+async sendPasswordResetConfirmationEmail(
+  email: string,
+  data: {
+    userName: string;
+    resetTime: string;
+  },
+): Promise<void> {
+  try {
+    const emailData = {
+      ...data,
+      supportEmail: this.configService.get('SUPPORT_EMAIL', 'support@taskosaur.com'),
+      companyName: 'Taskosaur',
+    };
+
+    await this.sendEmail({
+      to: email,
+      subject: 'Password Successfully Reset - Taskosaur',
+      template: EmailTemplate.PASSWORD_RESET_CONFIRMATION,
+      data: emailData,
+      priority: EmailPriority.HIGH,
+    });
+
+    console.log(`Password reset confirmation email sent to: ${email}`);
+  } catch (error) {
+    console.error(`Failed to send password reset confirmation email to ${email}:`, error);
+    // Don't throw error here as password was already reset successfully
+  }
+}
+
+
 }

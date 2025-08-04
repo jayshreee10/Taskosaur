@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsDateString,
   IsObject,
+  IsUUID,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ProjectStatus, ProjectPriority } from '@prisma/client';
@@ -31,15 +32,21 @@ export class CreateProjectDto {
   slug: string;
 
   @ApiProperty({
-    description: 'Unique project key for task prefixes',
-    example: 'ECOM',
-    pattern: '^[A-Z]{2,10}$',
-    minLength: 2,
-    maxLength: 10,
+    description: 'Project color theme (hex code)',
+    example: '#3498db',
+    pattern: '^#[0-9A-Fa-f]{6}$',
   })
   @IsString()
   @IsNotEmpty()
-  key: string;
+  color: string;
+
+  @ApiProperty({
+    description: 'URL to project avatar/icon',
+    example: 'https://example.com/projects/ecom-icon.png',
+  })
+  @IsString()
+  @IsOptional()
+  avatar: string;
 
   @ApiProperty({
     description: 'Project description and objectives',
@@ -53,28 +60,9 @@ export class CreateProjectDto {
   description?: string;
 
   @ApiProperty({
-    description: 'URL to project avatar/icon',
-    example: 'https://example.com/projects/ecom-icon.png',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  avatar?: string;
-
-  @ApiProperty({
-    description: 'Project color theme (hex code)',
-    example: '#3498db',
-    pattern: '^#[0-9A-Fa-f]{6}$',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  color?: string;
-
-  @ApiProperty({
     description: 'Current project status',
     enum: ProjectStatus,
-    example: ProjectStatus.ACTIVE,
+    example: ProjectStatus.PLANNING,
     required: false,
     default: ProjectStatus.PLANNING,
   })
@@ -85,7 +73,7 @@ export class CreateProjectDto {
   @ApiProperty({
     description: 'Project priority level',
     enum: ProjectPriority,
-    example: ProjectPriority.HIGH,
+    example: ProjectPriority.MEDIUM,
     required: false,
     default: ProjectPriority.MEDIUM,
   })
@@ -132,8 +120,19 @@ export class CreateProjectDto {
     description: 'ID of the workspace this project belongs to',
     example: '123e4567-e89b-12d3-a456-426614174000',
     format: 'uuid',
+    required: false,
   })
   @IsString()
-  @IsNotEmpty()
   workspaceId: string;
+
+  @ApiProperty({
+    description: 'ID of the workflow to use for this project (if not provided, organization default will be used)',
+    example: '123e4567-e89b-12d3-a456-426614174001',
+    format: 'uuid',
+    required: false,
+  })
+  @IsString()
+  @IsUUID()
+  @IsOptional()
+  workflowId?: string;
 }

@@ -1,0 +1,405 @@
+// src/common/interceptors/activity-notification.interceptor.ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
+import { NotificationsService } from '../../modules/notifications/notifications.service';
+import { Reflector } from '@nestjs/core';
+import { NotificationType, NotificationPriority } from '@prisma/client';
+import { ActivityLogService } from 'src/modules/activity-log/activity-log.service';
+
+@Injectable()
+export class ActivityNotificationInterceptor implements NestInterceptor {
+  constructor(
+    private activityLogService: ActivityLogService,
+    private notificationsService: NotificationsService,
+    private reflector: Reflector,
+  ) {}
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const request = context.switchToHttp().getRequest();
+    const handler = context.getHandler();
+
+    const activityConfig = this.reflector.get('activity-log', handler);
+    const notificationConfig = this.reflector.get('notification-config', handler);
+
+    if (!activityConfig && !notificationConfig) {
+      return next.handle();
+    }
+
+    const userId = request.user?.id;
+    const organizationId =
+      request.user?.currentOrganizationId ||
+      request.headers['x-organization-id'];
+    const originalData = request.body;
+
+    return next.handle().pipe(
+      tap(async (result) => {
+        try {
+          // Handle activity logging
+          if (userId && activityConfig) {
+            await this.logActivity(
+              activityConfig,
+              userId,
+              organizationId,
+              originalData,
+              result,
+            );
+          }
+
+          // Handle notifications
+          if (notificationConfig) {
+            await this.sendNotification(
+              notificationConfig,
+              request.user,
+              organizationId,
+              originalData,
+              result,
+            );
+          }
+        } catch (error) {
+          console.error('Error in activity/notification interceptor:', error);
+        }
+      }),
+    );
+  }
+
+  private async logActivity(
+    config: any,
+    userId: string,
+    organizationId: string | undefined,
+    oldValue: any,
+    newValue: any,
+  ) {
+    let finalOrganizationId = organizationId;
+
+    if (!finalOrganizationId) {
+      const entityId = newValue?.id || oldValue?.id;
+      if (entityId) {
+        finalOrganizationId =
+          await this.activityLogService.getOrganizationIdFromEntity(
+            config.entityType,
+            entityId,
+          );
+      }
+    }
+
+    await this.activityLogService.logActivity({
+      type: config.type,
+      description: config.description,
+      entityType: config.entityType,
+      entityId: newValue?.id || oldValue?.id,
+      userId,
+      organizationId: finalOrganizationId,
+      oldValue: config.includeOldValue ? oldValue : undefined,
+      newValue: config.includeNewValue ? newValue : undefined,
+    });
+  }
+
+  private async sendNotification(
+    config: any,
+    user: any,
+    organizationId: string | undefined,
+    requestData: any,
+    responseData: any,
+  ) {
+    let finalOrganizationId = organizationId;
+
+    if (!finalOrganizationId) {
+      const entityId = responseData?.id || config.entityId;
+      if (entityId) {
+        finalOrganizationId =
+          await this.activityLogService.getOrganizationIdFromEntity(
+            config.entityType,
+            entityId,
+          );
+      }
+    }
+
+    const notifyUserIds = await this.getNotificationRecipients(
+      config,
+      user,
+      requestData,
+      responseData,
+    );
+
+    if (notifyUserIds.length === 0) {
+      return;
+    }
+
+    for (const notifyUserId of notifyUserIds) {
+      try {
+        await this.notificationsService.createNotification({
+          title: config.title || this.generateTitle(config.type, responseData),
+          message:
+            config.message ||
+            this.generateMessage(config.type, user, responseData),
+          type: config.type,
+          userId: notifyUserId,
+          organizationId: finalOrganizationId,
+          entityType: config.entityType,
+          entityId: responseData.id || config.entityId,
+          actionUrl:
+            config.actionUrl ||
+            this.generateActionUrl(config.entityType, responseData.id),
+          createdBy: user.id,
+          priority: config.priority || NotificationPriority.MEDIUM,
+        });
+      } catch (error) {
+        console.error(
+          `❌ Failed to create notification for user ${notifyUserId}:`,
+          error,
+        );
+      }
+    }
+  }
+
+  // ✅ Updated to handle all notification types
+  private async getNotificationRecipients(
+    config: any,
+    user: any,
+    requestData: any,
+    responseData: any,
+  ): Promise<string[]> {
+    const recipients: string[] = [];
+
+    switch (config.type) {
+      // ✅ Task-related notifications
+      case NotificationType.TASK_ASSIGNED:
+        const assigneeId = requestData.assigneeId || responseData.assigneeId;
+        if (assigneeId) {
+          recipients.push(assigneeId);
+        }
+        break;
+
+      case NotificationType.TASK_STATUS_CHANGED:
+        const taskId = responseData.id || config.entityId;
+        if (taskId) {
+          const taskParticipants = await this.getTaskParticipants(taskId);
+          recipients.push(...taskParticipants.filter((id) => id !== user.id));
+        }
+        break;
+
+      case NotificationType.TASK_COMMENTED:
+        const commentTaskId = responseData.taskId || requestData.taskId;
+        if (commentTaskId) {
+          const commentTaskParticipants = await this.getTaskParticipants(commentTaskId);
+          recipients.push(...commentTaskParticipants.filter((id) => id !== user.id));
+        }
+        break;
+
+      case NotificationType.TASK_DUE_SOON:
+        const dueTaskId = responseData.id || config.entityId;
+        if (dueTaskId) {
+          const dueTaskParticipants = await this.getTaskParticipants(dueTaskId);
+          recipients.push(...dueTaskParticipants);
+        }
+        break;
+
+      // ✅ Project-related notifications
+      case NotificationType.PROJECT_CREATED:
+        const workspaceId = requestData.workspaceId || responseData.workspaceId;
+        if (workspaceId) {
+          const workspaceMembers = await this.getWorkspaceMembers(workspaceId);
+          recipients.push(...workspaceMembers.filter((id) => id !== user.id));
+        }
+        break;
+
+      case NotificationType.PROJECT_UPDATED:
+        const projectId = responseData.id || config.entityId;
+        if (projectId) {
+          const projectMembers = await this.getProjectMembers(projectId);
+          recipients.push(...projectMembers.filter((id) => id !== user.id));
+        }
+        break;
+
+      // ✅ Workspace-related notifications
+      case NotificationType.WORKSPACE_INVITED:
+        // Notify the invited user
+        const invitedUserId = requestData.userId || requestData.invitedUserId;
+        if (invitedUserId) {
+          recipients.push(invitedUserId);
+        }
+        break;
+
+      // ✅ User mention notifications
+      case NotificationType.MENTION:
+        const mentionedUserIds = requestData.mentionedUsers || [];
+        if (Array.isArray(mentionedUserIds)) {
+          recipients.push(...mentionedUserIds.filter((id) => id !== user.id));
+        } else if (mentionedUserIds) {
+          recipients.push(mentionedUserIds);
+        }
+        break;
+
+      // ✅ System notifications
+      case NotificationType.SYSTEM:
+        // System notifications can be sent to specific users or all organization members
+        if (config.notifyUserId) {
+          recipients.push(config.notifyUserId);
+        } else if (config.notifyAllOrgMembers) {
+          const orgMembers = await this.getOrganizationMembers(config.organizationId);
+          recipients.push(...orgMembers.filter((id) => id !== user.id));
+        }
+        break;
+
+      // ✅ Default case for custom notifications
+      default:
+        if (config.notifyUserId) {
+          recipients.push(config.notifyUserId);
+        } else if (config.notifyUserIds && Array.isArray(config.notifyUserIds)) {
+          recipients.push(...config.notifyUserIds);
+        }
+        break;
+    }
+
+    // Filter unique recipients
+    const uniqueRecipients = [...new Set(recipients)].filter((id) => {
+      if (!id) return false;
+      
+      // Always send notifications for assignments and invitations
+      if ([
+        NotificationType.TASK_ASSIGNED,
+        NotificationType.WORKSPACE_INVITED,
+        NotificationType.MENTION,
+        NotificationType.TASK_DUE_SOON
+      ].includes(config.type)) {
+        return true;
+      }
+      
+      // For other types, exclude the action performer
+      return id !== user.id;
+    });
+
+    return uniqueRecipients;
+  }
+
+  // ✅ Helper methods for getting participants/members
+  private async getTaskParticipants(taskId: string): Promise<string[]> {
+    if (!taskId) return [];
+    try {
+      return await this.activityLogService.getTaskParticipants(taskId);
+    } catch (error) {
+      console.error('Error getting task participants:', error);
+      return [];
+    }
+  }
+
+  private async getWorkspaceMembers(workspaceId: string): Promise<string[]> {
+    if (!workspaceId) return [];
+    try {
+      return await this.activityLogService.getWorkspaceMembers(workspaceId);
+    } catch (error) {
+      console.error('Error getting workspace members:', error);
+      return [];
+    }
+  }
+
+  private async getProjectMembers(projectId: string): Promise<string[]> {
+    if (!projectId) return [];
+    try {
+      const members = await this.activityLogService.getPrisma().projectMember.findMany({
+        where: { projectId },
+        select: { userId: true },
+      });
+      return members.map((member) => member.userId);
+    } catch (error) {
+      console.error('Error getting project members:', error);
+      return [];
+    }
+  }
+
+  private async getOrganizationMembers(organizationId: string): Promise<string[]> {
+    if (!organizationId) return [];
+    try {
+      const members = await this.activityLogService.getPrisma().organizationMember.findMany({
+        where: { organizationId },
+        select: { userId: true },
+      });
+      return members.map((member) => member.userId);
+    } catch (error) {
+      console.error('Error getting organization members:', error);
+      return [];
+    }
+  }
+
+  // ✅ Updated title generation for all types
+  private generateTitle(type: NotificationType, data: any): string {
+    switch (type) {
+      case NotificationType.TASK_ASSIGNED:
+        return 'Task Assigned';
+      case NotificationType.TASK_STATUS_CHANGED:
+        return 'Task Status Updated';
+      case NotificationType.TASK_COMMENTED:
+        return 'New Comment';
+      case NotificationType.TASK_DUE_SOON:
+        return 'Task Due Soon';
+      case NotificationType.PROJECT_CREATED:
+        return 'New Project Created';
+      case NotificationType.PROJECT_UPDATED:
+        return 'Project Updated';
+      case NotificationType.WORKSPACE_INVITED:
+        return 'Workspace Invitation';
+      case NotificationType.MENTION:
+        return 'You were mentioned';
+      case NotificationType.SYSTEM:
+        return 'System Notification';
+      default:
+        return 'Notification';
+    }
+  }
+
+  // ✅ Updated message generation for all types
+  private generateMessage(type: NotificationType, user: any, data: any): string {
+    const userName = `${user.firstName} ${user.lastName}`;
+
+    switch (type) {
+      case NotificationType.TASK_ASSIGNED:
+        return `You have been assigned to task "${data.title}"`;
+      case NotificationType.TASK_STATUS_CHANGED:
+        return `${userName} updated the status of task "${data.title}"`;
+      case NotificationType.TASK_COMMENTED:
+        return `${userName} commented on task "${data.title}"`;
+      case NotificationType.TASK_DUE_SOON:
+        return `Task "${data.title}" is due soon`;
+      case NotificationType.PROJECT_CREATED:
+        return `${userName} created a new project "${data.name}"`;
+      case NotificationType.PROJECT_UPDATED:
+        return `${userName} updated project "${data.name}"`;
+      case NotificationType.WORKSPACE_INVITED:
+        return `${userName} invited you to join workspace "${data.name}"`;
+      case NotificationType.MENTION:
+        return `${userName} mentioned you in a comment`;
+      case NotificationType.SYSTEM:
+        return data.message || 'System notification';
+      default:
+        return `${userName} performed an action`;
+    }
+  }
+
+  // ✅ Updated action URL generation for all types
+  private generateActionUrl(entityType: string, entityId: string): string {
+    if (!entityId) return '/';
+    
+    switch (entityType.toLowerCase()) {
+      case 'task':
+        return `/tasks/${entityId}`;
+      case 'project':
+        return `/projects/${entityId}`;
+      case 'workspace':
+        return `/workspaces/${entityId}`;
+      case 'taskcomment':
+        return `/tasks/${entityId}#comments`;
+      case 'user':
+        return `/users/${entityId}`;
+      case 'organization':
+        return `/organizations/${entityId}`;
+      default:
+        return '/';
+    }
+  }
+}

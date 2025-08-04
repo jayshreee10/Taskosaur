@@ -22,7 +22,7 @@ import {
 import UserAvatar from "@/components/ui/avatars/UserAvatar";
 import { HiPlus } from "react-icons/hi2";
 import { HiTrash } from "react-icons/hi2";
-import { HiMail } from "react-icons/hi2";
+import { HiMail } from "react-icons/hi";
 import { HiUserPlus } from "react-icons/hi2";
 import { HiChevronDown } from "react-icons/hi2";
 import { HiEllipsisVertical } from "react-icons/hi2";
@@ -78,6 +78,7 @@ const MembersManagerComponent = memo(function MembersManager({
   className = "",
   title,
 }: MembersManagerProps) {
+  console.log("Rendering MembersManager for type:", type, "entityId:", entityId, "organizationId:", organizationId);
   const [members, setMembers] = useState<Member[]>([]);
   const [organizationMembers, setOrganizationMembers] = useState<OrganizationMember[]>([]);
   const [workspaceMembers, setWorkspaceMembers] = useState<Member[]>([]);
@@ -249,7 +250,7 @@ const MembersManagerComponent = memo(function MembersManager({
         setIsFetchingMembers(false);
       }
     };
-  }, [entityId, organizationId, type, fetchMembers, isFetchingMembers]);
+  }, [entityId, organizationId, type, isFetchingMembers]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -379,18 +380,18 @@ const MembersManagerComponent = memo(function MembersManager({
 
   if (isLoading) {
     return (
-      <Card className={`border-border bg-card ${className}`}>
+      <Card className={`rounded-[var(--card-radius)]  border-none ${className}`}>
         <div className="p-6">
-          <div className="h-6 bg-muted rounded w-1/3 mb-6 animate-pulse"></div>
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6 animate-pulse"></div>
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="flex items-center space-x-3 animate-pulse">
-                <div className="h-10 w-10 bg-muted rounded-full"></div>
+                <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                  <div className="h-3 bg-muted rounded w-2/3"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
                 </div>
-                <div className="h-6 w-16 bg-muted rounded"></div>
+                <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
               </div>
             ))}
           </div>
@@ -400,52 +401,49 @@ const MembersManagerComponent = memo(function MembersManager({
   }
 
   return (
-    <Card className={`border-border bg-card ${className}`}>
+    <Card className={`bg-[var(--card)] rounded-[var(--card-radius)]  border-none ${className}`}>
       {/* Header */}
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-              <HiUsers className="w-5 h-5 text-muted-foreground" />
+            <CardTitle className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
+              <HiUsers className="w-5 h-5 text-[var(--gray-500)]" />
               {displayTitle}
             </CardTitle>
-          
           </div>
           <div className="flex items-center gap-2">
             <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
               <DialogTrigger asChild>
                 <Button 
                   variant="outline" 
-                  size="sm"
-                  className="border-border text-foreground hover:bg-accent"
+                  className="h-9 w-20 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center whitespace-nowrap cursor-pointer transition-all duration-200"
                 >
-                  {/* <HiMail className="w-4 h-4 mr-2" /> */}
                   Invite
                 </Button>
               </DialogTrigger>
-              <DialogContent className="border-border bg-card">
+              <DialogContent className="border-none bg-[var(--card)] rounded-[var(--card-radius)] shadow-lg">
                 <DialogHeader>
-                  <DialogTitle className="text-card-foreground">Invite Member via Email</DialogTitle>
+                  <DialogTitle className="text-[var(--foreground)]">Invite Member via Email</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-foreground">Email Address</Label>
+                    <Label htmlFor="email" className="text-[var(--foreground)]">Email Address</Label>
                     <Input
                       id="email"
                       type="email"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
                       placeholder="Enter email address"
-                      className="border-input bg-background text-foreground"
+                      className="border-input bg-background text-[var(--foreground)]"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-foreground">Role</Label>
+                    <Label className="text-[var(--foreground)]">Role</Label>
                     <Select value={selectedRole} onValueChange={setSelectedRole}>
-                      <SelectTrigger className="border-input bg-background text-foreground">
+                      <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5  text-[var(--foreground)]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-border bg-popover">
+                      <SelectContent className="border-none bg-[var(--card)]">
                         {roles.map((role) => (
                           <SelectItem key={role.value} value={role.value}>
                             {role.label}
@@ -458,6 +456,7 @@ const MembersManagerComponent = memo(function MembersManager({
                 <div className="flex justify-end gap-3">
                   <Button 
                     variant="outline" 
+                    className="h-9 w-20 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
                     onClick={() => {
                       setShowInviteModal(false);
                       setInviteEmail("");
@@ -469,7 +468,7 @@ const MembersManagerComponent = memo(function MembersManager({
                   <Button 
                     onClick={handleInviteMember} 
                     disabled={!inviteEmail.trim()}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    className="h-9 w-28 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium rounded-lg"
                   >
                     Send Invite
                   </Button>
@@ -480,9 +479,8 @@ const MembersManagerComponent = memo(function MembersManager({
             <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
               <DialogTrigger asChild>
                 <Button 
-                variant={"outline"}
-                  size="sm"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  variant="default"
+                  className="h-9 w-32 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center justify-center gap-2 text-sm"
                   onClick={() => {
                     if (type === 'project') {
                       fetchWorkspaceMembers();
@@ -491,24 +489,24 @@ const MembersManagerComponent = memo(function MembersManager({
                     }
                   }}
                 >
-                  <HiPlus className="w-4 h-4 mr-2" />
+                  <HiPlus className="w-4 h-4" />
                   Add Member
                 </Button>
               </DialogTrigger>
-              <DialogContent className="border-border bg-card max-w-lg">
+              <DialogContent className="border-none bg-[var(--card)] rounded-[var(--card-radius)] shadow-lg max-w-lg">
                 <DialogHeader>
-                  <DialogTitle className="text-card-foreground">
+                  <DialogTitle className="text-[var(--foreground)]">
                     Add Member to {type === "workspace" ? "Workspace" : "Project"}
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label className="text-foreground">Role</Label>
+                    <Label className="text-[var(--foreground)]">Role</Label>
                     <Select value={selectedRole} onValueChange={setSelectedRole}>
-                      <SelectTrigger className="border-input bg-background text-foreground">
+                      <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5  text-[var(--foreground)]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-border bg-popover">
+                      <SelectContent className="border-none bg-[var(--card)]">
                         {roles.map((role) => (
                           <SelectItem key={role.value} value={role.value}>
                             {role.label}
@@ -517,28 +515,27 @@ const MembersManagerComponent = memo(function MembersManager({
                       </SelectContent>
                     </Select>
                   </div>
-                  
                   <div className="space-y-2">
-                    <Label className="text-foreground">
+                    <Label className="text-[var(--foreground)]">
                       {type === 'project' ? 'Workspace Members' : 'Organization Members'}
                     </Label>
                     {isLoadingMembers ? (
                       <div className="space-y-3">
                         {[...Array(3)].map((_, i) => (
-                          <div key={i} className="flex items-center space-x-3 p-3 border border-border rounded-lg animate-pulse">
-                            <div className="h-8 w-8 bg-muted rounded-full"></div>
+                          <div key={i} className="flex items-center space-x-3 p-3 border border-[var(--gray-200)] dark:border-[var(--gray-700)] rounded-lg animate-pulse">
+                            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
                             <div className="flex-1 space-y-2">
-                              <div className="h-3 bg-muted rounded w-3/4"></div>
-                              <div className="h-3 bg-muted rounded w-1/2"></div>
+                              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
                             </div>
-                            <div className="h-6 w-12 bg-muted rounded"></div>
+                            <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="max-h-64 overflow-y-auto space-y-2">
                         {getAvailableMembers().map((member: any) => (
-                          <div key={member.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-background hover:bg-accent/50 transition-colors">
+                          <div key={member.id} className="flex items-center justify-between p-3 border border-[var(--gray-200)] dark:border-[var(--gray-700)] rounded-lg bg-[var(--gray-50)] dark:bg-[var(--gray-900)] hover:bg-[var(--primary)]/5 transition-colors">
                             <div className="flex items-center space-x-3">
                               <UserAvatar
                                 user={{
@@ -549,19 +546,17 @@ const MembersManagerComponent = memo(function MembersManager({
                                 size="sm"
                               />
                               <div>
-                                <div className="text-sm font-medium text-foreground">
+                                <div className="text-sm font-medium text-[var(--accent-foreground)]">
                                   {(member.user?.firstName || member.firstName)} {(member.user?.lastName || member.lastName)}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
+                                <div className="text-xs text-[var(--gray-500)]">
                                   {member.user?.email || member.email}
                                 </div>
                               </div>
                             </div>
                             <Button
                               onClick={() => handleAddMember(member.user?.id || member.userId)}
-                              size="sm"
-                              variant="outline"
-                              className="border-border text-foreground hover:bg-accent"
+                              className="h-9 w-16 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center whitespace-nowrap transition-all duration-200"
                             >
                               Add
                             </Button>
@@ -569,11 +564,10 @@ const MembersManagerComponent = memo(function MembersManager({
                         ))}
                         {getAvailableMembers().length === 0 && membersLoaded && (
                           <div className="text-center py-8 px-4">
-                            {/* <HiUserAdd className="w-8 h-8 mx-auto text-muted-foreground mb-3" /> */}
-                            <p className="text-sm text-muted-foreground font-medium">
+                            <p className="text-sm text-[var(--gray-500)] font-medium">
                               All {type === 'project' ? 'workspace' : 'organization'} members are already part of this {type}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-xs text-[var(--gray-500)] mt-1">
                               Use the "Invite" button to invite new members via email
                             </p>
                           </div>
@@ -585,6 +579,7 @@ const MembersManagerComponent = memo(function MembersManager({
                 <div className="flex justify-end">
                   <Button 
                     variant="outline" 
+                    className="h-9 w-20 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
                     onClick={() => setShowAddModal(false)}
                   >
                     Cancel
@@ -598,8 +593,8 @@ const MembersManagerComponent = memo(function MembersManager({
 
       {/* Error Display */}
       {error && (
-        <div className="mx-6 mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-sm text-destructive">{error}</p>
+        <div className="mx-6 mb-4 p-3 bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 rounded-lg">
+          <p className="text-sm text-[var(--destructive)]">{error}</p>
         </div>
       )}
 
@@ -607,16 +602,16 @@ const MembersManagerComponent = memo(function MembersManager({
       <CardContent className="pt-0">
         <div className="space-y-3">
           {members.length === 0 ? (
-            <div className="text-center py-8">
-              <HiUserPlus className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground font-medium">No members yet</p>
-              <p className="text-xs text-muted-foreground mt-1">
+            <div className="text-center py-8 flex flex-col items-center justify-center">
+              <HiUserPlus className="w-12 h-12 mx-auto text-[var(--gray-400)] mb-3" />
+              <p className="text-sm font-medium text-[var(--accent-foreground)]">No members yet</p>
+              <p className="text-xs text-[var(--gray-500)] mt-1">
                 Add members to start collaborating on this {type}.
               </p>
             </div>
           ) : (
             members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between py-2">
+              <div key={member.id} className="flex items-center justify-between py-2 rounded-lg  transition-colors">
                 <div className="flex items-center space-x-3">
                   <UserAvatar
                     user={{
@@ -627,38 +622,35 @@ const MembersManagerComponent = memo(function MembersManager({
                     size="sm"
                   />
                   <div>
-                    <div className="text-sm font-medium text-foreground">
+                    <div className="text-sm font-medium text-[var(--accent-foreground)]">
                       {member.user.firstName} {member.user.lastName}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-[var(--gray-500)]">
                       {member.user.email}
                     </div>
                   </div>
                 </div>
-                
                 <div className="flex items-center gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
                         variant="outline" 
-                        size="sm" 
-                        className="border-border text-foreground hover:bg-accent"
+                        className="cursor-pointer h-9 w-24 border-none  bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-200"
                       >
                         {getRoleLabel(member.role)}
-                        <HiChevronDown className="w-3 h-3 ml-2" />
+                        <HiChevronDown className="w-3 h-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="border-border bg-popover">
-                      {roles.map((role) => (
+<DropdownMenuContent className="z-50 border-none bg-[var(--card)] rounded-[var(--card-radius)] shadow-lg">                      {roles.map((role) => (
                         <DropdownMenuItem
                           key={role.value}
                           onClick={() => handleUpdateRole(member.id, role.value)}
-                          className="text-popover-foreground hover:bg-accent"
+                          className="text-[var(--foreground)] hover:bg-[var(--primary)]/10"
                         >
                           <div className="flex items-center justify-between w-full">
                             {role.label}
                             {member.role === role.value && (
-                              <HiCheck className="w-4 h-4 text-primary" />
+                              <HiCheck className="w-4 h-4 text-[var(--primary)]" />
                             )}
                           </div>
                         </DropdownMenuItem>
@@ -666,7 +658,7 @@ const MembersManagerComponent = memo(function MembersManager({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => handleRemoveMember(member.id)}
-                        className="text-destructive hover:bg-destructive/10"
+                        className="text-[var(--destructive)] hover:bg-[var(--destructive)]/10 bg-[var(--primary)]/5"
                       >
                         <HiTrash className="w-4 h-4 mr-2" />
                         Remove member

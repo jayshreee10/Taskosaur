@@ -7,6 +7,13 @@ import { WorkspacesSeederService } from './workspaces.seeder.service';
 import { ProjectsSeederService } from './projects.seeder.service';
 import { WorkflowSeederService } from './workflow.seeder';
 import { TaskStatusSeederService } from './taskstatus.seeder.service';
+import { TasksSeederService } from './tasks.seeder.service';
+import { SprintsSeederService } from './sprints.seeder.service';
+import { LabelsSeederService } from './labels.seeder.service';
+import { TaskCommentsSeederService } from './task-comments.seeder.service';
+import { TaskDependenciesSeederService } from './task-dependencies.seeder.service';
+import { TaskWatchersSeederService } from './task-watchers.seeder.service';
+import { TimeEntriesSeederService } from './time-entries.seeder.service';
 
 @Injectable()
 export class SeederService {
@@ -19,6 +26,13 @@ export class SeederService {
     private workflowsSeeder: WorkflowSeederService,
     private projectsSeeder: ProjectsSeederService,
     private taskStatusSeeder: TaskStatusSeederService,
+    private tasksSeeder: TasksSeederService,
+    private sprintsSeeder: SprintsSeederService,
+    private labelsSeeder: LabelsSeederService,
+    private taskCommentsSeeder: TaskCommentsSeederService,
+    private taskDependenciesSeeder: TaskDependenciesSeederService,
+    private taskWatchersSeeder: TaskWatchersSeederService,
+    private timeEntriesSeeder: TimeEntriesSeederService,
   ) {}
 
   async seedCoreModules() {
@@ -37,8 +51,8 @@ export class SeederService {
       const organizations = await this.organizationsSeeder.seed(users);
       console.log('✅ Organizations seeded');
 
-      const workflows = await this.workflowsSeeder.seed(organizations);
-      console.log('✅ Workflows seeded');
+      // const workflows = await this.workflowsSeeder.seed(organizations);
+      // console.log('✅ Workflows seeded');
 
       // 3. Seed Workspaces (depends on organizations)
       const workspaces = await this.workspacesSeeder.seed(organizations, users);
@@ -48,8 +62,36 @@ export class SeederService {
       const projects = await this.projectsSeeder.seed(workspaces, users);
       console.log('✅ Projects seeded');
 
-      const taskStatuses = await this.taskStatusSeeder.seed(workflows, users);
-      console.log('✅ Task statuses seeded');
+      // const taskStatuses = await this.taskStatusSeeder.seed(workflows, users);
+      // console.log('✅ Task statuses seeded');
+
+      // 5. Seed Tasks (depends on projects, users, and task statuses)
+      const tasks = await this.tasksSeeder.seed(projects, users);
+      console.log('✅ Tasks seeded');
+
+      // 6. Seed Sprints (depends on projects and users)
+      const sprints = await this.sprintsSeeder.seed(projects, users);
+      console.log('✅ Sprints seeded');
+
+      // 7. Seed Labels (depends on projects and users)
+      const labels = await this.labelsSeeder.seed(projects, users);
+      console.log('✅ Labels seeded');
+
+      // 8. Seed Task Comments (depends on tasks and users)
+      const taskComments = await this.taskCommentsSeeder.seed(tasks, users);
+      console.log('✅ Task comments seeded');
+
+      // 9. Seed Task Dependencies (depends on tasks and users)
+      const taskDependencies = await this.taskDependenciesSeeder.seed(tasks, users);
+      console.log('✅ Task dependencies seeded');
+
+      // 10. Seed Task Watchers (depends on tasks and users)
+      const taskWatchers = await this.taskWatchersSeeder.seed(tasks, users);
+      console.log('✅ Task watchers seeded');
+
+      // 11. Seed Time Entries (depends on tasks and users)
+      const timeEntries = await this.timeEntriesSeeder.seed(tasks, users);
+      console.log('✅ Time entries seeded');
 
       console.log('🎉 Core modules seeding completed successfully!');
 
@@ -59,8 +101,13 @@ export class SeederService {
         organizations,
         workspaces,
         projects,
-        workflows,
-        taskStatuses
+        tasks,
+        sprints,
+        labels,
+        taskComments,
+        taskDependencies,
+        taskWatchers,
+        timeEntries
       };
     } catch (error) {
       console.error('❌ Error seeding core modules:', error);
@@ -72,7 +119,31 @@ export class SeederService {
     console.log('🧹 Clearing core modules...');
 
     try {
+      // Clear in reverse dependency order to avoid foreign key constraints
 
+      // Clear task-related data first
+      await this.timeEntriesSeeder.clear();
+      console.log('✅ Time entries cleared');
+
+      await this.taskWatchersSeeder.clear();
+      console.log('✅ Task watchers cleared');
+
+      await this.taskDependenciesSeeder.clear();
+      console.log('✅ Task dependencies cleared');
+
+      await this.taskCommentsSeeder.clear();
+      console.log('✅ Task comments cleared');
+
+      await this.labelsSeeder.clear();
+      console.log('✅ Labels cleared');
+
+      await this.sprintsSeeder.clear();
+      console.log('✅ Sprints cleared');
+
+      await this.tasksSeeder.clear();
+      console.log('✅ Tasks cleared');
+
+      // Clear foundation data
       await this.taskStatusSeeder.clear();
       console.log('✅ Task statuses cleared');
 

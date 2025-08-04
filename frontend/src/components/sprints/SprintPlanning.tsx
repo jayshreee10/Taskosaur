@@ -2,14 +2,79 @@
 
 import React, { useState, useEffect } from 'react';
 import { Task, Sprint, TaskPriority, TaskType, SprintStatus } from '@/types/tasks';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import UserAvatar from '@/components/ui/avatars/UserAvatar';
+import {
+  HiPlay,
+  HiBookmark,
+  HiClock,
+  HiCalendar,
+  HiFlag,
+  HiPlus,
+  HiClipboardDocumentList,
+  HiArrowRight,
+  HiChartBar,
+  HiUsers,
+  HiExclamationTriangle,
+  HiDocumentText,
+  HiPencilSquare
+} from 'react-icons/hi2';
 
 interface SprintPlanningProps {
   projectId: string;
   sprintId?: string | null;
   onSprintUpdate?: (sprint: Sprint) => void;
 }
+
+const LoadingSkeleton = () => (
+  <div className="space-y-6">
+    <div className="animate-pulse">
+      <div className="h-8 bg-[var(--muted)] rounded w-1/3 mb-4"></div>
+      <div className="h-6 bg-[var(--muted)] rounded w-1/2 mb-6"></div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="bg-[var(--card)] rounded-[var(--card-radius)] border-none p-6">
+            <div className="h-6 bg-[var(--muted)] rounded mb-4"></div>
+            <div className="space-y-3">
+              {[...Array(4)].map((_, j) => (
+                <div key={j} className="h-24 bg-[var(--muted)] rounded"></div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const getTaskTypeIcon = (type: TaskType) => {
+  switch (type) {
+    case TaskType.BUG: return <HiExclamationTriangle className="w-4 h-4" />;
+    case TaskType.STORY: return <HiDocumentText className="w-4 h-4" />;
+    case TaskType.EPIC: return <HiFlag className="w-4 h-4" />;
+    case TaskType.SUBTASK: return <HiPencilSquare className="w-4 h-4" />;
+    default: return <HiClipboardDocumentList className="w-4 h-4" />;
+  }
+};
+
+const getPriorityConfig = (priority: TaskPriority) => {
+  switch (priority) {
+    case TaskPriority.HIGHEST:
+      return { className: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 border-none' };
+    case TaskPriority.HIGH:
+      return { className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400 border-none' };
+    case TaskPriority.MEDIUM:
+      return { className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 border-none' };
+    case TaskPriority.LOW:
+      return { className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-none' };
+    case TaskPriority.LOWEST:
+      return { className: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-none' };
+    default:
+      return { className: 'bg-[var(--muted)] text-[var(--muted-foreground)] border-none' };
+  }
+};
 
 export default function SprintPlanning({ projectId, sprintId, onSprintUpdate }: SprintPlanningProps) {
   const [backlogTasks, setBacklogTasks] = useState<Task[]>([]);
@@ -167,7 +232,7 @@ export default function SprintPlanning({ projectId, sprintId, onSprintUpdate }: 
       taskNumber: 1,
       key: 'PROJ-1',
       projectId,
-      sprintId: currentSprint?.id,
+      sprintId: 'sprint-1',
       reporterId: 'user-1',
       reporter: {
         id: 'user-1',
@@ -228,30 +293,13 @@ export default function SprintPlanning({ projectId, sprintId, onSprintUpdate }: 
   const formatDate = (dateString: string) => {
     if (!currentDate) return 'Loading...';
     try {
-      return new Date(dateString).toLocaleDateString();
+      return new Date(dateString).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
     } catch {
       return 'Invalid date';
-    }
-  };
-
-  const getTaskTypeIcon = (type: TaskType) => {
-    switch (type) {
-      case TaskType.BUG: return '🐛';
-      case TaskType.STORY: return '📖';
-      case TaskType.EPIC: return '🎯';
-      case TaskType.SUBTASK: return '📝';
-      default: return '📋';
-    }
-  };
-
-  const getPriorityColor = (priority: TaskPriority) => {
-    switch (priority) {
-      case TaskPriority.HIGHEST: return 'text-red-600 bg-red-100 dark:bg-red-900/20';
-      case TaskPriority.HIGH: return 'text-orange-600 bg-orange-100 dark:bg-orange-900/20';
-      case TaskPriority.MEDIUM: return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20';
-      case TaskPriority.LOW: return 'text-green-600 bg-green-100 dark:bg-green-900/20';
-      case TaskPriority.LOWEST: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
     }
   };
 
@@ -318,94 +366,102 @@ export default function SprintPlanning({ projectId, sprintId, onSprintUpdate }: 
   };
 
   const renderTask = (task: Task, inSprint: boolean) => (
-    <div
+    <Card
       key={task.id}
-      className={`p-4 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${
+      className={`cursor-pointer transition-all duration-200 hover:shadow-md border-none ${
         draggedTask?.id === task.id ? 'opacity-50' : ''
-      } ${inSprint ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-white dark:bg-gray-900'}`}
+      } ${inSprint ? 'bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10' : 'bg-[var(--card)] hover:bg-[var(--accent)]'}`}
       draggable
       onDragStart={(e) => handleDragStart(e, task)}
       onDragEnd={handleDragEnd}
       onClick={() => handleTaskClick(task)}
     >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center space-x-2">
-          <span className="text-lg">{getTaskTypeIcon(task.type)}</span>
-          <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-            {task.key}
-          </span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-            {task.priority}
-          </span>
-          {task.storyPoints && (
-            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-              {task.storyPoints} SP
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="text-[var(--primary)]">
+              {getTaskTypeIcon(task.type)}
+            </div>
+            <span className="text-sm text-[var(--muted-foreground)] font-medium">
+              {task.key}
             </span>
-          )}
+          </div>
+          <div className="flex items-center gap-2">
+            {(() => {
+              const config = getPriorityConfig(task.priority);
+              return (
+                <Badge className={`text-xs ${config.className}`}>
+                  {task.priority}
+                </Badge>
+              );
+            })()}
+            {task.storyPoints && (
+              <Badge variant="secondary" className="text-xs bg-[var(--muted)] text-[var(--muted-foreground)] border-none">
+                {task.storyPoints} SP
+              </Badge>
+            )}
+          </div>
         </div>
-      </div>
 
-      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-        {task.title}
-      </h4>
+        <h4 className="text-sm font-medium text-[var(--foreground)] mb-2 line-clamp-2">
+          {task.title}
+        </h4>
 
-      {task.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">
-          {task.description}
-        </p>
-      )}
+        {task.description && (
+          <p className="text-xs text-[var(--muted-foreground)] mb-3 line-clamp-2">
+            {task.description}
+          </p>
+        )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          {task.labels?.slice(0, 2).map(label => (
-            <span 
-              key={label.id}
-              className="inline-flex items-center px-2 py-1 text-xs rounded-full"
-              style={{ 
-                backgroundColor: `${label.color}20`, 
-                color: label.color 
-              }}
-            >
-              {label.name}
-            </span>
-          ))}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 flex-wrap">
+            {task.labels?.slice(0, 2).map(label => (
+              <Badge 
+                key={label.id}
+                variant="secondary"
+                className="text-xs border-none"
+                style={{ 
+                  backgroundColor: `${label.color}20`, 
+                  color: label.color 
+                }}
+              >
+                {label.name}
+              </Badge>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+              <HiClock className="w-3 h-3" />
+              {formatTime(task.originalEstimate || 0)}
+            </div>
+            {task.assignee && (
+              <UserAvatar
+                user={task.assignee}
+                size="xs"
+              />
+            )}
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {formatTime(task.originalEstimate || 0)}
-          </span>
-          {task.assignee && (
-            <UserAvatar
-              user={task.assignee}
-              size="xs"
-            />
-          )}
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (!currentSprint) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            No Sprint Selected
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400">
-            Please select a sprint from the dropdown above to start planning.
-          </p>
+      <div className="text-center py-12">
+        <div className="w-16 h-16 bg-[var(--muted)] rounded-xl flex items-center justify-center mx-auto mb-4">
+          <HiCalendar className="w-8 h-8 text-[var(--muted-foreground)]" />
         </div>
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+          No Sprint Selected
+        </h3>
+        <p className="text-sm text-[var(--muted-foreground)]">
+          Please select a sprint from the dropdown above to start planning.
+        </p>
       </div>
     );
   }
@@ -413,162 +469,199 @@ export default function SprintPlanning({ projectId, sprintId, onSprintUpdate }: 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
+            <HiCalendar className="w-5 h-5 text-[var(--primary)]" />
             Sprint Planning
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
             {currentSprint?.name || 'Select a sprint'}
           </p>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline"
+            className="h-9 px-4 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+          >
+            <HiBookmark className="w-4 h-4 mr-2" />
             Save Changes
           </Button>
-          <Button>
+          <Button className="h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg">
+            <HiPlay className="w-4 h-4 mr-2" />
             Start Sprint
           </Button>
         </div>
       </div>
 
       {/* Sprint Info */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Sprint Goal
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {currentSprint?.goal || 'No goal set'}
-            </p>
+      <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <h3 className="text-sm font-medium text-[var(--foreground)] mb-2 flex items-center gap-2">
+                <HiFlag className="w-4 h-4 text-[var(--primary)]" />
+                Sprint Goal
+              </h3>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                {currentSprint?.goal || 'No goal set'}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--foreground)] mb-2 flex items-center gap-2">
+                <HiCalendar className="w-4 h-4 text-[var(--primary)]" />
+                Duration
+              </h3>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                {currentSprint ? `${formatDate(currentSprint.startDate)} - ${formatDate(currentSprint.endDate)}` : 'No dates set'}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--foreground)] mb-2 flex items-center gap-2">
+                <HiUsers className="w-4 h-4 text-[var(--primary)]" />
+                Capacity
+              </h3>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                {(currentSprint as any)?.capacity || 0} hours
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Duration
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {currentSprint ? `${formatDate(currentSprint.startDate)} - ${formatDate(currentSprint.endDate)}` : 'No dates set'}
-            </p>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Capacity
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {(currentSprint as any)?.capacity || 0} hours
-            </p>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Planning Board */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Backlog */}
-        <div>
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Product Backlog
-            </h3>
-            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-              <span>{backlogTasks.length} tasks</span>
-              <span>{getTotalStoryPoints(backlogTasks)} story points</span>
-              <span>{formatTime(getTotalEstimate(backlogTasks))}</span>
-            </div>
-          </div>
-          
-          <div
-            className="space-y-3 min-h-[500px] p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600"
-            onDragOver={handleDragOver}
-            onDrop={handleBacklogDrop}
-          >
-            {backlogTasks.map(task => renderTask(task, false))}
-            {backlogTasks.length === 0 && (
-              <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">
-                  No tasks in backlog
-                </p>
+        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <HiClipboardDocumentList className="w-5 h-5 text-[var(--muted-foreground)]" />
+                Product Backlog
+              </CardTitle>
+              <div className="flex items-center gap-4 text-sm text-[var(--muted-foreground)]">
+                <span>{backlogTasks.length} tasks</span>
+                <span>{getTotalStoryPoints(backlogTasks)} SP</span>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="space-y-3 min-h-[500px] p-4 bg-[var(--muted)]/30 rounded-lg border-2 border-dashed border-[var(--border)] transition-colors"
+              onDragOver={handleDragOver}
+              onDrop={handleBacklogDrop}
+            >
+              {backlogTasks.map(task => renderTask(task, false))}
+              {backlogTasks.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[var(--muted)] flex items-center justify-center">
+                    <HiClipboardDocumentList className="w-6 h-6 text-[var(--muted-foreground)]" />
+                  </div>
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    No tasks in backlog
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Sprint */}
-        <div>
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Sprint Backlog
-            </h3>
-            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-              <span>{sprintTasks.length} tasks</span>
-              <span>{getTotalStoryPoints(sprintTasks)} story points</span>
-              <span>{formatTime(getTotalEstimate(sprintTasks))}</span>
-            </div>
-          </div>
-          
-          <div
-            className="space-y-3 min-h-[500px] p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-600"
-            onDragOver={handleDragOver}
-            onDrop={handleSprintDrop}
-          >
-            {sprintTasks.map(task => renderTask(task, true))}
-            {sprintTasks.length === 0 && (
-              <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <p className="text-blue-500 dark:text-blue-400 mt-2">
-                  Drag tasks here to add to sprint
-                </p>
+        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <HiFlag className="w-5 h-5 text-[var(--primary)]" />
+                Sprint Backlog
+              </CardTitle>
+              <div className="flex items-center gap-4 text-sm text-[var(--muted-foreground)]">
+                <span>{sprintTasks.length} tasks</span>
+                <span>{getTotalStoryPoints(sprintTasks)} SP</span>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="space-y-3 min-h-[500px] p-4 bg-[var(--primary)]/5 rounded-lg border-2 border-dashed border-[var(--primary)]/20 transition-colors"
+              onDragOver={handleDragOver}
+              onDrop={handleSprintDrop}
+            >
+              {sprintTasks.map(task => renderTask(task, true))}
+              {sprintTasks.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center">
+                    <HiPlus className="w-6 h-6 text-[var(--primary)]" />
+                  </div>
+                  <p className="text-sm text-[var(--primary)] font-medium mb-1">
+                    Drag tasks here to add to sprint
+                  </p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Click tasks to move them between backlog and sprint
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Sprint Summary */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Sprint Summary
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {sprintTasks.length}
+      <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+            <HiChartBar className="w-5 h-5 text-[var(--primary)]" />
+            Sprint Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <HiClipboardDocumentList className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="text-2xl font-bold text-[var(--foreground)] mb-1">
+                {sprintTasks.length}
+              </div>
+              <div className="text-sm text-[var(--muted-foreground)]">
+                Tasks
+              </div>
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Tasks
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                <HiFlag className="w-6 h-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="text-2xl font-bold text-[var(--foreground)] mb-1">
+                {getTotalStoryPoints(sprintTasks)}
+              </div>
+              <div className="text-sm text-[var(--muted-foreground)]">
+                Story Points
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+                <HiClock className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="text-2xl font-bold text-[var(--foreground)] mb-1">
+                {formatTime(getTotalEstimate(sprintTasks))}
+              </div>
+              <div className="text-sm text-[var(--muted-foreground)]">
+                Estimated Time
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                <HiUsers className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="text-2xl font-bold text-[var(--foreground)] mb-1">
+                {(currentSprint as any)?.capacity || 0}h
+              </div>
+              <div className="text-sm text-[var(--muted-foreground)]">
+                Capacity
+              </div>
             </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {getTotalStoryPoints(sprintTasks)}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Story Points
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {formatTime(getTotalEstimate(sprintTasks))}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Estimated Time
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-              {currentSprint.capacity || 0}h
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Capacity
-            </div>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

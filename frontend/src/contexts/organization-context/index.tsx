@@ -12,7 +12,18 @@ import {
   organizationApi,
   Organization,
   CreateOrganizationData,
+  OrganizationStats,
+  ActivityFilters,
+  ActivityResponse,
+  OrganizationMember,
+  Workflow,
 } from "@/utils/api/organizationApi";
+import {
+  CreateWorkflowData,
+  UpdateWorkflowData,
+  workflowsApi,
+} from "@/utils/api/workflowsApi";
+import { TaskStatus, taskStatusApi } from "@/utils/api/taskStatusApi";
 
 interface OrganizationState {
   organizations: Organization[];
@@ -42,6 +53,22 @@ interface OrganizationContextType extends OrganizationState {
   // Helper methods
   checkOrganizationAndRedirect: () => string;
   isUserInOrganization: (organizationId: string) => boolean;
+  getOrganizationStats: (organizationId: string) => Promise<OrganizationStats>;
+  getOrganizationRecentActivity: (
+    organizationId: string,
+    filters: ActivityFilters
+  ) => Promise<ActivityResponse>;
+  getOrganizationBySlug: (slug: string) => Promise<Organization>;
+  getOrganizationMembers: (slug: string) => Promise<OrganizationMember[]>;
+  getOrganizationWorkFlows: (slug: string) => Promise<Workflow[]>;
+  updateWorkflow: (
+    workflowId: string,
+    workflowData: UpdateWorkflowData
+  ) => Promise<Workflow>;
+  createWorkflow: (workflowData: CreateWorkflowData) => Promise<Workflow>;
+  updateTaskStatusPositions: (
+    statusUpdates: { id: string; position: number; }[]
+  ) => Promise<TaskStatus[]>;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(
@@ -282,6 +309,83 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
         return organizationState.organizations.some(
           (org) => org.id === organizationId
         );
+      },
+      getOrganizationStats: async (
+        organizationId: string
+      ): Promise<OrganizationStats> => {
+        const result = await handleApiOperation(
+          () => organizationApi.getOrganizationStats(organizationId),
+          false
+        );
+
+        // Update organization stats in state
+        setOrganizationState((prev) => ({
+          ...prev,
+          organizationStats: result,
+        }));
+
+        return result;
+      },
+      getOrganizationRecentActivity: async (
+        organizationId: string,
+        filters: ActivityFilters
+      ): Promise<ActivityResponse> => {
+        const result = await handleApiOperation(
+          () =>
+            organizationApi.getOrganizationRecentActivity(
+              organizationId,
+              filters
+            ),
+          false
+        );
+        return result;
+      },
+      getOrganizationBySlug: async (slug: string): Promise<Organization> => {
+        const result = await handleApiOperation(
+          () => organizationApi.getOrganizationBySlug(slug),
+          false
+        );
+        return result;
+      },
+      getOrganizationMembers: async (
+        slug: string
+      ): Promise<OrganizationMember[]> => {
+        const result = await handleApiOperation(
+          () => organizationApi.getOrganizationMembers(slug),
+          false
+        );
+        return result;
+      },
+      getOrganizationWorkFlows: async (slug: string): Promise<Workflow[]> => {
+        const result = await handleApiOperation(
+          () => organizationApi.getOrganizationWorkFlows(slug),
+          false
+        );
+        return result;
+      },
+      createWorkflow: async (
+        workflowData: CreateWorkflowData
+      ): Promise<Workflow> => {
+        const result = await workflowsApi.createWorkflow(workflowData);
+        return result;
+      },
+      updateWorkflow: async (
+        workflowId: string,
+        workflowData: UpdateWorkflowData
+      ): Promise<Workflow> => {
+        const result = await workflowsApi.updateWorkflow(
+          workflowId,
+          workflowData
+        );
+        return result;
+      },
+      updateTaskStatusPositions: async (
+        statusUpdates: { id: string; position: number; }[]
+      ): Promise<TaskStatus[]> => {
+        const result = await taskStatusApi.updateTaskStatusPositions(
+          statusUpdates
+        );
+        return result;
       },
     }),
     [organizationState, handleApiOperation, checkOrganizationAndRedirect]

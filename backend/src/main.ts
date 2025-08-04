@@ -25,6 +25,7 @@ async function bootstrap() {
           'http://localhost:3000',
           'http://localhost:3001',
           'http://0.0.0.0:3000',
+          'http://0.0.0.0:4000',
           'http://127.0.0.1:3000',
           'http://localhost:8080',
         ],
@@ -44,9 +45,9 @@ async function bootstrap() {
 
   // Check if Unix socket should be used
   const useUnixSocket =
-    process.env.BE_UNIX_SOCKET === '1' || !!process.env.BE_UNIX_SOCKET_PATH;
+    process.env.UNIX_SOCKET === '1' || !!process.env.UNIX_SOCKET_PATH;
   const unixSocketPath =
-    process.env.BE_UNIX_SOCKET_PATH ||
+    process.env.UNIX_SOCKET_PATH ||
     join(__dirname, '..', 'tmp', 'taskosaur-backend.sock');
 
   // Get port and host from config

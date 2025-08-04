@@ -35,6 +35,11 @@ export class WorkflowsController {
   findAll(@Query('organizationId') organizationId?: string) {
     return this.workflowsService.findAll(organizationId);
   }
+  @Get('slug')
+  findAllByOrganizationSlug(@Query('slug') slug: string) {
+    return this.workflowsService.findAllByOrganizationSlug(slug);
+  }
+
 
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {

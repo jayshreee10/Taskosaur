@@ -16,10 +16,13 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { SYSTEM_USER_ID } from '../../common/constants';
+import { User } from '@prisma/client';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(
+    private prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -28,12 +31,14 @@ export class AuthService {
 
   async validateUser(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
-    
+
     // Prevent system user from authenticating
     if (user && user.id === SYSTEM_USER_ID) {
-      throw new UnauthorizedException('System user cannot be used for authentication');
+      throw new UnauthorizedException(
+        'System user cannot be used for authentication',
+      );
     }
-    
+
     if (
       user &&
       user.password &&
@@ -191,94 +196,211 @@ export class AuthService {
   /**
    * Generate and send password reset token to user's email
    */
-  async forgotPassword(email: string): Promise<void> {
-    const user = await this.usersService.findByEmail(email);
-    if (!user) {
-      // For security, don't reveal if email exists or not
-      // Just return success to prevent email enumeration
-      return;
-    }
-
-    // Generate secure reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date();
-    resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 24); // Token expires in 24 hours
-
-    // Save reset token to database
-    await this.usersService.updateResetToken(
-      user.id,
-      resetToken,
-      resetTokenExpiry,
-    );
-
-    // Send password reset email
-    const resetUrl = `${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token=${resetToken}`;
-
-    await this.emailService.sendEmail({
-      to: user.email,
-      subject: 'Reset Your Taskosaur Password',
-      template: EmailTemplate.PASSWORD_RESET,
-      data: {
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    try {
+      const user = await this.usersService.findByEmail(email);
+      if (!user) {
+        return {
+          message:
+            'If an account with that email exists, a password reset link has been sent.',
+        };
+      }
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetTokenExpiry = new Date();
+      resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 24);
+      const hashedResetToken = await bcrypt.hash(resetToken, 10);
+      await this.usersService.updateResetToken(
+        user.id,
+        hashedResetToken,
+        resetTokenExpiry,
+      );
+      const resetUrl = `${this.configService.get('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token=${resetToken}`;
+      await this.emailService.sendPasswordResetEmail(user.email, {
         userName: user.firstName,
-        resetUrl,
-        expiresIn: '24 hours',
-      },
-      priority: EmailPriority.HIGH,
-    });
+        resetToken: resetToken, // Pass the plain token (not hashed)
+        resetUrl: resetUrl,
+      });
+      console.log(
+        `Password reset requested for email: ${email} at ${new Date().toISOString()}`,
+      );
+      return {
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      };
+    } catch (error) {
+      console.error('Error in forgotPassword:', error);
+      return {
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      };
+    }
   }
 
   /**
    * Verify if reset token is valid and not expired
    */
-  async verifyResetToken(token: string): Promise<boolean> {
-    if (!token || token.trim() === '') {
-      return false;
-    }
+  async verifyResetToken(
+    token: string,
+  ): Promise<{ isValid: boolean; user?: any }> {
+    try {
+      if (!token || token.trim() === '') {
+        return { isValid: false };
+      }
 
-    const user = await this.usersService.findByResetToken(token);
-    if (!user) {
-      return false;
-    }
+      // Find all users with active reset tokens
+      const users = await this.usersService.findAllUsersWithResetTokens();
+      let validUser: User | null = null;
 
-    // Check if token is expired
-    if (!user.resetTokenExpiry || new Date() > user.resetTokenExpiry) {
-      // Clean up expired token
-      await this.usersService.updateResetToken(user.id, null, null);
-      return false;
-    }
+      // Check each user's hashed token (since we hash tokens before storing)
+      for (const user of users) {
+        if (user.resetToken && (await bcrypt.compare(token, user.resetToken))) {
+          // Check if token is not expired
+          if (user.resetTokenExpiry && user.resetTokenExpiry > new Date()) {
+            validUser = user;
+            break;
+          }
+        }
+      }
 
-    return true;
+      if (!validUser) {
+        return { isValid: false };
+      }
+
+      // Check if token is expired
+      if (
+        !validUser.resetTokenExpiry ||
+        new Date() > validUser.resetTokenExpiry
+      ) {
+        // Clean up expired token
+        await this.usersService.clearResetToken(validUser.id);
+        return { isValid: false };
+      }
+      return {
+        isValid: true,
+        user: {
+          id: validUser.id,
+          email: validUser.email,
+          firstName: validUser.firstName,
+          lastName: validUser.lastName,
+        },
+      };
+    } catch (error) {
+      console.error('Error verifying reset token:', error);
+      return { isValid: false };
+    }
   }
 
   /**
    * Reset user password using valid reset token
    */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    if (!token || token.trim() === '') {
-      throw new BadRequestException('Invalid reset token');
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    try {
+      if (!token || token.trim() === '') {
+        throw new BadRequestException('Invalid reset token');
+      }
+
+      // Validate password strength
+      if (!newPassword || newPassword.length < 8) {
+        throw new BadRequestException(
+          'Password must be at least 8 characters long',
+        );
+      }
+
+      // Additional password validation
+      if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+        throw new BadRequestException(
+          'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+        );
+      }
+
+      // Find all users with active reset tokens
+      const users = await this.usersService.findAllUsersWithResetTokens();
+      let validUser: User | null = null;
+
+      // Check each user's hashed token
+      for (const user of users) {
+        if (user.resetToken && (await bcrypt.compare(token, user.resetToken))) {
+          // Check if token is not expired
+          if (user.resetTokenExpiry && user.resetTokenExpiry > new Date()) {
+            validUser = user;
+            break;
+          }
+        }
+      }
+
+      if (!validUser) {
+        throw new BadRequestException('Invalid or expired reset token');
+      }
+
+      // Check if token is expired (double check)
+      if (
+        !validUser.resetTokenExpiry ||
+        new Date() > validUser.resetTokenExpiry
+      ) {
+        // Clean up expired token
+        await this.usersService.clearResetToken(validUser.id);
+        throw new BadRequestException('Reset token has expired');
+      }
+
+      // Hash new password
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Update user password and clear reset token in a transaction
+      await this.prisma.$transaction(async (prisma) => {
+        // Update password
+        await prisma.user.update({
+          where: { id: validUser.id },
+          data: {
+            password: hashedPassword,
+            updatedAt: new Date(),
+          },
+        });
+
+        // Clear reset token
+        await prisma.user.update({
+          where: { id: validUser.id },
+          data: {
+            resetToken: null,
+            resetTokenExpiry: null,
+          },
+        });
+
+        // Invalidate all refresh tokens for security
+        await prisma.user.update({
+          where: { id: validUser.id },
+          data: {
+            refreshToken: null,
+          },
+        });
+      });
+
+      // Send password reset confirmation email
+      await this.emailService.sendPasswordResetConfirmationEmail(
+        validUser.email,
+        {
+          userName: validUser.firstName,
+          resetTime: new Date().toLocaleString(),
+        },
+      );
+
+      // Log successful password reset for security audit
+      console.log(
+        `Password successfully reset for user: ${validUser.email} at ${new Date().toISOString()}`,
+      );
+
+      return { message: 'Password has been successfully reset' };
+    } catch (error) {
+      console.error('Error in resetPassword:', error);
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException('Failed to reset password');
     }
-
-    const user = await this.usersService.findByResetToken(token);
-    if (!user) {
-      throw new BadRequestException('Invalid or expired reset token');
-    }
-
-    // Check if token is expired
-    if (!user.resetTokenExpiry || new Date() > user.resetTokenExpiry) {
-      // Clean up expired token
-      await this.usersService.updateResetToken(user.id, null, null);
-      throw new BadRequestException('Reset token has expired');
-    }
-
-    // Hash new password
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-    // Update user password and clear reset token
-    await this.usersService.updatePassword(user.id, hashedPassword);
-    await this.usersService.updateResetToken(user.id, null, null);
-
-    // Optionally, invalidate all refresh tokens for security
-    await this.usersService.updateRefreshToken(user.id, null);
   }
 }

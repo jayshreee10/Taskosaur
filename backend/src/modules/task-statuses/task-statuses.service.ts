@@ -224,6 +224,69 @@ export class TaskStatusesService {
       throw error;
     }
   }
+async updatePositions(
+  statusUpdates: { id: string; position: number; }[],
+  userId: string,
+): Promise<TaskStatus[]> {
+  try {
+    // Use a transaction to ensure all updates happen atomically
+    const updatedStatuses = await this.prisma.$transaction(
+      statusUpdates.map(({ id, position }) =>
+        this.prisma.taskStatus.update({
+          where: { id },
+          data: {
+            position,
+            updatedBy: userId,
+          },
+          include: {
+            workflow: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                organization: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+            createdByUser: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            updatedByUser: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            _count: {
+              select: {
+                tasks: true,
+              },
+            },
+          },
+        })
+      )
+    );
+
+    return updatedStatuses;
+  } catch (error) {
+    if (error.code === 'P2025') {
+      throw new NotFoundException('One or more task statuses not found');
+    }
+    throw error;
+  }
+}
 
   async remove(id: string): Promise<void> {
     try {

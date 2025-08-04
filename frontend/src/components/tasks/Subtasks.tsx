@@ -3,12 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { useTask } from '../../contexts/task-context';
 import { useGlobalFetchPrevention } from '@/hooks/useGlobalFetchPrevention';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   HiPlus,
   HiPencilSquare,
   HiXMark,
   HiCheck,
-  HiListBullet
+  HiListBullet,
+  HiExclamationTriangle
 } from 'react-icons/hi2';
 
 interface Task {
@@ -50,53 +55,6 @@ interface SubtasksProps {
     type?: "danger" | "warning" | "info"
   ) => void;
 }
-
-// UI Components matching your theme
-const Button = ({ 
-  children, 
-  variant = "primary", 
-  size = "sm",
-  className = "",
-  disabled = false,
-  ...props 
-}: { 
-  children: React.ReactNode;
-  variant?: "primary" | "secondary" | "danger";
-  size?: "sm" | "md";
-  className?: string;
-  disabled?: boolean;
-  [key: string]: any;
-}) => {
-  const variants = {
-    primary: "bg-amber-600 hover:bg-amber-700 disabled:bg-stone-300 dark:disabled:bg-stone-600 text-white",
-    secondary: "bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-600",
-    danger: "bg-red-600 hover:bg-red-700 disabled:bg-stone-300 dark:disabled:bg-stone-600 text-white"
-  };
-  
-  const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm"
-  };
-  
-  return (
-    <button 
-      className={`rounded-lg font-medium transition-colors disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
-      disabled={disabled}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-};
-
-const Input = ({ className = "", ...props }: { className?: string; [key: string]: any }) => (
-  <input
-    className={`w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 dark:bg-stone-700 dark:text-white transition-colors text-sm ${className}`}
-    {...props}
-  />
-);
-
-import { Badge } from '@/components/ui/badge';
 
 export default function Subtasks({
   taskId,
@@ -154,7 +112,6 @@ export default function Subtasks({
   useEffect(() => {
     const fetchKey = 'all-task-statuses';
     
-    // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       const cachedData = getCachedData(fetchKey);
       if (cachedData) {
@@ -169,8 +126,6 @@ export default function Subtasks({
       try {
         const statuses = await getAllTaskStatuses();
         setTaskStatuses(statuses);
-        
-        // Cache the successful result
         markFetchComplete(fetchKey, statuses);
       } catch (error) {
         console.error('Failed to fetch task statuses:', error);
@@ -179,7 +134,7 @@ export default function Subtasks({
     };
 
     fetchStatuses();
-  }, []); // No dependencies needed for statuses - they don't change
+  }, []);
 
   // Fetch subtasks when component mounts or taskId changes
   useEffect(() => {
@@ -187,7 +142,6 @@ export default function Subtasks({
 
     const fetchKey = `subtasks-${taskId}`;
     
-    // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       const cachedData = getCachedData(fetchKey);
       if (cachedData) {
@@ -202,8 +156,6 @@ export default function Subtasks({
       try {
         const taskSubtasks = await getSubtasksByParent(taskId);
         setSubtasks(taskSubtasks);
-        
-        // Cache the successful result
         markFetchComplete(fetchKey, taskSubtasks);
       } catch (error) {
         console.error('Failed to fetch subtasks:', error);
@@ -212,7 +164,7 @@ export default function Subtasks({
     };
 
     fetchSubtasks();
-  }, [taskId]); // Only depend on task ID
+  }, [taskId]);
 
   // Refresh subtasks function for real-time updates
   const refreshSubtasks = async () => {
@@ -251,7 +203,6 @@ export default function Subtasks({
 
       const newSubtask = await createSubtask(subtaskData);
       
-      // Refresh subtasks to get the latest data
       await refreshSubtasks();
       setNewSubtaskTitle("");
       setIsAddingSubtask(false);
@@ -283,9 +234,7 @@ export default function Subtasks({
         statusId: newStatusId
       });
 
-      // Refresh subtasks to get the latest data
       await refreshSubtasks();
-
       onSubtaskUpdated?.(subtaskId, { statusId: newStatusId });
     } catch (error) {
       console.error("Failed to toggle subtask status:", error);
@@ -305,7 +254,6 @@ export default function Subtasks({
         title: editingTitle.trim()
       });
 
-      // Refresh subtasks to get the latest data
       await refreshSubtasks();
 
       setEditingSubtaskId(null);
@@ -326,10 +274,7 @@ export default function Subtasks({
     const confirmDelete = async () => {
       try {
         await deleteTask(subtaskId);
-        
-        // Refresh subtasks to get the latest data
         await refreshSubtasks();
-        
         onSubtaskDeleted?.(subtaskId);
       } catch (error) {
         console.error("Failed to delete subtask:", error);
@@ -361,18 +306,19 @@ export default function Subtasks({
     return currentStatus?.category === 'DONE';
   };
 
-  // Helper function to get priority variant
-  const getPriorityVariant = (priority: string) => {
+  // Helper function to get priority colors
+  const getPriorityConfig = (priority: string) => {
     switch (priority) {
-      case 'HIGH':
       case 'HIGHEST':
-        return 'destructive';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 border-none';
+      case 'HIGH':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400 border-none';
       case 'MEDIUM':
-        return 'secondary';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 border-none';
       case 'LOW':
-        return 'default';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-none';
       default:
-        return 'default';
+        return 'bg-[var(--muted)] text-[var(--muted-foreground)] border-none';
     }
   };
 
@@ -381,44 +327,50 @@ export default function Subtasks({
   if (!currentUser) {
     return (
       <div className="mb-8">
-        <div className="text-center text-stone-500 dark:text-stone-400 p-4 bg-stone-50 dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700">
-          Please log in to manage subtasks.
-        </div>
+        <Alert className="bg-[var(--muted)]/50 border-[var(--border)] text-[var(--muted-foreground)]">
+          <HiExclamationTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Please log in to manage subtasks.
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
 
   return (
     <div className="mb-8">
-      <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-4 flex items-center gap-2">
-        <HiListBullet size={16} className="text-amber-600" />
-        Subtasks ({completedCount}/{subtasks.length})
-      </h2>
+      <div className="flex items-center gap-2 mb-4">
+        <HiListBullet className="w-5 h-5 text-[var(--primary)]" />
+        <h3 className="text-md font-semibold text-[var(--foreground)]">
+          Subtasks ({completedCount}/{subtasks.length})
+        </h3>
+      </div>
 
       {/* Loading State */}
       {loading && (
-        <div className="text-center text-stone-500 dark:text-stone-400 py-6 bg-stone-50 dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700">
+        <div className="text-center py-6 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
           <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-amber-200 border-t-amber-600"></div>
-            <span className="text-sm">Loading subtasks...</span>
+            <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm text-[var(--muted-foreground)]">Loading subtasks...</span>
           </div>
         </div>
       )}
 
       {/* Error State */}
       {error && (
-        <div className="text-center text-red-600 dark:text-red-400 py-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-          <span className="text-sm">Error: {error}</span>
-        </div>
+        <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
+          <HiExclamationTriangle className="h-4 w-4" />
+          <AlertDescription>Error: {error}</AlertDescription>
+        </Alert>
       )}
       
       {/* Subtasks List */}
       {subtasks.length > 0 && (
-        <div className="space-y-2 mb-4">
+        <div className="space-y-3 mb-6">
           {subtasks.map((subtask) => (
             <div
               key={subtask.id}
-              className="flex items-center justify-between group p-3 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-700 transition-colors"
+              className="flex items-center justify-between group p-4 rounded-lg hover:bg-[var(--accent)] border border-[var(--border)] transition-colors"
             >
               <div className="flex items-center flex-1">
                 <input
@@ -426,7 +378,7 @@ export default function Subtasks({
                   id={`subtask-${subtask.id}`}
                   checked={isSubtaskCompleted(subtask)}
                   onChange={() => handleToggleSubtaskStatus(subtask.id)}
-                  className="h-4 w-4 text-amber-600 focus:ring-2 focus:ring-amber-500/20 border-stone-300 dark:border-stone-600 rounded cursor-pointer"
+                  className="h-4 w-4 text-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 border-[var(--border)] rounded cursor-pointer accent-[var(--primary)]"
                   disabled={loading}
                 />
                 {editingSubtaskId === subtask.id ? (
@@ -435,22 +387,23 @@ export default function Subtasks({
                       type="text"
                       value={editingTitle}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingTitle(e.target.value)}
-                      className="flex-1"
+                      className="flex-1 h-9 border-input bg-background text-[var(--foreground)]"
                       autoFocus
                     />
                     <Button
                       onClick={() => handleSaveEdit(subtask.id)}
                       disabled={loading}
                       size="sm"
-                      className="flex items-center gap-1"
+                      className="h-8 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] flex items-center gap-1"
                     >
-                      <HiCheck size={12} />
+                      <HiCheck className="w-3 h-3" />
                       Save
                     </Button>
                     <Button
                       onClick={handleCancelEdit}
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
+                      className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
                     >
                       Cancel
                     </Button>
@@ -461,17 +414,17 @@ export default function Subtasks({
                       htmlFor={`subtask-${subtask.id}`}
                       className={`text-sm cursor-pointer block font-medium ${
                         isSubtaskCompleted(subtask)
-                          ? "text-stone-500 dark:text-stone-400 line-through"
-                          : "text-stone-700 dark:text-stone-300"
+                          ? "text-[var(--muted-foreground)] line-through"
+                          : "text-[var(--foreground)]"
                       }`}
                     >
                       {subtask.title}
                     </label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={getPriorityVariant(subtask.priority)}>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge className={getPriorityConfig(subtask.priority)}>
                         {subtask.priority}
                       </Badge>
-                      <Badge variant="default">
+                      <Badge className="bg-[var(--muted)] text-[var(--muted-foreground)] border-none">
                         {taskStatuses.find(s => s.id === subtask.statusId)?.name || 'Unknown'}
                       </Badge>
                     </div>
@@ -483,19 +436,19 @@ export default function Subtasks({
                 <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
                   <button
                     onClick={() => handleEditSubtask(subtask.id, subtask.title)}
-                    className="text-stone-500 hover:text-amber-600 dark:text-stone-400 dark:hover:text-amber-400 p-1 rounded transition-colors"
+                    className="text-[var(--muted-foreground)] hover:text-[var(--primary)] p-2 rounded-lg transition-colors"
                     title="Edit subtask"
                     disabled={loading}
                   >
-                    <HiPencilSquare size={16} />
+                    <HiPencilSquare className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteSubtask(subtask.id)}
-                    className="text-stone-500 hover:text-red-600 dark:text-stone-400 dark:hover:text-red-400 p-1 rounded transition-colors"
+                    className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] p-2 rounded-lg transition-colors"
                     title="Delete subtask"
                     disabled={loading}
                   >
-                    <HiXMark size={16} />
+                    <HiXMark className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -506,22 +459,22 @@ export default function Subtasks({
 
       {/* Empty State */}
       {!loading && subtasks.length === 0 && (
-        <div className="text-center text-stone-500 dark:text-stone-400 py-8 bg-stone-50 dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700">
-          <HiListBullet size={32} className="mx-auto mb-2 text-stone-400" />
-          <p className="text-sm">No subtasks yet. Add one to break down this task.</p>
+        <div className="text-center py-8 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
+          <HiListBullet className="w-8 h-8 mx-auto mb-3 text-[var(--muted-foreground)]" />
+          <p className="text-sm text-[var(--muted-foreground)]">No subtasks yet. Add one to break down this task.</p>
         </div>
       )}
 
       {/* Add Subtask Form/Button */}
       {isAddingSubtask ? (
         <form onSubmit={handleAddSubtask} className="mt-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Input
               type="text"
               value={newSubtaskTitle}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSubtaskTitle(e.target.value)}
               placeholder="Enter subtask title..."
-              className="flex-1"
+              className="flex-1 h-9 border-input bg-background text-[var(--foreground)]"
               autoFocus
               disabled={loading}
             />
@@ -529,17 +482,18 @@ export default function Subtasks({
               type="submit"
               disabled={!newSubtaskTitle.trim() || loading}
               size="sm"
-              className="flex items-center gap-1"
+              className="h-9 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] flex items-center gap-1"
             >
-              <HiPlus size={12} />
+              <HiPlus className="w-3 h-3" />
               {loading ? 'Adding...' : 'Add'}
             </Button>
             <Button
               type="button"
               onClick={handleCancelAddSubtask}
-              variant="secondary"
+              variant="outline"
               size="sm"
               disabled={loading}
+              className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
             >
               Cancel
             </Button>
@@ -547,14 +501,14 @@ export default function Subtasks({
         </form>
       ) : (
         <div className="mt-4">
-          <button
+          <Button
             onClick={() => setIsAddingSubtask(true)}
-            className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 disabled:opacity-50 flex items-center gap-1 transition-colors"
+                className="relative h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2 text-sm"
             disabled={loading}
           >
-            <HiPlus size={14} />
+            <HiPlus className="w-4 h-4" />
             Add subtask
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 'use client';
-import { Task } from '@/types';
 import TaskTable from '@/components/ui/tables/TaskTable';
+import { Task } from '@/utils/api';
 
 interface TaskListViewProps {
   tasks: Task[];
@@ -16,7 +16,7 @@ export default function TaskListView({
   projects
 }: TaskListViewProps) {
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-lg  overflow-hidden">
+    <div className="bg-[var(--card)] rounded-lg border-none overflow-hidden">
       <TaskTable
         tasks={tasks}
         workspaceSlug={workspaceSlug}

@@ -1,12 +1,11 @@
 'use client';
-import { useState, useContext } from 'react';
+
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { WorkspaceContext } from '@/contexts/workspace-context'; 
+import { useWorkspaceContext } from '@/contexts/workspace-context';
 import { useAuth } from '@/contexts/auth-context'; 
-import { HiExclamation, HiArrowLeft } from 'react-icons/hi';
-
-// Import shadcn UI components
+import { HiExclamationTriangle, HiArrowLeft } from 'react-icons/hi2';
 import {
   Card,
   CardHeader,
@@ -19,43 +18,45 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface FormData {
+  name: string;
+  description: string;
+}
 
 export default function NewWorkspacePage() {
   const router = useRouter();
-  const workspaceContext = useContext(WorkspaceContext);
+  const workspaceContext = useWorkspaceContext();
   const { isAuthenticated } = useAuth();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
   });
 
-  // Form validation - all fields must be filled
-  const isFormValid = () => {
-    return (
-      formData.name.trim() !== '' &&
-      formData.description.trim() !== ''
-    );
-  };
+  const isFormValid = useCallback(() => {
+    return formData.name.trim() !== '' && formData.description.trim() !== '';
+  }, [formData]);
 
-  const getAuthToken = () => {
-    // This function is no longer needed since contexts handle auth
-    return '';
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (error) setError(null);
-  };
+  }, [error]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!workspaceContext) {
       setError('Workspace context not available');
+      return;
+    }
+
+    if (!isFormValid()) {
+      setError('Please fill in all required fields');
       return;
     }
 
@@ -67,82 +68,123 @@ export default function NewWorkspacePage() {
         throw new Error('Authentication required');
       }
       
-      const response = await workspaceContext.createWorkspace(formData);
+      const response = await workspaceContext.createWorkspace({
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+      });
       
-      const slug = formData.name.toLowerCase().replace(/\s+/g, '-');
-      
+      const slug = formData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       router.push(`/${response.slug || slug}`);
       
     } catch (error) {
-      console.error('Error creating workspace:', error);
       setError(error instanceof Error ? error.message : 'Failed to create workspace');
+    } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [workspaceContext, isFormValid, isAuthenticated, formData, router]);
 
   return (
-    <div className="min-h-screen bg-stone-100 dark:bg-stone-950">
-      <div className="max-w-7xl mx-auto p-6"> {/* Changed from max-w-2xl to max-w-4xl for wider form */}
+    <div className="min-h-screen bg-[var(--background)]">
+      <div className="max-w-[80vw] mx-auto py-6">
         {/* Header */}
-        <div className="mb-6">
-         
-          <h1 className="text-2xl font-semibold text-stone-900 dark:text-stone-100 mb-2">Create New Workspace</h1>
-          <p className="text-sm text-stone-600 dark:text-stone-400">
-            Workspaces help you organize projects and collaborate with teams.
-          </p>
+        <div className="mb-6 flex items-center gap-4">
+          
+          <h1 className="text-2xl font-semibold text-[var(--foreground)] mb-2">
+            New Workspace
+          </h1>
         </div>
 
         {/* Form */}
-        <Card className="p-8"> {/* Increased padding from p-6 to p-8 */}
-          {error && (
-            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <div className="flex items-start gap-2">
-                <HiExclamation className="w-4 h-4 text-red-500 mt-0.5" />
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        <Card className="border-[var(--border)] bg-[var(--card)]">
+          <CardHeader>
+            <CardTitle className="text-[var(--card-foreground)]">Workspace Details</CardTitle>
+            <CardDescription className="text-[var(--muted-foreground)]">
+              Provide basic information about your new workspace.
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="space-y-6">
+            {error && (
+              <Alert variant="destructive" className="border-[var(--destructive)] bg-[var(--destructive)]/10">
+                <HiExclamationTriangle className="h-4 w-4 text-[var(--destructive)]" />
+                <AlertDescription className="text-[var(--destructive-foreground)]">
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="workspace-name" className="text-[var(--foreground)]">
+                  Workspace Name *
+                </Label>
+                <Input
+                  id="workspace-name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  placeholder="My Workspace"
+                  className="border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus-visible:ring-[var(--ring)]"
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Choose a clear, descriptive name for your workspace.
+                </p>
               </div>
-            </div>
-          )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <Label htmlFor="workspace-name">Workspace Name</Label>
-              <Input
-                id="workspace-name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                placeholder="My Workspace"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="workspace-description" className="text-[var(--foreground)]">
+                  Description *
+                </Label>
+                <Textarea
+                  id="workspace-description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  required
+                  rows={4}
+                  placeholder="Describe the purpose of this workspace..."
+                  className="border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] resize-none focus-visible:ring-[var(--ring)]"
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Help team members understand what this workspace is for.
+                </p>
+              </div>
+            </form>
+          </CardContent>
 
-            <div>
-              <Label htmlFor="workspace-description">Description</Label>
-              <Textarea
-                id="workspace-description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                required
-                rows={4}
-                placeholder="Describe the purpose of this workspace"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-stone-200 dark:border-stone-800">
+          <CardFooter className="border-t border-[var(--border)] bg-[var(--muted)]/20">
+            <div className="flex justify-end gap-3 w-full">
               <Link href="/workspaces">
-                <Button variant="secondary">
+                <Button 
+                  variant="outline" 
+                  disabled={isSubmitting}
+                  className="border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]"
+                >
                   Cancel
                 </Button>
               </Link>
               <Button
-                type="submit"
+                onClick={handleSubmit}
                 disabled={isSubmitting || !isFormValid()}
+                className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] hover:shadow-md transition-all duration-200"
               >
-                {isSubmitting ? 'Creating...' : 'Create Workspace'}
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-[var(--primary-foreground)]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  'Create Workspace'
+                )}
               </Button>
             </div>
-          </form>
+          </CardFooter>
         </Card>
       </div>
     </div>

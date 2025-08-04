@@ -9,16 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import UserAvatar from '@/components/ui/avatars/UserAvatar';
 import {
   Select,
   SelectContent,
@@ -35,13 +27,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   HiMagnifyingGlass,
   HiPlus,
-  HiPencilSquare,
   HiTrash,
   HiUsers,
   HiEnvelope,
-  HiExclamationTriangle
+  HiExclamationTriangle,
+  HiChevronDown,
+  HiCheck,
+  HiUserPlus
 } from 'react-icons/hi2';
 
 interface Member {
@@ -61,50 +62,46 @@ interface Workspace {
   description?: string;
 }
 
-const UserAvatar = ({ 
-  name, 
-  size = "md" 
-}: { 
-  name: string;
-  size?: "sm" | "md" | "lg";
-}) => {
-  const sizes = {
-    sm: "h-6 w-6",
-    md: "h-8 w-8",
-    lg: "h-10 w-10"
+const StatusBadge = ({ status }: { status: string }) => {
+  const getStatusConfig = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case 'ACTIVE':
+        return 'bg-green-500/10 text-green-700 dark:bg-green-400/10 dark:text-green-500 ';
+      case 'PENDING':
+        return 'bg-yellow-400/10 text-yellow-700 dark:bg-yellow-400/10 dark:text-yellow-500 ';
+      case 'INACTIVE':
+        return 'bg-gray-400/10 text-gray-700 dark:bg-gray-400/10 dark:text-gray-500 ';
+      default:
+        return 'bg-[var(--muted)] text-[var(--muted-foreground)] ';
+    }
   };
-  
-  const getInitials = (name: string) => {
-    if (!name || name.trim() === '') return 'UN';
-    
-    return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
-  
+
   return (
-    <Avatar className={sizes[size]}>
-      <AvatarFallback className="bg-primary text-primary-foreground font-medium">
-        {getInitials(name)}
-      </AvatarFallback>
-    </Avatar>
+    <Badge className={`text-[10px] font-semibold border-none  py-0.5 rounded-full capitalize text-center tracking-wide shadow-sm ${getStatusConfig(status)}`}
+      >
+      {status?.toLowerCase()}
+    </Badge>
   );
 };
 
 const LoadingSkeleton = () => (
   <div className="min-h-screen bg-[var(--background)]">
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="animate-pulse">
-        <div className="h-6 bg-muted rounded w-1/3 mb-8"></div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="h-6 bg-muted rounded w-1/4 mb-4"></div>
+    <div className="max-w-7xl mx-auto p-4">
+      <div className="animate-pulse space-y-4">
+        <div className="h-6 bg-[var(--muted)] rounded w-1/3 mb-6"></div>
+        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none">
+          <CardContent className="p-4">
+            <div className="h-6 bg-[var(--muted)] rounded w-1/4 mb-4"></div>
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 bg-muted rounded"></div>
+                <div key={i} className="flex items-center space-x-3 p-2">
+                  <div className="h-8 w-8 bg-[var(--muted)] rounded-full flex-shrink-0"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-[var(--muted)] rounded w-1/2"></div>
+                    <div className="h-3 bg-[var(--muted)] rounded w-2/3"></div>
+                  </div>
+                  <div className="h-6 w-16 bg-[var(--muted)] rounded"></div>
+                </div>
               ))}
             </div>
           </CardContent>
@@ -123,14 +120,13 @@ const EmptyState = ({
   title: string;
   description: string;
 }) => (
-  <div className="px-6 py-10 text-center">
-    <Icon size={48} className="mx-auto text-muted-foreground mb-4" />
-    <p className="text-sm text-foreground font-medium mb-1">{title}</p>
-    <p className="text-xs text-muted-foreground">{description}</p>
+  <div className="text-center py-8 flex flex-col items-center justify-center">
+    <Icon className="w-12 h-12 mx-auto text-[var(--muted-foreground)] mb-4" />
+    <p className="text-sm font-medium text-[var(--foreground)] mb-2">{title}</p>
+    <p className="text-xs text-[var(--muted-foreground)]">{description}</p>
   </div>
 );
 
-// Invite modal component using shadcn Dialog
 const InviteModal = ({ 
   isOpen, 
   onClose, 
@@ -157,7 +153,6 @@ const InviteModal = ({
       setRole('MEMBER');
       onClose();
     } catch (error) {
-      console.error('Error inviting member:', error);
     } finally {
       setInviting(false);
     }
@@ -165,38 +160,39 @@ const InviteModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="bg-[var(--card)] border-none rounded-[var(--card-radius)] shadow-lg">
         <DialogHeader>
-          <DialogTitle>Invite Member</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-[var(--foreground)]">Invite Member via Email</DialogTitle>
+          <DialogDescription className="text-[var(--muted-foreground)]">
             Send an invitation to join this workspace.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email" className="text-[var(--foreground)]">Email Address</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter email address"
+                className="border-input bg-background text-[var(--foreground)]"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role" className="text-[var(--foreground)]">Role</Label>
               <Select value={role} onValueChange={setRole}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-none bg-[var(--card)]">
                   {availableRoles.map((r: any) => (
                     <SelectItem key={r.id} value={r.name}>
                       <div>
                         <div className="font-medium">{r.name}</div>
-                        <div className="text-xs text-muted-foreground">{r.description}</div>
+                        <div className="text-xs text-[var(--muted-foreground)]">{r.description}</div>
                       </div>
                     </SelectItem>
                   ))}
@@ -204,10 +200,11 @@ const InviteModal = ({
               </Select>
             </div>
           </div>
-          <DialogFooter className="mt-6">
+          <DialogFooter className="flex justify-end gap-3">
             <Button 
               type="button" 
               variant="outline" 
+              className="h-9 w-20 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
               onClick={onClose}
               disabled={inviting}
             >
@@ -215,6 +212,7 @@ const InviteModal = ({
             </Button>
             <Button 
               type="submit" 
+              className="h-9 w-28 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium"
               disabled={inviting || !email.trim()}
             >
               {inviting ? 'Inviting...' : 'Send Invite'}
@@ -250,7 +248,6 @@ export default function WorkspaceMembersPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Enhanced refs to prevent duplicate API calls - Strict Mode compatible
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef<string>('');
@@ -263,13 +260,17 @@ export default function WorkspaceMembersPage() {
   });
 
   const roles = [
-    { id: '1', name: 'ADMIN', description: 'Full access to all workspace resources' },
-    { id: '2', name: 'MANAGER', description: 'Can manage projects and members' },
-    { id: '3', name: 'MEMBER', description: 'Can access and work on projects' },
-    { id: '4', name: 'VIEWER', description: 'Can only view workspace content' },
+    { id: '1', name: 'ADMIN', description: 'Full access to all workspace resources', variant: 'secondary' as const },
+    { id: '2', name: 'MANAGER', description: 'Can manage projects and members', variant: 'default' as const },
+    { id: '3', name: 'MEMBER', description: 'Can access and work on projects', variant: 'default' as const },
+    { id: '4', name: 'VIEWER', description: 'Can only view workspace content', variant: 'secondary' as const },
   ];
 
-  // Update context functions in refs when they change
+  const getRoleLabel = (role: string) => {
+    const roleConfig = roles.find(r => r.name === role);
+    return roleConfig?.name || role;
+  };
+
   useEffect(() => {
     contextFunctionsRef.current = {
       getWorkspaceBySlug,
@@ -278,31 +279,23 @@ export default function WorkspaceMembersPage() {
     };
   }, [getWorkspaceBySlug, getWorkspaceMembers, isAuthenticated]);
 
-  // Enhanced initialization effect that's Strict Mode compatible
   useEffect(() => {
     const initializeData = async () => {
-      // Generate unique request ID for this page (including path to distinguish between workspace pages)
       const pageKey = `${workspaceSlug}/members`;
       const requestId = `${pageKey}-${Date.now()}-${Math.random()}`;
       
-      // Only prevent if we're truly initialized for this exact page and have data
       if (!isMountedRef.current || 
           (currentSlugRef.current === pageKey && isInitializedRef.current && workspace && members.length >= 0)) {
-        console.log('🚫 [MEMBERS] Skipping fetch - already initialized or unmounted');
         return;
       }
 
-      // Cancel any ongoing request with a small delay to handle rapid mount/unmount cycles
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
 
-      // Create new abort controller
       abortControllerRef.current = new AbortController();
       requestIdRef.current = requestId;
       currentSlugRef.current = pageKey;
-
-      console.log('📋 [MEMBERS] Initializing data fetch for slug:', workspaceSlug, 'requestId:', requestId);
 
       if (!workspaceSlug || !contextFunctionsRef.current.isAuthenticated()) {
         setError('Authentication required');
@@ -314,18 +307,13 @@ export default function WorkspaceMembersPage() {
         setLoading(true);
         setError(null);
         
-        // Double-check we're still the active request
         if (requestIdRef.current !== requestId || !isMountedRef.current) {
-          console.log('🚫 [MEMBERS] Request cancelled or component unmounted');
           return;
         }
 
-        console.log('🔍 [MEMBERS] Fetching workspace data for slug:', workspaceSlug);
         const workspaceData = await contextFunctionsRef.current.getWorkspaceBySlug(workspaceSlug);
         
-        // Check again if we're still the active request
         if (requestIdRef.current !== requestId || !isMountedRef.current) {
-          console.log('🚫 [MEMBERS] Request cancelled after workspace fetch');
           return;
         }
 
@@ -337,16 +325,11 @@ export default function WorkspaceMembersPage() {
 
         setWorkspace(workspaceData);
 
-        console.log(`🔍 [MEMBERS] Fetching members for workspace: ${workspaceData.id}`);
         const membersData = await contextFunctionsRef.current.getWorkspaceMembers(workspaceData.id);
         
-        // Final check if we're still the active request
         if (requestIdRef.current !== requestId || !isMountedRef.current) {
-          console.log('🚫 [MEMBERS] Request cancelled after members fetch');
           return;
         }
-        
-        console.log(`📊 [MEMBERS] Received members data:`, { count: membersData?.length, isEmpty: !membersData || membersData.length === 0 });
         
         const processedMembers = (membersData || []).map((member: any) => ({
           id: member.id,
@@ -360,12 +343,9 @@ export default function WorkspaceMembersPage() {
         
         setMembers(processedMembers);
         isInitializedRef.current = true;
-        console.log(`✅ [MEMBERS] Successfully loaded ${processedMembers.length} members`);
         
       } catch (err) {
-        // Only handle error if we're still the active request
         if (requestIdRef.current === requestId && isMountedRef.current) {
-          console.error('❌ [MEMBERS] Error fetching data:', err);
           setError(err instanceof Error ? err.message : 'An error occurred');
           isInitializedRef.current = false;
         }
@@ -376,36 +356,30 @@ export default function WorkspaceMembersPage() {
       }
     };
 
-    // Reset initialization when page changes
     const pageKey = `${workspaceSlug}/members`;
     if (currentSlugRef.current !== pageKey) {
-      console.log('📍 [MEMBERS] Page changed, resetting for new page:', pageKey);
       isInitializedRef.current = false;
       setWorkspace(null);
       setMembers([]);
       setError(null);
     }
 
-    // Add a small delay to handle rapid mount/unmount cycles
     const timeoutId = setTimeout(() => {
       initializeData();
     }, 50);
 
     return () => clearTimeout(timeoutId);
-  }, [workspaceSlug]); // Only depend on workspaceSlug
+  }, [workspaceSlug]);
 
-  // Enhanced cleanup effect
   useEffect(() => {
     isMountedRef.current = true;
     
     return () => {
-      console.log('🧹 [MEMBERS] Component unmounting, cleaning up');
       isMountedRef.current = false;
       isInitializedRef.current = false;
       currentSlugRef.current = '';
       requestIdRef.current = '';
       
-      // Cancel any ongoing request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -413,35 +387,28 @@ export default function WorkspaceMembersPage() {
     };
   }, []);
 
+
+  // Separate members into pending and others
   const filteredMembers = members.filter(member => {
     const name = member.name || '';
     const email = member.email || '';
     const searchLower = searchTerm.toLowerCase();
-    
-    return name.toLowerCase().includes(searchLower) || 
-           email.toLowerCase().includes(searchLower);
+    return (name.toLowerCase().includes(searchLower) || email.toLowerCase().includes(searchLower)) && member.status?.toLowerCase() !== 'pending';
   });
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'Unknown';
-    
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch (error) {
-      return 'Invalid Date';
-    }
-  };
+  const filteredPendingMembers = members.filter(member => {
+    const name = member.name || '';
+    const email = member.email || '';
+    const searchLower = searchTerm.toLowerCase();
+    return (name.toLowerCase().includes(searchLower) || email.toLowerCase().includes(searchLower)) && member.status?.toLowerCase() === 'pending';
+  });
 
-  // Function to refresh members list
   const refreshMembers = async () => {
     if (!workspace) return;
     
     try {
       setIsRefreshing(true);
-      console.log(`🔄 [MEMBERS] Refreshing members for workspace ${workspace.id}`);
       const membersData = await contextFunctionsRef.current.getWorkspaceMembers(workspace.id);
-      
-      console.log(`📊 [MEMBERS] Refresh received members data:`, { count: membersData?.length, isEmpty: !membersData || membersData.length === 0 });
       
       const processedMembers = (membersData || []).map((member: any) => ({
         id: member.id,
@@ -454,26 +421,19 @@ export default function WorkspaceMembersPage() {
       }));
       
       setMembers(processedMembers);
-      setError(null); // Clear any previous errors
-      console.log(`✅ [MEMBERS] Successfully refreshed ${processedMembers.length} members`);
+      setError(null);
     } catch (err) {
-      console.error('❌ [MEMBERS] Error refreshing members:', err);
       setError(err instanceof Error ? err.message : 'Failed to load members');
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // Enhanced manual retry function
   const retryFetch = () => {
-    console.log('🔄 [MEMBERS] Manual retry triggered');
-    
-    // Cancel any ongoing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     
-    // Reset all state
     isInitializedRef.current = false;
     currentSlugRef.current = '';
     requestIdRef.current = '';
@@ -481,11 +441,8 @@ export default function WorkspaceMembersPage() {
     setWorkspace(null);
     setError(null);
     setLoading(true);
-    
-    // The useEffect will automatically trigger a new fetch
   };
 
-  // Handle role update
   const handleRoleUpdate = async (memberId: string, newRole: string) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -498,14 +455,12 @@ export default function WorkspaceMembersPage() {
       await updateMemberRole(memberId, { role: newRole as any }, currentUser.id);
       await refreshMembers();
     } catch (err) {
-      console.error('Error updating role:', err);
       setError(err instanceof Error ? err.message : 'Failed to update role');
     } finally {
       setUpdatingMember(null);
     }
   };
 
-  // Handle member removal
   const handleRemoveMember = async (memberId: string) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -522,14 +477,12 @@ export default function WorkspaceMembersPage() {
       await removeMemberFromWorkspace(memberId, currentUser.id);
       await refreshMembers();
     } catch (err) {
-      console.error('Error removing member:', err);
       setError(err instanceof Error ? err.message : 'Failed to remove member');
     } finally {
       setRemovingMember(null);
     }
   };
 
-  // Handle member invitation
   const handleInvite = async (email: string, role: string) => {
     if (!workspace) return;
 
@@ -541,7 +494,6 @@ export default function WorkspaceMembersPage() {
       });
       await refreshMembers();
     } catch (err) {
-      console.error('Error inviting member:', err);
       throw err;
     }
   };
@@ -553,14 +505,19 @@ export default function WorkspaceMembersPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
-          <Alert variant="destructive">
+        <div className="max-w-7xl mx-auto p-4">
+          <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
             <HiExclamationTriangle className="h-4 w-4" />
             <AlertTitle>Error loading workspace members</AlertTitle>
             <AlertDescription>
               {error}
               <div className="mt-4">
-                <Button onClick={retryFetch} variant="outline" size="sm">
+                <Button 
+                  onClick={retryFetch} 
+                  variant="outline" 
+                  size="sm"
+                  className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                >
                   Try Again
                 </Button>
               </div>
@@ -574,9 +531,9 @@ export default function WorkspaceMembersPage() {
   if (!workspace) {
     return (
       <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
+        <div className="max-w-7xl mx-auto p-4">
           <div className="text-center py-12">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">
               Workspace not found
             </h2>
           </div>
@@ -587,208 +544,194 @@ export default function WorkspaceMembersPage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-            <div>
-              <h1 className="text-lg font-semibold text-foreground mb-1">
-                {workspace.name} Members
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Manage members and their permissions in the {workspace.name} workspace.
-              </p>
-            </div>
-            <div className="flex gap-3 mt-4 md:mt-0">
-              <Button onClick={() => setShowInviteModal(true)}>
-                <HiPlus size={16} className="mr-2" />
-                Invite Member
-              </Button>
-            </div>
+      <div className="max-w-7xl mx-auto p-4">
+
+        {/* Header - Compact */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-[var(--foreground)] mb-1 flex items-center gap-2">
+              <HiUsers className="w-5 h-5" />
+              Internal Operations Members
+            </h1>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Manage members and their permissions in this workspace.
+            </p>
           </div>
+          <Button 
+            onClick={() => setShowInviteModal(true)}
+            className="h-9 px-4 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
+          >
+            <HiPlus className="w-4 h-4" />
+            Invite Member
+          </Button>
         </div>
 
-        {/* Members Table */}
-        <Card className="mb-6">
-          {isRefreshing && !loading && (
-            <div className="absolute top-0 left-0 right-0 h-1 bg-muted rounded-t-lg overflow-hidden">
-              <div className="h-full bg-primary animate-pulse"></div>
-            </div>
-          )}
-          <CardHeader className="border-b border-border">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <HiUsers size={16} />
-                Members ({filteredMembers.length})
-                {isRefreshing && (
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin ml-2"></div>
-                )}
-              </CardTitle>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <HiMagnifyingGlass size={16} className="text-muted-foreground" />
-                </div>
-                <Input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                  placeholder="Search members..."
-                />
-              </div>
-            </div>
-          </CardHeader>
+        {/* Main Content - Single Column Layout like MembersManager */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {filteredMembers.length === 0 && !loading ? (
-            <EmptyState
-              icon={HiUsers}
-              title={searchTerm ? 'No members found matching your search' : (error ? 'Error loading members' : 'No members found in this workspace')}
-              description={searchTerm ? 'Try adjusting your search terms' : (error ? 'Please refresh the page or try again later' : 'Start by inviting team members to collaborate')}
-            />
-          ) : (
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMembers.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <UserAvatar name={member.name} size="lg" />
+          {/* Members List - Takes most space */}
+          <div className="lg:col-span-2">
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
+                    <HiUsers className="w-5 h-5 text-[var(--muted-foreground)]" />
+                    Members ({filteredMembers.length})
+                  </CardTitle>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <HiMagnifyingGlass className="w-4 h-4 text-[var(--muted-foreground)]" />
+                    </div>
+                    <Input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-9 w-64 border-input bg-background text-[var(--foreground)]"
+                      placeholder="Search members..."
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="pt-0">
+                {filteredMembers.length === 0 && !loading ? (
+                  <EmptyState
+                    icon={HiUserPlus}
+                    title={searchTerm ? 'No members found matching your search' : 'No members found in this workspace'}
+                    description={searchTerm ? 'Try adjusting your search terms' : 'Start by inviting team members to collaborate'}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {filteredMembers.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between py-2 rounded-lg transition-colors hover:bg-[var(--primary)]/5">
+                        <div className="flex items-center space-x-3">
+                          <UserAvatar
+                            user={{
+                              firstName: member.name.split(' ')[0] || '',
+                              lastName: member.name.split(' ')[1] || '',
+                              avatar: member.avatar,
+                            }}
+                            size="sm"
+                          />
                           <div>
-                            <div className="font-medium text-foreground">
-                              {member.name}
+                            <div className="text-sm font-medium text-[var(--foreground)] flex gap-3">
+                              {member.name}   <StatusBadge status={member.status} />
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-[var(--muted-foreground)]">
                               {member.email}
                             </div>
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="relative">
-                          <Select
-                            value={member.role}
-                            onValueChange={(value) => handleRoleUpdate(member.id, value)}
-                            disabled={updatingMember === member.id}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {roles.map(role => (
-                                <SelectItem key={role.id} value={role.name}>
-                                  {role.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {updatingMember === member.id && (
-                            <div className="absolute inset-0 bg-[var(--background)]/50 rounded-lg flex items-center justify-center">
-                              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={member.status === 'ACTIVE' ? 'default' : 'secondary'} className="capitalize">
-                          {member.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(member.joinedAt)}
-                      </TableCell>
-                      <TableCell>
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <HiPencilSquare size={16} />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                            onClick={() => handleRemoveMember(member.id)}
-                            disabled={removingMember === member.id}
-                          >
-                            {removingMember === member.id ? (
-                              <div className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                              <HiTrash size={16} />
-                            )}
-                          </Button>
+                        
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                className="h-9 w-28 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-200 text-xs"
+                                disabled={updatingMember === member.id}
+                              >
+                                {updatingMember === member.id ? (
+                                  <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <>
+                                    {getRoleLabel(member.role)}
+                                    <HiChevronDown className="w-3 h-3" />
+                                  </>
+                                )}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="z-50 border-none bg-[var(--card)] rounded-[var(--card-radius)] shadow-lg">
+                              {roles.map((role) => (
+                                <DropdownMenuItem
+                                  key={role.id}
+                                  onClick={() => handleRoleUpdate(member.id, role.name)}
+                                  className="text-[var(--foreground)] hover:bg-[var(--primary)]/10"
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    {role.name}
+                                    {member.role === role.name && (
+                                      <HiCheck className="w-4 h-4 text-[var(--primary)]" />
+                                    )}
+                                  </div>
+                                </DropdownMenuItem>
+                              ))}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleRemoveMember(member.id)}
+                                className="text-[var(--destructive)] hover:bg-[var(--destructive)]/10"
+                                disabled={removingMember === member.id}
+                              >
+                                {removingMember === member.id ? (
+                                  <div className="w-4 h-4 border-2 border-[var(--destructive)] border-t-transparent rounded-full animate-spin mr-2"></div>
+                                ) : (
+                                  <HiTrash className="w-4 h-4 mr-2" />
+                                )}
+                                Remove member
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          )}
-          
-          {/* Show retry button if members disappeared but no error state */}
-          {!loading && members.length === 0 && !error && workspace && (
-            <CardContent>
-              <div className="text-center py-6">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Members data seems to have disappeared. This might be a caching issue.
-                </p>
-                <Button 
-                  onClick={retryFetch}
-                  variant="outline"
-                  disabled={isRefreshing}
-                >
-                  {isRefreshing ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <HiUsers size={16} className="mr-2" />
-                      Reload Members
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-          <CardContent className="border-t border-border pt-4">
-            <Button 
-              variant="ghost"
-              onClick={() => setShowInviteModal(true)}
-              className="text-primary hover:text-primary/80"
-            >
-              <HiPlus size={16} className="mr-2" />
-              Invite Member
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Pending Invitations - Small Sidebar Card */}
+          <div className="lg:col-span-1">
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
+                  <HiEnvelope className="w-5 h-5 text-[var(--muted-foreground)]" />
+                  Pending Invitations
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {filteredPendingMembers.length === 0 ? (
+                  <EmptyState
+                    icon={HiEnvelope}
+                    title="No pending invitations"
+                    description="All invitations have been accepted or no invitations have been sent"
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {filteredPendingMembers.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between py-2 rounded-lg transition-colors hover:bg-[var(--primary)]/5">
+                        <div className="flex items-center space-x-3">
+                          <UserAvatar
+                            user={{
+                              firstName: member.name.split(' ')[0] || '',
+                              lastName: member.name.split(' ')[1] || '',
+                              avatar: member.avatar,
+                            }}
+                            size="sm"
+                          />
+                          <div>
+                            <div className="text-sm font-medium text-[var(--foreground)] flex gap-3">
+                              {member.name}   <StatusBadge status={member.status} />
+                            </div>
+                            <div className="text-xs text-[var(--muted-foreground)]">
+                              {member.email}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 rounded-md border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-200 text-xs">
+                            Invited
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-        {/* Pending Invitations */}
-        <Card>
-          <CardHeader className="border-b border-border">
-            <CardTitle className="flex items-center gap-2">
-              <HiEnvelope size={16} />
-              Pending Invitations
-            </CardTitle>
-          </CardHeader>
-          <EmptyState
-            icon={HiEnvelope}
-            title="No pending invitations"
-            description="All invitations have been accepted or no invitations have been sent"
-          />
-        </Card>
-
-        {/* Invite Member Modal */}
         <InviteModal 
           isOpen={showInviteModal}
           onClose={() => setShowInviteModal(false)}

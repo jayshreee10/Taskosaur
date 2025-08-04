@@ -257,6 +257,50 @@ export class EmailProcessor {
             </div>
           </div>
         `;
+      case EmailTemplate.PASSWORD_RESET_CONFIRMATION:
+        return `
+        ${baseStyles}
+        <div class="container">
+          <div class="header">
+            <h1>✅ Password Successfully Reset</h1>
+          </div>
+          <div class="content">
+            <h2>Hi ${data.userName}!</h2>
+            <p>Your Taskosaur account password has been successfully reset.</p>
+            
+            <div class="task-info">
+              <h3>🔐 Password Reset Confirmation</h3>
+              <p><strong>Reset completed:</strong> ${data.resetTime}</p>
+              <p>Your password has been updated and all existing sessions have been logged out for security.</p>
+            </div>
+            
+            <div style="margin: 20px 0; padding: 15px; background: #f0fdf4; border-radius: 6px; border-left: 4px solid #22c55e;">
+              <p><strong>✅ What happened:</strong></p>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>Your password has been successfully changed</li>
+                <li>All existing sessions have been logged out</li>
+                <li>You can now log in with your new password</li>
+              </ul>
+            </div>
+            
+            <div style="margin: 20px 0; padding: 15px; background: #fef2f2; border-radius: 6px; border-left: 4px solid #ef4444;">
+              <p><strong>🚨 Didn't make this change?</strong></p>
+              <p>If you didn't reset your password, please contact our support team immediately at ${data.supportEmail || 'support@taskosaur.com'}</p>
+            </div>
+            
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" class="button">Login to Your Account</a>
+            
+            <p>Need help? Our support team is here to assist you.</p>
+            
+            <p>Stay secure! 🛡️</p>
+          </div>
+          <div class="footer">
+            <p>Taskosaur - Modern Project Management</p>
+            <p>This is a security notification about your account password change.</p>
+            <p>If you have any concerns, please contact us at ${data.supportEmail || 'support@taskosaur.com'}</p>
+          </div>
+        </div>
+      `;
 
       default:
         return `

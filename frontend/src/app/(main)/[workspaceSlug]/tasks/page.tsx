@@ -37,7 +37,7 @@ const LoadingSpinner = () => (
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex justify-center items-center h-64">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary"></div>
+          <div className="animate-spin rounded-full h-8 w-8 "></div>
           <div className="text-sm text-muted-foreground">Loading workspace tasks...</div>
         </div>
       </div>
@@ -259,7 +259,9 @@ export default function WorkspaceTasksPage(props: Props) {
               </Select>
 
               <Link href={`/${workspaceSlug}/tasks/new`}>
-                <Button className="flex items-center gap-2">
+                <Button
+                  className="flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg text-sm px-4 h-9"
+                >
                   <HiPlus size={16} />
                   Add Task
                 </Button>
@@ -300,10 +302,10 @@ export default function WorkspaceTasksPage(props: Props) {
         </div>
 
         <div className="mb-4">
-          <TaskViewTabs currentView="" baseUrl={`/${workspaceSlug}/tasks`} />
+          <TaskViewTabs currentView="list" baseUrl={`/${workspaceSlug}/tasks`} />
         </div>
         
-        <Card>
+    
           {filteredTasks.length > 0 ? (
             <TaskListView
               tasks={filteredTasks}
@@ -311,7 +313,8 @@ export default function WorkspaceTasksPage(props: Props) {
               projects={projectsData}
             />
           ) : (
-            <CardContent className="p-8 text-center">
+                <Card>
+            <CardContent className="p-8 text-center border-none">
               <HiClipboardDocumentList size={48} className="mx-auto text-muted-foreground mb-4" />
               <CardTitle className="text-sm font-medium text-foreground mb-2">
                 {workspaceTasks.length === 0 ? 'No tasks yet' : 'No tasks match your filters'}
@@ -322,15 +325,29 @@ export default function WorkspaceTasksPage(props: Props) {
                   : 'Try adjusting your filters or create a new task.'
                 }
               </CardDescription>
-              <Link href={`/${workspaceSlug}/tasks/new`}>
-                <Button className="flex items-center gap-2">
-                  <HiPlus size={16} />
-                  Create Task
-                </Button>
-              </Link>
+              <div className="flex justify-center gap-3">
+                <Link href={`/${workspaceSlug}/tasks/new`}>
+                  <Button className="flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg text-sm px-4 h-9">
+                    <HiPlus size={16} />
+                    Create Task
+                  </Button>
+                </Link>
+                {(selectedProject !== 'all' || selectedStatus !== 'all') && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedProject('all');
+                      setSelectedStatus('all');
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
             </CardContent>
+              </Card>
           )}
-        </Card>
+      
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationRole, Organization } from '@prisma/client';
+import { DEFAULT_WORKFLOW, DEFAULT_TASK_STATUSES, DEFAULT_STATUS_TRANSITIONS } from '../constants/defaultWorkflow';
 
 @Injectable()
 export class OrganizationsSeederService {
@@ -76,9 +77,54 @@ export class OrganizationsSeederService {
 
     for (const orgData of organizationsData) {
       try {
+        // Create organization with default workflow and task statuses
         const organization = await this.prisma.organization.create({
-          data: orgData,
+          data: {
+            ...orgData,
+            // Create default workflow with task statuses
+            workflows: {
+              create: {
+                name: DEFAULT_WORKFLOW.name,
+                description: DEFAULT_WORKFLOW.description,
+                isDefault: true,
+                createdBy: orgData.createdBy,
+                updatedBy: orgData.updatedBy,
+                statuses: {
+                  create: DEFAULT_TASK_STATUSES.map(status => ({
+                    name: status.name,
+                    color: status.color,
+                    category: status.category,
+                    position: status.position,
+                    isDefault: status.isDefault,
+                    createdBy: orgData.createdBy,
+                    updatedBy: orgData.updatedBy,
+                  })),
+                },
+              },
+            },
+          },
+          include: {
+            workflows: {
+              where: { isDefault: true },
+              include: {
+                statuses: {
+                  orderBy: { position: 'asc' },
+                },
+              },
+            },
+          },
         });
+
+        // Create status transitions after organization is created
+        const defaultWorkflow = organization.workflows[0];
+        if (defaultWorkflow?.statuses && defaultWorkflow.statuses.length > 0) {
+          await this.createDefaultStatusTransitions(
+            defaultWorkflow.id,
+            defaultWorkflow.statuses,
+            orgData.createdBy
+          );
+          console.log(`   ✓ Created default workflow and transitions for: ${organization.name}`);
+        }
 
         // Add organization members
         await this.addMembersToOrganization(organization.id, users);
@@ -103,6 +149,35 @@ export class OrganizationsSeederService {
       `✅ Organizations seeding completed. Created/Found ${createdOrganizations.length} organizations.`,
     );
     return createdOrganizations;
+  }
+
+  // Helper method to create status transitions
+  private async createDefaultStatusTransitions(
+    workflowId: string, 
+    statuses: any[], 
+    userId: string
+  ) {
+    // Create a map of status names to IDs
+    const statusMap = new Map(statuses.map(status => [status.name, status.id]));
+
+    const transitionsToCreate = DEFAULT_STATUS_TRANSITIONS
+      .filter(transition => 
+        statusMap.has(transition.from) && statusMap.has(transition.to)
+      )
+      .map(transition => ({
+        name: `${transition.from} → ${transition.to}`,
+        workflowId,
+        fromStatusId: statusMap.get(transition.from),
+        toStatusId: statusMap.get(transition.to),
+        createdBy: userId,
+        updatedBy: userId,
+      }));
+
+    if (transitionsToCreate.length > 0) {
+      await this.prisma.statusTransition.createMany({
+        data: transitionsToCreate,
+      });
+    }
   }
 
   private async addMembersToOrganization(organizationId: string, users: any[]) {
@@ -142,11 +217,21 @@ export class OrganizationsSeederService {
     console.log('🧹 Clearing organizations...');
 
     try {
-      // Delete organization members first (foreign key constraint)
+      // Delete in correct order due to foreign key constraints
+      console.log('   🧹 Deleting status transitions...');
+      await this.prisma.statusTransition.deleteMany();
+
+      console.log('   🧹 Deleting task statuses...');
+      await this.prisma.taskStatus.deleteMany();
+
+      console.log('   🧹 Deleting workflows...');
+      await this.prisma.workflow.deleteMany();
+
+      console.log('   🧹 Deleting organization members...');
       const deletedMembers = await this.prisma.organizationMember.deleteMany();
       console.log(`   ✓ Deleted ${deletedMembers.count} organization members`);
 
-      // Delete organizations
+      console.log('   🧹 Deleting organizations...');
       const deletedOrgs = await this.prisma.organization.deleteMany();
       console.log(`✅ Deleted ${deletedOrgs.count} organizations`);
     } catch (error) {
@@ -169,6 +254,24 @@ export class OrganizationsSeederService {
             firstName: true,
             lastName: true,
             email: true,
+          },
+        },
+        workflows: {
+          where: { isDefault: true },
+          select: {
+            id: true,
+            name: true,
+            isDefault: true,
+            statuses: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                category: true,
+                position: true,
+              },
+              orderBy: { position: 'asc' },
+            },
           },
         },
         members: {

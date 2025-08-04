@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { WorkspaceContext } from '@/contexts/workspace-context';
+import { useWorkspace } from '@/contexts/workspace-context';
 import { useProjectContext } from '@/contexts/project-context';
 import { useAuth } from '@/contexts/auth-context';
 import ProjectAvatar from '@/components/ui/avatars/ProjectAvatar';
@@ -45,8 +45,10 @@ import {
   HiExclamationTriangle,
   HiPhoto,
   HiArchiveBox,
-  HiTrash
+  HiTrash,
+  HiChevronLeft
 } from 'react-icons/hi2';
+import Link from 'next/link';
 
 interface Workspace {
   id: string;
@@ -71,7 +73,7 @@ interface Project {
 export default function ProjectSettingsPage() {
   const params = useParams();
   const router = useRouter();
-  const workspaceContext = useContext(WorkspaceContext);
+  const workspaceContext = useWorkspace();
   const projectContext = useProjectContext();
   const { isAuthenticated } = useAuth();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -100,7 +102,10 @@ export default function ProjectSettingsPage() {
         const token = getAuthToken();
         
         const workspaceData = await workspaceContext.getWorkspaceBySlug(workspaceSlug);
-        setWorkspace(workspaceData);
+        setWorkspace({
+          ...workspaceData,
+          description: workspaceData.description ?? '',
+        });
 
         const projects = await projectContext.getProjectsByWorkspace(workspaceData.id);
 
@@ -115,7 +120,10 @@ export default function ProjectSettingsPage() {
         });
 
         if (matchedProject) {
-          setProject(matchedProject);
+          setProject({
+            ...matchedProject,
+            description: matchedProject.description ?? '',
+          });
         } else {
           console.error('No matching project found for slug:', projectSlug);
         }
@@ -130,7 +138,7 @@ export default function ProjectSettingsPage() {
     if (workspaceSlug && projectSlug) {
       fetchData();
     }
-  }, [workspaceContext, projectContext, workspaceSlug, projectSlug]);
+  }, [ workspaceSlug, projectSlug]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,9 +175,11 @@ export default function ProjectSettingsPage() {
         updateData.endDate = formatDateToISO(endDate);
       }
       
-      const updatedProject = await projectContext.updateProject(project.id, updateData, token);
-      
-      setProject(updatedProject);
+      const updatedProject = await projectContext.updateProject(project.id, updateData);
+      setProject({
+        ...updatedProject,
+        description: updatedProject.description ?? '',
+      });
       alert('Project updated successfully!');
       
     } catch (error) {
@@ -189,7 +199,7 @@ export default function ProjectSettingsPage() {
     try {
       const token = getAuthToken();
       
-      await projectContext.deleteProject(project.id, token);
+      await projectContext.deleteProject(project.id);
       alert('Project deleted successfully!');
       router.push(`/${workspaceSlug}`);
       
@@ -205,10 +215,25 @@ export default function ProjectSettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary"></div>
-            <span className="ml-2 text-muted-foreground">Loading project settings...</span>
+        <div className="max-w-7xl mx-auto p-4">
+          <div className="animate-pulse space-y-4">
+            {/* Header skeleton */}
+            <div className="h-4 bg-[var(--muted)] rounded w-1/3 mb-4"></div>
+            <div className="h-6 bg-[var(--muted)] rounded w-1/4 mb-2"></div>
+            <div className="h-4 bg-[var(--muted)] rounded w-1/2 mb-6"></div>
+            
+            {/* Tabs skeleton */}
+            <div className="h-10 bg-[var(--muted)] rounded mb-4"></div>
+            
+            {/* Card skeleton */}
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] border-none p-4">
+              <div className="h-5 bg-[var(--muted)] rounded w-1/4 mb-4"></div>
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-10 bg-[var(--muted)] rounded"></div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -218,8 +243,8 @@ export default function ProjectSettingsPage() {
   if (!workspace || !project) {
     return (
       <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
-          <Alert variant="destructive">
+        <div className="max-w-7xl mx-auto p-4">
+          <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
             <HiExclamationTriangle className="h-4 w-4" />
             <AlertTitle>Project Not Found</AlertTitle>
             <AlertDescription>
@@ -233,160 +258,192 @@ export default function ProjectSettingsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
+      <div className="max-w-7xl mx-auto p-4">
+        
+        {/* Compact Header - Following your theme patterns */}
         <div className="mb-6">
-          <nav className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-            <span>{workspace.name}</span>
-            <span>/</span>
-            <span>{project.name}</span>
-            <span>/</span>
-            <span>Settings</span>
-          </nav>
-          <h1 className="text-lg font-semibold text-foreground mb-1">
-            Project Settings
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your project configuration and preferences.
-          </p>
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm mb-4">
+            <Link href={`/${workspaceSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
+              {workspace.name}
+            </Link>
+            <span className="text-[var(--muted-foreground)]">/</span>
+            <Link href={`/${workspaceSlug}/${projectSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
+              {project.name}
+            </Link>
+            <span className="text-[var(--muted-foreground)]">/</span>
+            <span className="text-[var(--foreground)] font-medium">Settings</span>
+          </div>
+          
+          {/* Header with back button */}
+          <div className="flex items-center gap-3 mb-2">
+            <Link href={`/${workspaceSlug}/${projectSlug}`}>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="h-9 w-9 p-0 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+              >
+                <HiChevronLeft className="w-4 h-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold text-[var(--foreground)]">
+                Project Settings
+              </h1>
+              <p className="text-sm text-[var(--muted-foreground)] mt-1">
+                Manage your project configuration and preferences
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="general" className="flex items-center gap-2">
-              <HiCog6Tooth size={16} />
+        {/* Tabs - Theme consistent */}
+        <Tabs defaultValue="general" className="space-y-4">
+          <TabsList className="h-10 bg-[var(--muted)] rounded-lg p-1">
+            <TabsTrigger 
+              value="general" 
+              className="flex items-center gap-2 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
+            >
+              <HiCog6Tooth className="w-4 h-4" />
               General
             </TabsTrigger>
-            <TabsTrigger value="workflow" className="flex items-center gap-2">
-              <HiArrowPath size={16} />
-              Workflow
-            </TabsTrigger>
-            <TabsTrigger value="automation" className="flex items-center gap-2">
-              <HiCpuChip size={16} />
-              Automation
-            </TabsTrigger>
-            <TabsTrigger value="danger" className="flex items-center gap-2">
-              <HiExclamationTriangle size={16} />
+            <TabsTrigger 
+              value="danger" 
+              className="flex items-center gap-2 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
+            >
+              <HiExclamationTriangle className="w-4 h-4" />
               Danger Zone
             </TabsTrigger>
           </TabsList>
 
           {/* General Tab */}
           <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <HiPhoto size={16} />
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                  <HiPhoto className="w-5 h-5 text-[var(--primary)]" />
                   Project Information
                 </CardTitle>
-                <CardDescription>
-                  Basic information about your project.
+                <CardDescription className="text-[var(--muted-foreground)]">
+                  Basic information about your project
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="pt-0">
                 {error && (
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" className="mb-4 bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
                     <HiExclamationTriangle className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
                 
                 <form onSubmit={handleSave} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Project Avatar</Label>
+                  {/* Project Avatar */}
+                  <div className="space-y-3">
+                    <Label className="text-[var(--foreground)] font-medium">Project Avatar</Label>
                     <div className="flex items-center gap-4">
                       <ProjectAvatar project={project} size="lg" />
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                      >
                         Change Avatar
                       </Button>
                     </div>
                   </div>
                   
+                  {/* Name and Key */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="project-name">Project Name *</Label>
+                      <Label htmlFor="project-name" className="text-[var(--foreground)] font-medium">Project Name *</Label>
                       <Input
                         id="project-name"
                         name="project-name"
                         defaultValue={project.name}
                         required
+                        className="h-9 border-input bg-background text-[var(--foreground)]"
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="project-key">Project Key</Label>
+                      <Label htmlFor="project-key" className="text-[var(--foreground)] font-medium">Project Key</Label>
                       <Input
                         id="project-key"
                         value={project.key}
                         disabled
-                        className="bg-muted text-muted-foreground"
+                        className="h-9 bg-[var(--muted)] text-[var(--muted-foreground)] border-none"
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Project key cannot be changed after creation.
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        Project key cannot be changed after creation
                       </p>
                     </div>
                   </div>
                   
+                  {/* Description */}
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description" className="text-[var(--foreground)] font-medium">Description</Label>
                     <Textarea
                       id="description"
                       name="description"
                       rows={3}
                       defaultValue={project.description}
                       placeholder="Brief description of your project..."
+                      className="border-input bg-background text-[var(--foreground)] resize-none"
                     />
                   </div>
                   
+                  {/* Dates */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="start-date">Start Date</Label>
+                      <Label htmlFor="start-date" className="text-[var(--foreground)] font-medium">Start Date</Label>
                       <Input
                         id="start-date"
                         name="start-date"
                         type="date"
                         defaultValue={project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : ''}
+                        className="h-9 border-input bg-background text-[var(--foreground)]"
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="end-date">End Date</Label>
+                      <Label htmlFor="end-date" className="text-[var(--foreground)] font-medium">End Date</Label>
                       <Input
                         id="end-date"
                         name="end-date"
                         type="date"
                         defaultValue={project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : ''}
+                        className="h-9 border-input bg-background text-[var(--foreground)]"
                       />
                     </div>
                   </div>
 
+                  {/* Status and Priority */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
+                      <Label htmlFor="status" className="text-[var(--foreground)] font-medium">Status</Label>
                       <Select name="status" defaultValue={project.status}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="border-none bg-[var(--card)]">
                           <SelectItem value="ACTIVE">
                             <div className="flex items-center gap-2">
-                              <Badge variant="default">Active</Badge>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-none">Active</Badge>
                             </div>
                           </SelectItem>
                           <SelectItem value="ON_HOLD">
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary">On Hold</Badge>
+                              <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 border-none">On Hold</Badge>
                             </div>
                           </SelectItem>
                           <SelectItem value="COMPLETED">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline">Completed</Badge>
+                              <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-none">Completed</Badge>
                             </div>
                           </SelectItem>
                           <SelectItem value="ARCHIVED">
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary">Archived</Badge>
+                              <Badge className="bg-[var(--muted)] text-[var(--muted-foreground)] border-none">Archived</Badge>
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -394,30 +451,30 @@ export default function ProjectSettingsPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="priority">Priority</Label>
+                      <Label htmlFor="priority" className="text-[var(--foreground)] font-medium">Priority</Label>
                       <Select name="priority" defaultValue={project.priority}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
                           <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="border-none bg-[var(--card)]">
                           <SelectItem value="LOW">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline">Low</Badge>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-none">Low</Badge>
                             </div>
                           </SelectItem>
                           <SelectItem value="MEDIUM">
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary">Medium</Badge>
+                              <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 border-none">Medium</Badge>
                             </div>
                           </SelectItem>
                           <SelectItem value="HIGH">
                             <div className="flex items-center gap-2">
-                              <Badge variant="default">High</Badge>
+                              <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400 border-none">High</Badge>
                             </div>
                           </SelectItem>
                           <SelectItem value="URGENT">
                             <div className="flex items-center gap-2">
-                              <Badge variant="destructive">Urgent</Badge>
+                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 border-none">Urgent</Badge>
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -425,8 +482,13 @@ export default function ProjectSettingsPage() {
                     </div>
                   </div>
                 
+                  {/* Save Button */}
                   <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={saving}>
+                    <Button 
+                      type="submit" 
+                      disabled={saving}
+                      className="h-9 px-6 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg"
+                    >
                       {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
@@ -435,88 +497,58 @@ export default function ProjectSettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Workflow Tab */}
-          <TabsContent value="workflow">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <HiArrowPath size={16} />
-                  Workflow Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure task statuses and workflow transitions.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <WorkflowManager projectId={project?.id || ''} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Automation Tab */}
-          <TabsContent value="automation">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <HiCpuChip size={16} />
-                  Automation Rules
-                </CardTitle>
-                <CardDescription>
-                  Set up automated workflows and triggers.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AutomationRules projectId={project?.id || ''} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Danger Zone Tab */}
           <TabsContent value="danger">
-            <Card className="border-destructive">
-              <CardHeader className="bg-destructive/10">
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <HiExclamationTriangle size={16} />
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-[var(--destructive)] flex items-center gap-2">
+                  <HiExclamationTriangle className="w-5 h-5" />
                   Danger Zone
                 </CardTitle>
-                <CardDescription className="text-destructive/70">
-                  Permanent actions that cannot be undone.
+                <CardDescription className="text-[var(--muted-foreground)]">
+                  Permanent actions that cannot be undone
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6 pt-6">
-                <div className="flex items-start justify-between p-4 border border-border rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-foreground mb-1">
-                      Archive Project
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Archiving a project will make it read-only. No new changes can be made.
-                    </p>
+              <CardContent className="pt-0 space-y-4">
+                {/* Archive Project */}
+                <div className="flex items-center justify-between p-4 border border-[var(--border)] rounded-lg bg-[var(--muted)]/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center">
+                      <HiArchiveBox className="w-5 h-5 text-[var(--muted-foreground)]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[var(--foreground)] mb-1">Archive Project</h4>
+                      <p className="text-xs text-[var(--muted-foreground)]">Make this project read-only. No new changes can be made.</p>
+                    </div>
                   </div>
-                  <Button variant="outline" size="sm" className="ml-4 flex-shrink-0 flex items-center gap-2">
-                    <HiArchiveBox size={16} />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center gap-2"
+                  >
+                    <HiArchiveBox className="w-4 h-4" />
                     Archive
                   </Button>
                 </div>
                 
-                <Separator />
-                
-                <div className="flex items-start justify-between p-4 border border-destructive/20 rounded-lg bg-destructive/5">
-                  <div>
-                    <h4 className="font-medium text-foreground mb-1">
-                      Delete Project
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Once you delete a project, all of its data will be permanently removed.
-                    </p>
+                {/* Delete Project */}
+                <div className="flex items-center justify-between p-4 border border-[var(--destructive)]/20 rounded-lg bg-[var(--destructive)]/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[var(--destructive)]/10 flex items-center justify-center">
+                      <HiTrash className="w-5 h-5 text-[var(--destructive)]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[var(--foreground)] mb-1">Delete Project</h4>
+                      <p className="text-xs text-[var(--muted-foreground)]">Permanently remove this project and all its data. This cannot be undone.</p>
+                    </div>
                   </div>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={() => setDeleteConfirmOpen(true)}
-                    className="ml-4 flex-shrink-0 flex items-center gap-2"
+                    className="h-9 bg-[var(--destructive)] hover:bg-[var(--destructive)]/90 text-[var(--destructive-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
                   >
-                    <HiTrash size={16} />
+                    <HiTrash className="w-4 h-4" />
                     Delete Project
                   </Button>
                 </div>
@@ -525,23 +557,25 @@ export default function ProjectSettingsPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Delete Confirmation Dialog */}
+        {/* Delete Confirmation Dialog - Theme consistent */}
         <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md bg-[var(--card)] border-none rounded-[var(--card-radius)] shadow-lg">
             <DialogHeader>
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-destructive/10 mb-4">
-                <HiExclamationTriangle className="h-6 w-6 text-destructive" />
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-[var(--destructive)]/10 mb-4">
+                <HiExclamationTriangle className="h-6 w-6 text-[var(--destructive)]" />
               </div>
-              <DialogTitle className="text-center">Delete Project</DialogTitle>
-              <DialogDescription className="text-center">
-                Are you sure you want to delete "{project.name}"? This action cannot be undone and will permanently remove all tasks, files, and data associated with this project.
+              <DialogTitle className="text-center text-lg font-semibold text-[var(--destructive)]">
+                Delete Project
+              </DialogTitle>
+              <DialogDescription className="text-center text-[var(--muted-foreground)]">
+                Are you sure you want to delete <span className="font-semibold text-[var(--foreground)]">"{project.name}"</span>? This action cannot be undone and will permanently remove all tasks, files, and data associated with this project.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="gap-2">
+            <DialogFooter className="gap-2 mt-4 flex flex-row">
               <Button
                 variant="outline"
                 onClick={() => setDeleteConfirmOpen(false)}
-                className="flex-1"
+                className="flex-1 h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
               >
                 Cancel
               </Button>
@@ -549,7 +583,7 @@ export default function ProjectSettingsPage() {
                 variant="destructive"
                 onClick={handleDelete}
                 disabled={deleteLoading}
-                className="flex-1"
+                className="flex-1 h-9 bg-[var(--destructive)] hover:bg-[var(--destructive)]/90 text-[var(--destructive-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg"
               >
                 {deleteLoading ? 'Deleting...' : 'Delete Project'}
               </Button>

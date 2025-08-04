@@ -29,6 +29,14 @@ export class ProjectsSeederService {
     for (const workspace of workspaces) {
       const projectsData = this.getProjectsDataForWorkspace(workspace);
 
+      // Get the organization's default workflow for this workspace
+      const defaultWorkflow = await this.getDefaultWorkflowForWorkspace(workspace.id);
+      
+      if (!defaultWorkflow) {
+        console.log(`   ⚠ No default workflow found for workspace ${workspace.name}, skipping projects...`);
+        continue;
+      }
+
       for (const projectData of projectsData) {
         try {
           // Find a manager/admin user from workspace members to set as creator
@@ -43,9 +51,19 @@ export class ProjectsSeederService {
             data: {
               ...projectData,
               workspaceId: workspace.id,
+              workflowId: defaultWorkflow.id, // Assign the default workflow
               slug: slugify(projectData.name, { lower: true, strict: true }),
               createdBy: creatorUser.id,
               updatedBy: creatorUser.id,
+            },
+            include: {
+              workflow: {
+                select: {
+                  id: true,
+                  name: true,
+                  isDefault: true,
+                },
+              },
             },
           });
 
@@ -54,7 +72,7 @@ export class ProjectsSeederService {
 
           createdProjects.push(project);
           console.log(
-            `   ✓ Created project: ${project.name} in ${workspace.name}`,
+            `   ✓ Created project: ${project.name} in ${workspace.name} with workflow: ${defaultWorkflow.name}`,
           );
         } catch (error) {
           console.log(
@@ -64,6 +82,7 @@ export class ProjectsSeederService {
           const existingProject = await this.prisma.project.findFirst({
             where: {
               workspaceId: workspace.id,
+              name: projectData.name,
             },
           });
           if (existingProject) {
@@ -79,13 +98,36 @@ export class ProjectsSeederService {
     return createdProjects;
   }
 
+  // Helper method to get default workflow for a workspace
+  private async getDefaultWorkflowForWorkspace(workspaceId: string) {
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { organizationId: true },
+    });
+
+    if (!workspace) {
+      return null;
+    }
+
+    return await this.prisma.workflow.findFirst({
+      where: { 
+        organizationId: workspace.organizationId, 
+        isDefault: true 
+      },
+      select: {
+        id: true,
+        name: true,
+        isDefault: true,
+      },
+    });
+  }
+
   private getProjectsDataForWorkspace(workspace: any) {
     // Different project configurations based on workspace
     if (workspace.slug === 'dev-team') {
       return [
         {
           name: 'Taskosaur Web Application',
-          slug: 'TWA',
           description:
             'Main web application built with React, TypeScript, and modern UI components. Includes user management, task tracking, and collaboration features.',
           color: '#3b82f6',
@@ -107,7 +149,6 @@ export class ProjectsSeederService {
         },
         {
           name: 'Backend API Services',
-          slug: 'API',
           description:
             'RESTful API backend services built with NestJS, PostgreSQL, and Redis. Handles authentication, data management, and third-party integrations.',
           color: '#10b981',
@@ -129,7 +170,6 @@ export class ProjectsSeederService {
         },
         {
           name: 'DevOps Infrastructure',
-          slug: 'INFRA',
           description:
             'Cloud infrastructure, CI/CD pipelines, monitoring, and deployment automation using AWS, Docker, and Kubernetes.',
           color: '#f59e0b',
@@ -154,7 +194,6 @@ export class ProjectsSeederService {
       return [
         {
           name: 'UI Design System',
-          slug: 'UDS',
           description:
             'Comprehensive design system with components, patterns, and guidelines for consistent user experience across all products.',
           color: '#8b5cf6',
@@ -176,7 +215,6 @@ export class ProjectsSeederService {
         },
         {
           name: 'User Research & Testing',
-          slug: 'URT',
           description:
             'User research initiatives, usability testing, and feedback collection to inform product decisions.',
           color: '#ec4899',
@@ -201,7 +239,6 @@ export class ProjectsSeederService {
       return [
         {
           name: 'Product Launch Campaign',
-          slug: 'PLC',
           description:
             'Comprehensive marketing campaign for product launch including content creation, social media, and promotional activities.',
           color: '#f59e0b',
@@ -226,7 +263,6 @@ export class ProjectsSeederService {
       return [
         {
           name: 'E-commerce Platform - TechCorp',
-          slug: 'ECP',
           description:
             'Custom e-commerce platform development for TechCorp client with advanced inventory management and analytics.',
           color: '#059669',
@@ -248,7 +284,6 @@ export class ProjectsSeederService {
         },
         {
           name: 'Mobile App - FinanceFlow',
-          slug: 'MAF',
           description:
             'React Native mobile application for personal finance management with real-time synchronization and reporting.',
           color: '#3730a3',
@@ -273,7 +308,6 @@ export class ProjectsSeederService {
       return [
         {
           name: 'HR Process Automation',
-          slug: 'HRP',
           description:
             'Streamline HR processes including employee onboarding, performance reviews, and leave management.',
           color: '#6b7280',
@@ -300,7 +334,6 @@ export class ProjectsSeederService {
     return [
       {
         name: 'General Tasks',
-        slug: 'GEN',
         description: 'General project for miscellaneous tasks and activities',
         color: '#6b7280',
         status: ProjectStatus.ACTIVE,
@@ -367,7 +400,7 @@ export class ProjectsSeederService {
     console.log('🧹 Clearing projects...');
 
     try {
-      // Delete project members first (foreign slug constraint)
+      // Delete project members first (foreign key constraint)
       const deletedMembers = await this.prisma.projectMember.deleteMany();
       console.log(`   ✓ Deleted ${deletedMembers.count} project members`);
 
@@ -401,6 +434,23 @@ export class ProjectsSeederService {
                 name: true,
                 slug: true,
               },
+            },
+          },
+        },
+        workflow: { // Add workflow information
+          select: {
+            id: true,
+            name: true,
+            isDefault: true,
+            statuses: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                category: true,
+                position: true,
+              },
+              orderBy: { position: 'asc' },
             },
           },
         },

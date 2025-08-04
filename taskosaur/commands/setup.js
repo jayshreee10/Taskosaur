@@ -1,29 +1,20 @@
-const { installDependencies, setupDatabase } = require('../modules/npm');
-const { getConfig } = require('../modules/config');
-const { createEnvFiles } = require('../modules/env');
+const { createSimpleEnvFile } = require('../modules/env');
 
 /**
- * Setup command - Install dependencies and build projects
+ * Setup command - Create .env file only
  */
 async function setup(options = {}) {
     try {
-        console.log('🔧 Setting up Taskosaur...\n');
+        console.log('🔧 Setting up Taskosaur environment...\n');
         
-        const config = getConfig();
-        const isDev = options.dev || false;
+        // Create environment file
+        await createSimpleEnvFile();
         
-        // Install dependencies
-        await installDependencies();
-        
-        // Create environment files
-        await createEnvFiles();
-        
-        // Setup database (migrations and seed)
-        console.log('\n🗃️  Setting up database...');
-        await setupDatabase();
-        
-        console.log('\n✅ Setup completed successfully!');
+        console.log('\n✅ Environment setup completed successfully!');
         console.log('\nNext steps:');
+        console.log('  • Install dependencies: npm run be:install && npm run fe:install');
+        console.log('  • Run database migrations: npm run db:migrate');
+        console.log('  • Seed the database: npm run db:seed');
         console.log('  • Run "node taskosaur.js run" to start all services');
         console.log('  • Run "node taskosaur.js run --dev" for development mode');
         

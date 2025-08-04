@@ -99,85 +99,96 @@
    cd taskosaur
    ```
 
-2. **Automated Setup (Recommended)**
+2. **Environment Setup**
    
-   Run the interactive setup command that will:
-   - Install dependencies for both frontend and backend
-   - Create environment files with guided configuration
-   - Run database migrations and seeding
+   Run the interactive setup command to create your environment configuration:
    
    ```bash
    npm run setup
    ```
    
-   The setup will prompt you for:
+   This will create a single `.env` file with guided configuration for:
    - **Global Configuration**: App host and port settings
-   - **Database Details**: Host, port, username, password, and database name
-   - **Authentication**: JWT secrets (auto-generated secure defaults)
-   - **Redis Configuration**: Host, port, and password
-   - **Email Setup**: SMTP configuration for notifications
-   - **File Upload**: Upload directory and size limits
+   - **Backend Configuration**: Database, authentication, Redis, email, and file upload settings
+   - **Frontend Configuration**: API base URL and organization settings
+   
+   After setup, you'll need to manually run:
+   ```bash
+   # Install dependencies
+   npm run be:install && npm run fe:install
+   
+   # Setup database
+   npm run db:migrate
+   npm run db:seed
+   ```
    
 3. **Manual Setup (Alternative)**
    
-   If you prefer manual configuration, create the environment files:
+   If you prefer manual configuration, create a single environment file in the root directory:
 
    **Root Environment** (`.env`):
    ```env
-   #### Global Configuration >>>>>
-   GLOBAL_APP_HOST=127.0.0.1
-   GLOBAL_APP_PORT=9100
-   GLOBAL_FE_UNIX_SOCKET=1
-   GLOBAL_BE_UNIX_SOCKET=1
-   #### Global Configuration <<<<<
-   ```
+   # Global/Proxy Configuration
+   APP_HOST=127.0.0.1
+   APP_PORT=9123
 
-   **Backend Environment** (`backend/.env`):
-   ```env
    #### Backend Configuration >>>>>
-   DATABASE_URL="postgresql://your-db-username:your-db-password@localhost:5432/taskosaur"
+   BE_UNIX_SOCKET=1
+   # BE_HOST=127.0.0.1  # Use when BE_UNIX_SOCKET=0
+   # BE_PORT=9102       # Use when BE_UNIX_SOCKET=0
+   
+   BE_DATABASE_URL="postgresql://your-db-username:your-db-password@localhost:5432/taskosaur"
    
    # Authentication
-   JWT_SECRET="your-jwt-secret-key-change-this"
-   JWT_REFRESH_SECRET="your-refresh-secret-key-change-this-too"
-   JWT_EXPIRES_IN="15m"
-   JWT_REFRESH_EXPIRES_IN="7d"
+   BE_JWT_SECRET="your-jwt-secret-key-change-this"
+   BE_JWT_REFRESH_SECRET="your-refresh-secret-key-change-this-too"
+   BE_JWT_EXPIRES_IN="15m"
+   BE_JWT_REFRESH_EXPIRES_IN="7d"
    
    # Redis Configuration (for Bull Queue)
-   REDIS_HOST=localhost
-   REDIS_PORT=6379
-   REDIS_PASSWORD=
+   BE_REDIS_HOST=localhost
+   BE_REDIS_PORT=6379
+   BE_REDIS_PASSWORD=
    
    # Email Configuration (for notifications)
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USER=your-email@gmail.com
-   SMTP_PASS=your-app-password
-   SMTP_FROM=noreply@taskosaur.com
+   BE_SMTP_HOST=smtp.gmail.com
+   BE_SMTP_PORT=587
+   BE_SMTP_USER=your-email@gmail.com
+   BE_SMTP_PASS=your-app-password
+   BE_SMTP_FROM=noreply@taskosaur.com
    
    # Frontend URL (for email links)
-   FRONTEND_URL=http://127.0.0.1:9100
+   BE_FRONTEND_URL=http://127.0.0.1:9123
    
    # File Upload
-   UPLOAD_DEST="./uploads"
-   MAX_FILE_SIZE=10485760
+   BE_UPLOAD_DEST="./uploads"
+   BE_MAX_FILE_SIZE=10485760
    
    # Queue Configuration
-   MAX_CONCURRENT_JOBS=5
-   JOB_RETRY_ATTEMPTS=3
+   BE_MAX_CONCURRENT_JOBS=5
+   BE_JOB_RETRY_ATTEMPTS=3
    #### Backend Configuration <<<<<
+
+   #### Frontend Configuration >>>>>
+   FE_UNIX_SOCKET=1
+   # FE_HOST=127.0.0.1  # Use when FE_UNIX_SOCKET=0
+   # FE_PORT=9101       # Use when FE_UNIX_SOCKET=0
+   
+   FE_NEXT_PUBLIC_API_BASE_URL=/api
+   FE_NEXT_PUBLIC_DEFAULT_ORGANIZATION_ID=your-default-organization-id-here
+   #### Frontend Configuration <<<<<
    ```
 
    Then install dependencies and setup database:
    ```bash
-   # Install dependencies
-   cd backend && npm install
-   cd ../frontend && npm install
-   cd ..
+   # Install dependencies (run from root directory)
+   npm install
+   npm run be:install         # Install backend dependencies
+   npm run fe:install         # Install frontend dependencies
    
    # Setup database
-   npm run migrate          # Run database migrations
-   npm run seed             # Seed the database with core data
+   npm run db:migrate         # Run database migrations
+   npm run db:seed            # Seed the database with core data
    ```
 
 4. **Start the Application**
@@ -190,7 +201,7 @@
    ```
 
 5. **Access the Application**
-   - Application: [http://127.0.0.1:9100](http://127.0.0.1:9100) (or your configured host/port)
+   - Application: [http://127.0.0.1:9123](http://127.0.0.1:9123) (or your configured host/port)
    - Backend API: Check your backend configuration
    - API Documentation: Available at your backend URL + `/api/docs`
 
@@ -199,7 +210,9 @@
 ### Root Commands (Unified)
 ```bash
 # Setup & Installation
-npm run setup             # Interactive setup (install deps, create .env, migrate, seed)
+npm run setup             # Interactive setup (create .env only)
+npm run be:install        # Install backend dependencies  
+npm run fe:install        # Install frontend dependencies
 
 # Application Management
 npm run start             # Start both backend and frontend in production
@@ -214,39 +227,39 @@ npm run db:generate          # Generate Prisma client
 
 ### Backend Commands
 ```bash
-cd backend
+# All commands run from root directory with environment variables loaded
 
 # Development
-npm run start:dev          # Start development server with hot reload
-npm run build             # Build for production
-npm run start:prod        # Start production server
+npm run be:start:dev       # Start development server with hot reload
+npm run be:build           # Build for production
+npm run be:start:prod      # Start production server
 
 # Database
-npm run prisma:studio     # Open Prisma Studio
-npm run prisma:migrate:dev # Create and apply migration
-npm run prisma:generate   # Generate Prisma client
+npm run be:prisma:studio      # Open Prisma Studio
+npm run be:prisma:migrate:dev # Create and apply migration
+npm run be:prisma:generate    # Generate Prisma client
 
 # Testing
-npm run test              # Run unit tests
-npm run test:watch        # Run tests in watch mode
-npm run test:e2e          # Run end-to-end tests
+npm run be:test            # Run unit tests
+npm run be:test:watch      # Run tests in watch mode
+npm run be:test:e2e        # Run end-to-end tests
 
 # Code Quality
-npm run lint              # Run ESLint
-npm run format            # Format code with Prettier
+npm run be:lint            # Run ESLint
+npm run be:format          # Format code with Prettier
 ```
 
 ### Frontend Commands
 ```bash
-cd frontend
+# All commands run from root directory with environment variables loaded
 
 # Development
-npm run dev               # Start development server
-npm run build             # Build for production
-npm run start             # Start production server
+npm run fe:dev            # Start development server
+npm run fe:build          # Build for production
+npm run fe:start          # Start production server
 
 # Code Quality
-npm run lint              # Run ESLint
+npm run fe:lint           # Run ESLint
 ```
 
 ## Project Structure
@@ -381,37 +394,40 @@ docker-compose -f docker-compose.prod.yml up -d
 
 **Backend Deployment:**
 ```bash
-cd backend
+# From root directory
 npm install --production
-npm run build
-npm run prisma:migrate:deploy
-npm run start:prod
+npm run be:build
+npm run be:prisma:migrate:deploy
+npm run be:start:prod
 ```
 
 **Frontend Deployment:**
 ```bash
-cd frontend
+# From root directory
 npm install --production
-npm run build
-npm run start
+npm run fe:build
+npm run fe:start
 ```
 
 #### Environment Variables for Production
 
 Update your environment variables for production:
 
-**Backend (.env):**
+**Root (.env):**
 ```env
+# Global/Proxy Configuration
+APP_HOST=0.0.0.0
+APP_PORT=9123
 NODE_ENV=production
-DATABASE_URL="postgresql://username:password@your-db-host:5432/taskosaur"
-JWT_SECRET="your-secure-production-jwt-secret"
-REDIS_HOST="your-redis-host"
-CORS_ORIGIN="https://your-domain.com"
-```
 
-**Frontend (.env.local):**
-```env
-NEXT_PUBLIC_API_BASE_URL=https://api.your-domain.com
+# Backend Configuration
+BE_DATABASE_URL="postgresql://username:password@your-db-host:5432/taskosaur"
+BE_JWT_SECRET="your-secure-production-jwt-secret"
+BE_REDIS_HOST="your-redis-host"
+BE_CORS_ORIGIN="https://your-domain.com"
+
+# Frontend Configuration  
+FE_NEXT_PUBLIC_API_BASE_URL=https://api.your-domain.com
 ```
 
 #### Hosting Platforms
@@ -425,7 +441,7 @@ NEXT_PUBLIC_API_BASE_URL=https://api.your-domain.com
 ## API Documentation
 
 The API documentation is automatically generated using Swagger and is available at:
-- Development: [http://localhost:9100/api/docs](http://localhost:9100/api/docs)
+- Development: [http://localhost:9123/api/docs](http://localhost:9123/api/docs)
 - Production: `https://your-domain.com/api/docs`
 
 ## FAQ

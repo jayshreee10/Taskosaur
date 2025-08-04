@@ -66,6 +66,15 @@ export function SignupForm() {
   const passwordsMatch = formData.password === formData.confirmPassword && formData.confirmPassword.length > 0;
   const isPasswordValid = isPasswordLongEnough && hasUpperCase && hasLowerCase && hasNumber;
 
+  // All required fields check
+  const allFieldsFilled = [
+    formData.firstName,
+    formData.lastName,
+    formData.email,
+    formData.password,
+    formData.confirmPassword
+  ].every((field) => typeof field === 'string' && field.trim().length > 0);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -376,7 +385,13 @@ export function SignupForm() {
         >
           <Button
             type="submit"
-            disabled={isLoading || !isPasswordValid || !passwordsMatch || !formData.acceptTerms}
+            disabled={
+              isLoading ||
+              !allFieldsFilled ||
+              !isPasswordValid ||
+              !passwordsMatch ||
+              !formData.acceptTerms
+            }
             className="w-full h-12 bg-[var(--primary)] hover:bg-[var(--primary)]/90 disabled:bg-[var(--muted)] disabled:text-[var(--muted-foreground)] text-[var(--primary-foreground)] font-semibold shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl group"
           >
             {isLoading ? (

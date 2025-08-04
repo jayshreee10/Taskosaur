@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
 import { getSidebarCollapsedState, toggleSidebar as toggleSidebarUtil } from '@/utils/sidebarUtils';
 import ResizableSidebar from './ResizableSidebar';
+import WorkspaceSelector from './WorkspaceSelector';
+import ProjectSelector from './ProjectSelector';
 import '@/styles/layouts/resizable-sidebar.css';
 import '@/styles/layouts/sidebar.css';
 
@@ -118,7 +120,7 @@ export default function Sidebar() {
       { name: 'Members', href: `/${currentWorkspaceSlug}/members`, icon: <HiUsers size={16} />, title: 'Workspace Members' },
       { name: 'Activity', href: `/${currentWorkspaceSlug}/activity`, icon: <HiCalendar size={16} />, title: 'Workspace Activity' },
       { name: 'Tasks', href: `/${currentWorkspaceSlug}/tasks`, icon: <HiClipboardList size={16} />, title: 'Workspace Tasks' },
-      { name: 'Analytics', href: `/${currentWorkspaceSlug}/analytics`, icon: <HiChartBar size={16} />, title: 'Workspace Analytics' },
+      // { name: 'Analytics', href: `/${currentWorkspaceSlug}/analytics`, icon: <HiChartBar size={16} />, title: 'Workspace Analytics' },
       { name: 'Settings', href: `/${currentWorkspaceSlug}/settings`, icon: <HiCog size={16} />, title: 'Workspace Settings' },
     ] : [],
   [currentWorkspaceSlug]);
@@ -129,8 +131,8 @@ export default function Sidebar() {
       { name: 'Tasks', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/tasks`, icon: <HiClipboardList size={16} />, title: 'Tasks' },
       { name: 'Sprints', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/sprints`, icon: <HiLightningBolt size={16} />, title: 'Sprints' },
       { name: 'Calendar', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/tasks/calendar`, icon: <HiCalendar size={16} />, title: 'Calendar' },
-      { name: 'Time', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/time`, icon: <HiClock size={16} />, title: 'Time Tracking' },
-      { name: 'Analytics', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/analytics`, icon: <HiChartBar size={16} />, title: 'Analytics' },
+      // { name: 'Time', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/time`, icon: <HiClock size={16} />, title: 'Time Tracking' },
+      // { name: 'Analytics', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/analytics`, icon: <HiChartBar size={16} />, title: 'Analytics' },
       { name: 'Members', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/members`, icon: <HiUsers size={16} />, title: 'Members' },
       { name: 'Settings', href: `/${currentWorkspaceSlug}/${currentProjectSlug}/settings`, icon: <HiCog size={16} />, title: 'Settings' },
     ] : [],
@@ -155,17 +157,18 @@ export default function Sidebar() {
   const renderSkeleton = () => (
     <div className="hidden md:flex h-screen">
       <div className="w-12 bg-[var(--sidebar)] h-screen flex-col pt-3 items-center overflow-y-auto border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40 hidden md:flex">
-        <div className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--muted-foreground)]">
+        <div className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--muted)]">
           <HiMenu size={16} />
         </div>
         <div className="flex-grow flex flex-col items-center gap-4"></div>
       </div>
       <div className="w-full md:ml-12">
         <div className="w-full md:w-64 bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] h-screen flex flex-col p-4 overflow-y-auto">
+        <div className="w-full md:w-64 bg-[var(--secondary)] dark:bg-stone-900 border-r border-[var(--secondary)] dark:border-stone-800 h-screen flex flex-col p-4 overflow-y-auto">
           <div className="flex flex-col h-full">
-            <div className="h-12 mb-6 pb-4 border-b border-[var(--sidebar-border)] flex items-center">
               <div className="w-8 h-8 rounded-lg bg-[var(--sidebar-accent)] animate-pulse"></div>
               <div className="ml-3 h-4 w-32 bg-[var(--sidebar-accent)] rounded animate-pulse"></div>
+              <div className="ml-3 h-4 w-32 bg-stone-300 dark:bg-stone-700 rounded animate-pulse"></div>
             </div>
             <div className="flex-grow">
               <ul className="space-y-1 mb-6">
@@ -174,6 +177,7 @@ export default function Sidebar() {
                     <div className="flex items-center gap-3 px-3 py-2 rounded-lg">
                       <div className="w-4 h-4 rounded bg-[var(--sidebar-accent)] animate-pulse"></div>
                       <div className="h-3 w-16 bg-[var(--sidebar-accent)] rounded animate-pulse"></div>
+                      <div className="h-3 w-16 bg-stone-300 dark:bg-stone-700 rounded animate-pulse"></div>
                     </div>
                   </li>
                 ))}
@@ -188,6 +192,7 @@ export default function Sidebar() {
   const renderFullSidebar = () => (
     <div className={`w-full transition-colors ${getSidebarColor()} h-screen flex flex-col p-4 overflow-y-auto`}>
       <div className="h-12 mb-6 pb-4 border-b border-[var(--sidebar-border)] flex items-center justify-between relative">
+        {/* Global Dashboard - Show when not in workspace context */}
         {!currentWorkspaceSlug && (
           <div className="flex items-center">
             <div className="flex-shrink-0 w-8 h-8 bg-[var(--sidebar-primary)] rounded-lg flex items-center justify-center text-[var(--sidebar-primary-foreground)]">
@@ -196,20 +201,21 @@ export default function Sidebar() {
             <span className="ml-3 text-sm font-medium text-[var(--sidebar-foreground)] truncate">Dashboard</span>
           </div>
         )}
-        {currentWorkspaceSlug && (
-          <div className="flex items-center overflow-hidden">
-            <div className="flex-shrink-0 w-8 h-8 bg-[var(--sidebar-primary)] rounded-lg flex items-center justify-center text-[var(--sidebar-primary-foreground)] text-xs font-medium">
-              {currentWorkspaceSlug.charAt(0).toUpperCase()}
-            </div>
-            <span className="ml-3 text-sm font-medium text-[var(--sidebar-foreground)] flex items-center truncate">
-              <span className="truncate">{currentWorkspaceSlug}</span>
-              {currentProjectSlug && (
-                <span>
-                  <span className="mx-1 text-[var(--muted-foreground)]">/</span>
-                  <span className="truncate">{currentProjectSlug}</span>
-                </span>
-              )}
-            </span>
+        
+        {/* Workspace Level - Show workspace selector */}
+        {currentWorkspaceSlug && !currentProjectSlug && (
+          <div className="flex-1">
+            <WorkspaceSelector currentWorkspaceSlug={currentWorkspaceSlug} />
+          </div>
+        )}
+        
+        {/* Project Level - Show project selector */}
+        {currentWorkspaceSlug && currentProjectSlug && (
+          <div className="flex-1">
+            <ProjectSelector 
+              currentWorkspaceSlug={currentWorkspaceSlug} 
+              currentProjectSlug={currentProjectSlug}
+            />
           </div>
         )}
       </div>
@@ -238,8 +244,8 @@ export default function Sidebar() {
   const renderMiniSidebar = () => {
     if (!isMounted) {
       return (
-        <div className="w-12 bg-[var(--sidebar)] h-screen flex-col py-3 items-center overflow-y-auto border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40 hidden md:flex">
-          <div className="mb-6 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--muted-foreground)]">
+        <div className="w-12 bg-stone-900 dark:bg-stone-950 h-screen flex-col py-3 items-center overflow-y-auto border-r border-stone-800 fixed left-0 top-0 z-40 hidden md:flex">
+          <div className="mb-6 w-8 h-8 flex items-center justify-center rounded-lg text-stone-400">
             <HiMenu size={16} />
           </div>
           <div className="flex-grow flex flex-col items-center gap-4"></div>
@@ -248,10 +254,10 @@ export default function Sidebar() {
     }
     
     return (
-      <div className="w-12 bg-[var(--sidebar)] h-screen flex-col pt-3 items-center overflow-y-auto border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40 hidden md:flex">
+      <div className="w-12 bg-stone-900 dark:bg-stone-950 h-screen flex-col pt-3 items-center overflow-y-auto border-r border-stone-800 fixed left-0 top-0 z-40 hidden md:flex">
         <button 
           onClick={() => toggleSidebar(true)}
-          className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--sidebar-foreground)] hover:text-[var(--sidebar-primary)] hover:bg-[var(--sidebar-accent)] transition-colors"
+          className="mb-6 ml-0 w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:text-[var(--secondary)] hover:bg-stone-800 transition-colors"
           title="Toggle navigation"
         >
           <HiMenu size={16} />
@@ -264,8 +270,8 @@ export default function Sidebar() {
               href={item.href}
               className={`w-8 h-8 flex items-center justify-center rounded-lg relative group transition-colors ${
                 pathname === item.href 
-                  ? 'bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]' 
-                  : 'text-[var(--sidebar-foreground)] hover:text-[var(--sidebar-primary)] hover:bg-[var(--sidebar-accent)]'
+                  ? 'bg-amber-600 text-white' 
+                  : 'text-stone-400 hover:text-[var(--secondary)] hover:bg-stone-800'
               }`}
               title={item.title || item.name}
             >
@@ -277,8 +283,13 @@ export default function Sidebar() {
     );
   };
 
+  // Hide sidebar on /organization page
+  const isOrganizationPage = isMounted && pathname === '/organization';
   if (!isMounted) {
     return renderSkeleton();
+  }
+  if (isOrganizationPage) {
+    return null;
   }
 
   return (
@@ -286,7 +297,8 @@ export default function Sidebar() {
       {isSidebarCollapsed && (
         <button 
           onClick={() => toggleSidebar(false)}
-          className="fixed top-4 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--background)] text-[var(--foreground)] border border-[var(--border)] shadow-lg md:hidden hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)] transition-colors"
+          className="sidebar-toggle-button fixed top-4 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-lg bg-stone-900 text-[var(--secondary)] shadow-lg md:hidden"
+          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
           title="Show navigation"
         >
           <HiMenu size={20} />

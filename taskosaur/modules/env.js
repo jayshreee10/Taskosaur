@@ -37,399 +37,264 @@ function askQuestion(rl, question, defaultValue = '') {
     return new Promise((resolve) => {
         const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `;
         rl.question(prompt, (answer) => {
-            resolve(answer.trim() || defaultValue);
+            const trimmedAnswer = answer.trim();
+            // If user enters blank and there's a default value, use it
+            // If user enters blank and no default value, return empty string
+            resolve(trimmedAnswer || defaultValue);
         });
     });
 }
 
 /**
- * Create root .env file with Global Configuration
+ * Parse existing .env file and categorize variables by prefix
  */
-async function createRootEnv(rl) {
-    const rootEnvPath = path.join(process.cwd(), '.env');
-    
-    // Check if root .env already exists
-    if (fs.existsSync(rootEnvPath)) {
-        console.log('ℹ️  Global .env file already exists, skipping setup...');
+function parseExistingEnvFile(filePath) {
+    try {
+        const envContent = fs.readFileSync(filePath, 'utf8');
+        const globalConfig = {};
+        const backendConfig = {};
+        const frontendConfig = {};
         
-        // Read existing .env file and parse global config
-        try {
-            const envContent = fs.readFileSync(rootEnvPath, 'utf8');
-            const globalConfig = {};
+        // Parse the existing .env file for all environment variables
+        const lines = envContent.split('\n');
+        for (const line of lines) {
+            const trimmedLine = line.trim();
             
-            // Parse the existing .env file for global config values
-            const lines = envContent.split('\n');
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith('GLOBAL_APP_HOST=')) {
-                    globalConfig.GLOBAL_APP_HOST = trimmedLine.split('=')[1];
-                } else if (trimmedLine.startsWith('GLOBAL_APP_PORT=')) {
-                    globalConfig.GLOBAL_APP_PORT = trimmedLine.split('=')[1];
-                }
+            // Skip comments and empty lines
+            if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('####')) {
+                continue;
             }
             
-            // Return parsed values or defaults
-            return {
-                GLOBAL_APP_HOST: globalConfig.GLOBAL_APP_HOST || '127.0.0.1',
-                GLOBAL_APP_PORT: globalConfig.GLOBAL_APP_PORT || '9100'
-            };
-        } catch (error) {
-            console.warn('⚠️  Failed to parse existing .env file, using defaults');
-            return {
-                GLOBAL_APP_HOST: '127.0.0.1',
-                GLOBAL_APP_PORT: '9100'
-            };
-        }
-    }
-    
-    try {
-        console.log('\n🌐 Setting up global configuration...\n');
-        
-        const globalConfig = {};
-        
-        console.log('🌍 Global Application Settings:');
-        globalConfig.GLOBAL_APP_HOST = await askQuestion(
-            rl, 
-            'Global App Host', 
-            '127.0.0.1'
-        );
-        globalConfig.GLOBAL_APP_PORT = await askQuestion(
-            rl, 
-            'Global App Port', 
-            '9100'
-        );
-        
-        console.log('\n🔧 Unix Socket Configuration:');
-        const useFeUnixSocket = await askQuestion(
-            rl, 
-            'Use Frontend Unix Socket? (1 for yes, 0 for no)', 
-            '1'
-        );
-        globalConfig.GLOBAL_FE_UNIX_SOCKET = useFeUnixSocket;
-        
-        const useBeUnixSocket = await askQuestion(
-            rl, 
-            'Use Backend Unix Socket? (1 for yes, 0 for no)', 
-            '1'
-        );
-        globalConfig.GLOBAL_BE_UNIX_SOCKET = useBeUnixSocket;
-        
-        // Only ask for host/port if not using unix sockets
-        if (useFeUnixSocket === '0') {
-            globalConfig.GLOBAL_APP_FE_HOST = await askQuestion(
-                rl, 
-                'Frontend Host', 
-                '127.0.0.1'
-            );
-            globalConfig.GLOBAL_APP_FE_PORT = await askQuestion(
-                rl, 
-                'Frontend Port', 
-                '9101'
-            );
+            // Split on first '=' to handle values that contain '='
+            const equalIndex = trimmedLine.indexOf('=');
+            if (equalIndex === -1) continue;
+            
+            const key = trimmedLine.substring(0, equalIndex);
+            const value = trimmedLine.substring(equalIndex + 1);
+            
+            // Categorize variables by prefix
+            if (key.startsWith('BE_')) {
+                backendConfig[key] = value;
+            } else if (key.startsWith('FE_')) {
+                frontendConfig[key] = value;
+            } else {
+                // All other variables are global
+                globalConfig[key] = value;
+            }
         }
         
-        if (useBeUnixSocket === '0') {
-            globalConfig.GLOBAL_APP_BE_HOST = await askQuestion(
-                rl, 
-                'Backend Host', 
-                '127.0.0.1'
-            );
-            globalConfig.GLOBAL_APP_BE_PORT = await askQuestion(
-                rl, 
-                'Backend Port', 
-                '9102'
-            );
-        }
-        
-        // Generate root .env content
-        const rootEnvContent = [
-            '#### Global Configuration >>>>>',
-            `GLOBAL_APP_HOST=${globalConfig.GLOBAL_APP_HOST}`,
-            `GLOBAL_APP_PORT=${globalConfig.GLOBAL_APP_PORT}`,
-        ];
-        
-        if (globalConfig.GLOBAL_APP_FE_HOST) {
-            rootEnvContent.push(`GLOBAL_APP_FE_HOST=${globalConfig.GLOBAL_APP_FE_HOST}`);
-        } else {
-            rootEnvContent.push('# GLOBAL_APP_FE_HOST=127.0.0.1 # Use when FE_UNIX_SOCKET=0');
-        }
-        
-        if (globalConfig.GLOBAL_APP_FE_PORT) {
-            rootEnvContent.push(`GLOBAL_APP_FE_PORT=${globalConfig.GLOBAL_APP_FE_PORT}`);
-        } else {
-            rootEnvContent.push('# GLOBAL_APP_FE_PORT=9101 # Use when FE_UNIX_SOCKET=0');
-        }
-        
-        if (globalConfig.GLOBAL_APP_BE_HOST) {
-            rootEnvContent.push(`GLOBAL_APP_BE_HOST=${globalConfig.GLOBAL_APP_BE_HOST}`);
-        } else {
-            rootEnvContent.push('# GLOBAL_APP_BE_HOST=127.0.0.1 # Use when BE_UNIX_SOCKET=0');
-        }
-        
-        if (globalConfig.GLOBAL_APP_BE_PORT) {
-            rootEnvContent.push(`GLOBAL_APP_BE_PORT=${globalConfig.GLOBAL_APP_BE_PORT}`);
-        } else {
-            rootEnvContent.push('# GLOBAL_APP_BE_PORT=9102 # Use when BE_UNIX_SOCKET=0');
-        }
-        
-        rootEnvContent.push(
-            `GLOBAL_FE_UNIX_SOCKET=${globalConfig.GLOBAL_FE_UNIX_SOCKET}`,
-            `GLOBAL_BE_UNIX_SOCKET=${globalConfig.GLOBAL_BE_UNIX_SOCKET}`,
-            '# GLOBAL_FE_SOCKET_PATH=/path/to/frontend/tmp/taskosaur-frontend.sock',
-            '# GLOBAL_BE_SOCKET_PATH=/path/to/backend/tmp/taskosaur-backend.sock',
-            '#### Global Configuration <<<<<',
-            ''
-        );
-        
-        // Write to root .env
-        fs.writeFileSync(rootEnvPath, rootEnvContent.join('\n'));
-        
-        console.log('\n✅ Root .env file created successfully!');
-        console.log(`📁 Location: ${rootEnvPath}`);
-        
-        // Return the global config for use in backend env
-        return globalConfig;
-        
+        return {
+            global: globalConfig,
+            backend: backendConfig,
+            frontend: frontendConfig
+        };
     } catch (error) {
-        console.error('❌ Failed to create root .env file:', error.message);
-        throw error;
+        return {
+            global: {},
+            backend: {},
+            frontend: {}
+        };
     }
 }
 
 /**
- * Create backend .env file by asking interactive questions
+ * Generate .env file content with all variables properly categorized
  */
-async function createBackendEnv(rl, globalConfig = null) {
-    const backendEnvPath = path.join(process.cwd(), 'backend', '.env');
+function generateEnvContent(globalVars, backendVars, frontendVars) {
+    const content = [];
     
-    // Check if backend .env already exists
-    if (fs.existsSync(backendEnvPath)) {
-        console.log('ℹ️  Backend .env file already exists, skipping setup...');
-        return;
+    // Global variables section
+    if (Object.keys(globalVars).length > 0) {
+        content.push('# Global/Proxy Configuration');
+        Object.entries(globalVars).forEach(([key, value]) => {
+            content.push(`${key}=${value}`);
+        });
+        content.push('');
     }
     
-    try {
-        console.log('\n🔧 Setting up backend environment configuration...\n');
-        
-        // Backend Configuration questions based on .env.example
-        const config = {};
-        
-        console.log('📊 Database Configuration:');
-        const dbHost = await askQuestion(
-            rl, 
-            'Database Host', 
-            'localhost'
-        );
-        const dbPort = await askQuestion(
-            rl, 
-            'Database Port', 
-            '5432'
-        );
-        const dbUsername = await askQuestion(
-            rl, 
-            'Database Username', 
-            'your-db-username'
-        );
-        const dbPassword = await askQuestion(
-            rl, 
-            'Database Password', 
-            'your-db-password'
-        );
-        const dbName = await askQuestion(
-            rl, 
-            'Database Name', 
-            'taskosaur'
-        );
-        
-        // Construct DATABASE_URL from components
-        config.DATABASE_URL = `postgresql://${dbUsername}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
-        
-        console.log('\n🔐 Authentication:');
-        const defaultJwtSecret = generateJwtSecret();
-        const defaultJwtRefreshSecret = generateJwtSecret();
-        
-        config.JWT_SECRET = await askQuestion(
-            rl, 
-            'JWT Secret Key', 
-            defaultJwtSecret
-        );
-        config.JWT_REFRESH_SECRET = await askQuestion(
-            rl, 
-            'JWT Refresh Secret Key', 
-            defaultJwtRefreshSecret
-        );
-        config.JWT_EXPIRES_IN = await askQuestion(
-            rl, 
-            'JWT Expiration Time', 
-            '15m'
-        );
-        config.JWT_REFRESH_EXPIRES_IN = await askQuestion(
-            rl, 
-            'JWT Refresh Expiration Time', 
-            '7d'
-        );
-        
-        console.log('\n🔴 Redis Configuration:');
-        config.REDIS_HOST = await askQuestion(
-            rl, 
-            'Redis Host', 
-            'localhost'
-        );
-        config.REDIS_PORT = await askQuestion(
-            rl, 
-            'Redis Port', 
-            '6379'
-        );
-        config.REDIS_PASSWORD = await askQuestion(
-            rl, 
-            'Redis Password (leave empty if none)', 
-            ''
-        );
-        
-        console.log('\n📧 Email Configuration:');
-        config.SMTP_HOST = await askQuestion(
-            rl, 
-            'SMTP Host', 
-            'smtp.gmail.com'
-        );
-        config.SMTP_PORT = await askQuestion(
-            rl, 
-            'SMTP Port', 
-            '587'
-        );
-        config.SMTP_USER = await askQuestion(
-            rl, 
-            'SMTP User (email address)', 
-            'your-email@gmail.com'
-        );
-        config.SMTP_PASS = await askQuestion(
-            rl, 
-            'SMTP Password (app password)', 
-            'your-app-password'
-        );
-        config.SMTP_FROM = await askQuestion(
-            rl, 
-            'From Email Address', 
-            'noreply@taskosaur.com'
-        );
-        
-        console.log('\n🌐 Frontend Configuration:');
-        const defaultFrontendUrl = globalConfig 
-            ? `http://${globalConfig.GLOBAL_APP_HOST}:${globalConfig.GLOBAL_APP_PORT}`
-            : 'http://127.0.0.1:9100';
-        config.FRONTEND_URL = await askQuestion(
-            rl, 
-            'Frontend URL', 
-            defaultFrontendUrl
-        );
-        
-        console.log('\n📁 File Upload Configuration:');
-        config.UPLOAD_DEST = await askQuestion(
-            rl, 
-            'Upload Destination Directory', 
-            './uploads'
-        );
-        config.MAX_FILE_SIZE = await askQuestion(
-            rl, 
-            'Maximum File Size (bytes)', 
-            '10485760'
-        );
-        
-        console.log('\n⚙️ Queue Configuration:');
-        config.MAX_CONCURRENT_JOBS = await askQuestion(
-            rl, 
-            'Maximum Concurrent Jobs', 
-            '5'
-        );
-        config.JOB_RETRY_ATTEMPTS = await askQuestion(
-            rl, 
-            'Job Retry Attempts', 
-            '3'
-        );
-        
-        // Generate .env content
-        const envContent = [
-            '#### Backend Configuration >>>>>',
-            `DATABASE_URL="${config.DATABASE_URL}"`,
-            '',
-            '# Authentication',
-            `JWT_SECRET="${config.JWT_SECRET}"`,
-            `JWT_REFRESH_SECRET="${config.JWT_REFRESH_SECRET}"`,
-            `JWT_EXPIRES_IN="${config.JWT_EXPIRES_IN}"`,
-            `JWT_REFRESH_EXPIRES_IN="${config.JWT_REFRESH_EXPIRES_IN}"`,
-            '',
-            '# Redis Configuration (for Bull Queue)',
-            `REDIS_HOST=${config.REDIS_HOST}`,
-            `REDIS_PORT=${config.REDIS_PORT}`,
-            `REDIS_PASSWORD=${config.REDIS_PASSWORD}`,
-            '',
-            '# Email Configuration (for notifications)',
-            `SMTP_HOST=${config.SMTP_HOST}`,
-            `SMTP_PORT=${config.SMTP_PORT}`,
-            `SMTP_USER=${config.SMTP_USER}`,
-            `SMTP_PASS=${config.SMTP_PASS}`,
-            `SMTP_FROM=${config.SMTP_FROM}`,
-            '',
-            '# Frontend URL (for email links)',
-            `FRONTEND_URL=${config.FRONTEND_URL}`,
-            '',
-            '# File Upload',
-            `UPLOAD_DEST="${config.UPLOAD_DEST}"`,
-            `MAX_FILE_SIZE=${config.MAX_FILE_SIZE}`,
-            '',
-            '# Queue Configuration',
-            `MAX_CONCURRENT_JOBS=${config.MAX_CONCURRENT_JOBS}`,
-            `JOB_RETRY_ATTEMPTS=${config.JOB_RETRY_ATTEMPTS}`,
-            '#### Backend Configuration <<<<<',
-            ''
-        ].join('\n');
-        
-        // Write to backend/.env
-        fs.writeFileSync(backendEnvPath, envContent);
-        
-        console.log('\n✅ Backend .env file created successfully!');
-        console.log(`📁 Location: ${backendEnvPath}`);
-        
-    } catch (error) {
-        console.error('❌ Failed to create backend .env file:', error.message);
-        throw error;
+    // Backend variables section
+    if (Object.keys(backendVars).length > 0) {
+        content.push('#### Backend Configuration >>>>>');
+        Object.entries(backendVars).forEach(([key, value]) => {
+            content.push(`${key}=${value}`);
+        });
+        content.push('#### Backend Configuration <<<<<');
+        content.push('');
     }
+    
+    // Frontend variables section
+    if (Object.keys(frontendVars).length > 0) {
+        content.push('#### Frontend Configuration >>>>>');
+        Object.entries(frontendVars).forEach(([key, value]) => {
+            content.push(`${key}=${value}`);
+        });
+        content.push('#### Frontend Configuration <<<<<');
+        content.push('');
+    }
+    
+    return content.join('\n');
 }
 
 /**
- * Create both root and backend .env files
+ * Create simplified .env file with all configurations in one place
  */
-async function createEnvFiles() {
+async function createSimpleEnvFile() {
     const rootEnvPath = path.join(process.cwd(), '.env');
-    const backendEnvPath = path.join(process.cwd(), 'backend', '.env');
     
-    // Check if both files already exist
-    if (fs.existsSync(rootEnvPath) && fs.existsSync(backendEnvPath)) {
-        console.log('ℹ️  Both global and backend .env files already exist, skipping environment setup...');
+    // Check if .env already exists
+    if (fs.existsSync(rootEnvPath)) {
+        console.log('ℹ️  .env file already exists, skipping environment setup...');
         return;
     }
     
     const rl = createReadlineInterface();
     
     try {
-        // Create root .env file with Global Configuration
-        const globalConfig = await createRootEnv(rl);
+        console.log('\n🌐 Setting up environment configuration...\n');
         
-        // Create backend .env file with Backend Configuration
-        await createBackendEnv(rl, globalConfig);
+        const config = {};
         
-        console.log('\n🎉 Environment setup completed!');
+        // Global/Proxy Configuration
+        console.log('🌍 Global Application Settings:');
+        config.APP_HOST = await askQuestion(rl, 'Global App Host', '127.0.0.1');
+        config.APP_PORT = await askQuestion(rl, 'Global App Port', '9100');
+        
+        // Backend Configuration
+        console.log('\n🔧 Backend Configuration:');
+        const useBeUnixSocket = await askQuestion(rl, 'Use Backend Unix Socket? (1 for yes, 0 for no)', '1');
+        config.BE_UNIX_SOCKET = useBeUnixSocket;
+        
+        if (useBeUnixSocket === '0') {
+            config.BE_HOST = await askQuestion(rl, 'Backend Host', '127.0.0.1');
+            config.BE_PORT = await askQuestion(rl, 'Backend Port', '9102');
+        }
+        
+        // Frontend Configuration  
+        console.log('\n🖥️  Frontend Configuration:');
+        const useFeUnixSocket = await askQuestion(rl, 'Use Frontend Unix Socket? (1 for yes, 0 for no)', '1');
+        config.FE_UNIX_SOCKET = useFeUnixSocket;
+        
+        if (useFeUnixSocket === '0') {
+            config.FE_HOST = await askQuestion(rl, 'Frontend Host', '127.0.0.1');
+            config.FE_PORT = await askQuestion(rl, 'Frontend Port', '9101');
+        }
+        
+        // Database Configuration
+        console.log('\n📊 Database Configuration:');
+        const dbHost = await askQuestion(rl, 'Database Host', 'localhost');
+        const dbPort = await askQuestion(rl, 'Database Port', '5432');
+        const dbUsername = await askQuestion(rl, 'Database Username', 'taskosaur');
+        const dbPassword = await askQuestion(rl, 'Database Password', 'taskosaur');
+        const dbName = await askQuestion(rl, 'Database Name', 'taskosaur');
+        config.BE_DATABASE_URL = `"postgresql://${dbUsername}:${dbPassword}@${dbHost}:${dbPort}/${dbName}"`;
+        
+        // Authentication
+        console.log('\n🔐 Authentication:');
+        const defaultJwtSecret = generateJwtSecret();
+        const defaultJwtRefreshSecret = generateJwtSecret();
+        config.BE_JWT_SECRET = `"${await askQuestion(rl, 'JWT Secret Key', defaultJwtSecret)}"`;
+        config.BE_JWT_REFRESH_SECRET = `"${await askQuestion(rl, 'JWT Refresh Secret Key', defaultJwtRefreshSecret)}"`;
+        config.BE_JWT_EXPIRES_IN = `"${await askQuestion(rl, 'JWT Expiration Time', '15m')}"`;
+        config.BE_JWT_REFRESH_EXPIRES_IN = `"${await askQuestion(rl, 'JWT Refresh Expiration Time', '7d')}"`;
+        
+        // Redis Configuration
+        console.log('\n🔴 Redis Configuration:');
+        config.BE_REDIS_HOST = await askQuestion(rl, 'Redis Host', 'localhost');
+        config.BE_REDIS_PORT = await askQuestion(rl, 'Redis Port', '6379');
+        config.BE_REDIS_PASSWORD = await askQuestion(rl, 'Redis Password (leave empty if none)', '');
+        
+        // Email Configuration
+        console.log('\n📧 Email Configuration:');
+        config.BE_SMTP_HOST = await askQuestion(rl, 'SMTP Host', 'smtp.gmail.com');
+        config.BE_SMTP_PORT = await askQuestion(rl, 'SMTP Port', '587');
+        config.BE_SMTP_USER = await askQuestion(rl, 'SMTP User (email address)', 'your-email@gmail.com');
+        config.BE_SMTP_PASS = await askQuestion(rl, 'SMTP Password (app password)', 'your-app-password');
+        config.BE_SMTP_FROM = await askQuestion(rl, 'From Email Address', 'noreply@taskosaur.com');
+        // Bucket Configuration
+        console.log('\n📧 Bucket Configuration:');
+        config.BE_AWS_ACCESS_KEY_ID = await askQuestion(rl, 'AWS Access Key', 'your-access-key');
+        config.BE_AWS_SECRET_ACCESS_KEY = await askQuestion(rl, 'AWS Secret Key', 'your-secret-key');
+        config.BE_AWS_REGION = await askQuestion(rl, 'AWS Region', 'ap-south-1');
+        config.BE_AWS_BUCKET_NAME = await askQuestion(rl, 'AWS Bucket Name', 'your-bucket-name');
+    
+        
+        // Frontend URL (auto-configured based on APP_HOST and APP_PORT)
+        config.BE_FRONTEND_URL = `http://${config.APP_HOST}:${config.APP_PORT}`;
+        
+        // File Upload
+        console.log('\n📁 File Upload Configuration:');
+        config.BE_UPLOAD_DEST = `"${await askQuestion(rl, 'Upload Destination Directory', './uploads')}"`;
+        config.BE_MAX_FILE_SIZE = await askQuestion(rl, 'Maximum File Size (bytes)', '10485760');
+        
+        // Queue Configuration
+        console.log('\n⚙️ Queue Configuration:');
+        config.BE_MAX_CONCURRENT_JOBS = await askQuestion(rl, 'Maximum Concurrent Jobs', '5');
+        config.BE_JOB_RETRY_ATTEMPTS = await askQuestion(rl, 'Job Retry Attempts', '3');
+        
+        // Frontend Environment Variables
+        config.FE_NEXT_PUBLIC_API_BASE_URL = await askQuestion(rl, 'Frontend API Base URL', '/api');
+        config.FE_NEXT_PUBLIC_DEFAULT_ORGANIZATION_ID = await askQuestion(rl, 'Default Organization ID', 'your-default-organization-id-here');
+        
+        // Categorize variables
+        const globalVars = {
+            APP_HOST: config.APP_HOST,
+            APP_PORT: config.APP_PORT
+        };
+        
+        const backendVars = {};
+        const frontendVars = {};
+        
+        // Sort variables by prefix
+        Object.entries(config).forEach(([key, value]) => {
+            if (key.startsWith('BE_')) {
+                backendVars[key] = value;
+            } else if (key.startsWith('FE_')) {
+                frontendVars[key] = value;
+            } else if (!key.startsWith('APP_')) {
+                globalVars[key] = value;
+            }
+        });
+        
+        // Generate and write .env file
+        const envContent = generateEnvContent(globalVars, backendVars, frontendVars);
+        fs.writeFileSync(rootEnvPath, envContent);
+        
+        console.log('\n✅ .env file created successfully!');
+        console.log(`📁 Location: ${rootEnvPath}`);
         
     } catch (error) {
-        console.error('❌ Failed to create environment files:', error.message);
+        console.error('❌ Failed to create .env file:', error.message);
         throw error;
     } finally {
         rl.close();
     }
 }
 
+/**
+ * Update .env file with new variables while preserving existing ones
+ */
+function updateEnvFile(filePath, newGlobalVars = {}, newBackendVars = {}, newFrontendVars = {}) {
+    const existingConfig = parseExistingEnvFile(filePath);
+    
+    // Merge existing with new variables
+    const mergedGlobal = { ...existingConfig.global, ...newGlobalVars };
+    const mergedBackend = { ...existingConfig.backend, ...newBackendVars };
+    const mergedFrontend = { ...existingConfig.frontend, ...newFrontendVars };
+    
+    // Generate and write updated content
+    const envContent = generateEnvContent(mergedGlobal, mergedBackend, mergedFrontend);
+    fs.writeFileSync(filePath, envContent);
+    
+    return {
+        global: mergedGlobal,
+        backend: mergedBackend,
+        frontend: mergedFrontend
+    };
+}
+
 module.exports = {
-    createBackendEnv,
-    createRootEnv,
-    createEnvFiles
+    createSimpleEnvFile,
+    parseExistingEnvFile,
+    generateEnvContent,
+    updateEnvFile
 };

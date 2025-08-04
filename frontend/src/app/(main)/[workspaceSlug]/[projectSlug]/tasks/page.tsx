@@ -280,7 +280,7 @@ export default function TasksPage({ params }: Props) {
 
               {/* Add Task Button */}
               <Link href={`/${workspaceSlug}/${projectSlug}/tasks/new`}>
-                <Button className="flex items-center gap-2">
+                <Button className="flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg text-sm px-4 h-9">
                   <HiPlus size={16} />
                   Create Task
                 </Button>
@@ -317,7 +317,7 @@ export default function TasksPage({ params }: Props) {
         </div>
         
         {/* Tasks List */}
-        <Card>
+        
           {filteredTasks.length > 0 ? (
             <TaskListView
               tasks={filteredTasks}
@@ -325,26 +325,36 @@ export default function TasksPage({ params }: Props) {
               projectSlug={projectSlug}
             />
           ) : (
-            <CardContent className="p-8 text-center">
+            <CardContent className="text-center">
               <HiClipboardDocumentList size={48} className="mx-auto text-muted-foreground mb-4" />
               <CardTitle className="text-sm font-medium text-foreground mb-2">
-                {projectTasks.length === 0 ? 'No tasks yet' : 'No tasks match your filter'}
+                {projectTasks.length === 0 ? 'No tasks yet' : 'No tasks match your filters'}
               </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground mb-6">
+              <CardDescription className="mb-6">
                 {projectTasks.length === 0 
                   ? 'Create your first task to get started with project management.'
-                  : 'Try adjusting your filter or create a new task.'
+                  : 'Try adjusting your filters or create a new task.'
                 }
               </CardDescription>
-              <Link href={`/${workspaceSlug}/${projectSlug}/tasks/new`}>
-                <Button className="flex items-center gap-2">
-                  <HiPlus size={16} />
-                  Create Task
-                </Button>
-              </Link>
+              <div className="flex justify-center gap-3">
+                <Link href={`/${workspaceSlug}/${projectSlug}/tasks/new`}>
+                  <Button className="flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg text-sm px-4 h-9">
+                    <HiPlus size={16} />
+                    Create Task
+                  </Button>
+                </Link>
+                {selectedStatus !== 'all' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedStatus('all')}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
             </CardContent>
           )}
-        </Card>
+        
       </div>
     </div>
   );

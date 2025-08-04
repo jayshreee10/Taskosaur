@@ -7,24 +7,26 @@ import TagManagerWrapper from "@/components/tasks/TagManagerWrapper";
 import ConfirmationModal from "@/components/modals/ConfirmationModal";
 import TaskComments from "./TaskComments";
 import Subtasks from "./Subtasks";
+import UserAvatar from "@/components/ui/avatars/UserAvatar";
 import { useTask } from "@/contexts/task-context";
 import { useProjectContext } from "@/contexts/project-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useGlobalFetchPrevention } from '@/hooks/useGlobalFetchPrevention';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { TokenManager } from '@/lib/api';
 import {
   HiDocumentText,
   HiCog,
   HiUsers,
   HiTag,
   HiPaperClip,
-  // HiCalendar,
   HiTrash,
   HiPencil,
-  // HiLink,
   HiChevronDown,
   HiXMark,
   HiArrowLeft,
-  HiPlus
+  HiPlus,
+  HiExclamationTriangle
 } from 'react-icons/hi2';
 
 interface TaskDetailClientProps {
@@ -35,22 +37,6 @@ interface TaskDetailClientProps {
 }
 
 // Import shadcn UI components
-// Local UI helpers
-const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
-  <div className="mb-4 flex items-center gap-2">
-    <Icon size={16} className="text-amber-600" />
-    <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">{title}</span>
-  </div>
-);
-
-const UserAvatar = ({ name }: { name: string }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-  return (
-    <div className="h-6 w-6 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-medium">
-      {initials}
-    </div>
-  );
-};
 import {
   Card,
   CardHeader,
@@ -61,10 +47,18 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+
+// Theme-consistent section header component
+const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
+  <div className="flex items-center gap-2 mb-4">
+    <Icon className="w-5 h-5 text-[var(--primary)]" />
+    <h3 className="text-md font-semibold text-[var(--foreground)]">{title}</h3>
+  </div>
+);
 
 export default function TaskDetailClient({
   task,
@@ -170,33 +164,41 @@ export default function TaskDetailClient({
     onConfirm: () => {},
   });
 
-  const statusColors = {
-    Todo: "default" as const,
-    "To Do": "default" as const,
-    "In Progress": "secondary" as const,
-    Review: "secondary" as const,
-    Done: "secondary" as const,
-  };
-
-  const priorityColors = {
-    LOW: "default" as const,
-    Low: "default" as const,
-    MEDIUM: "secondary" as const,
-    Medium: "secondary" as const,
-    HIGH: "secondary" as const,
-    High: "secondary" as const,
-    HIGHEST: "secondary" as const,
-    Highest: "secondary" as const,
-  };
-
-  const getStatusVariant = (status: any) => {
+  // Theme-consistent status and priority colors
+  const getStatusConfig = (status: any) => {
     const statusName = typeof status === "object" ? status?.name : status;
-    return statusColors[statusName as keyof typeof statusColors] || "default";
+    switch (statusName?.toLowerCase()) {
+      case 'done':
+      case 'completed':
+        return 'bg-green-500/15 text-green-700 border border-green-200 dark:bg-green-400/10 dark:text-green-400 dark:border-green-400/30';
+      case 'in progress':
+      case 'in_progress':
+        return 'bg-blue-500/15 text-blue-700 border border-blue-200 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/30';
+      case 'review':
+        return 'bg-purple-500/15 text-purple-700 border border-purple-200 dark:bg-purple-400/10 dark:text-purple-400 dark:border-purple-400/30';
+      case 'todo':
+      case 'to do':
+        // Further improved: even darker text, higher contrast background for accessibility
+        return 'bg-gray-300/40 text-gray-800 border  border-gray-400 dark:bg-gray-700/20 dark:text-gray-100 dark:border-gray-500/40';
+      default:
+        return 'bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]';
+    }
   };
 
-  const getPriorityVariant = (priority: any) => {
-    const priorityName = typeof priority === "object" ? priority?.name : priority;
-    return priorityColors[priorityName as keyof typeof priorityColors] || "default";
+  const getPriorityConfig = (priority: any) => {
+  const priorityName = typeof priority === "object" ? priority?.name : priority;
+  switch (priorityName?.toLowerCase()) {
+    case 'highest':
+      return 'bg-red-500/15 text-red-700 border border-red-200 dark:bg-red-400/10 dark:text-red-400 dark:border-red-400/30';
+    case 'high':
+      return 'bg-orange-500/15 text-orange-700 border border-orange-200 dark:bg-orange-400/10 dark:text-orange-400 dark:border-orange-400/30';
+    case 'medium':
+      return 'bg-yellow-500/15 text-yellow-700 border border-yellow-200 dark:bg-yellow-400/10 dark:text-yellow-400 dark:border-yellow-400/30';
+    case 'low':
+      return 'bg-green-500/15 text-green-700 border border-green-200 dark:bg-green-400/10 dark:text-green-400 dark:border-green-400/30';
+    default:
+      return 'bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]';
+  }
   };
 
   // Fetch project members
@@ -206,7 +208,6 @@ export default function TaskDetailClient({
 
     const fetchKey = `project-members-${workspaceId}`;
     
-    // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       const cachedData = getCachedData(fetchKey);
       if (cachedData) {
@@ -221,19 +222,15 @@ export default function TaskDetailClient({
       markFetchStart(fetchKey);
       
       try {
-        const token = localStorage.getItem("token");
+        const token = TokenManager.getAccessToken();
         if (token && workspaceId) {
-
-          const members = await getProjectMembersByWorkspace(workspaceId, token);
+          const members = await getProjectMembersByWorkspace(workspaceId);
           const membersData = members || [];
           setProjectMembers(membersData);
-          
-          // Cache the successful result
           markFetchComplete(fetchKey, membersData);
-
         }
       } catch (error) {
-        console.error('❌ [TASK_DETAIL_CLIENT] Failed to fetch project members:', error);
+        console.error('Failed to fetch project members:', error);
         setProjectMembers([]);
         markFetchError(fetchKey);
       } finally {
@@ -242,7 +239,7 @@ export default function TaskDetailClient({
     };
 
     fetchProjectMembers();
-  }, [task.workspace?.id, task.workspaceId]); // Only depend on workspace ID
+  }, [task.workspace?.id, task.workspaceId]);
 
   // Fetch project labels
   useEffect(() => {
@@ -251,7 +248,6 @@ export default function TaskDetailClient({
 
     const fetchKey = `project-labels-${projectId}`;
     
-    // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       const cachedData = getCachedData(fetchKey);
       if (cachedData) {
@@ -264,32 +260,25 @@ export default function TaskDetailClient({
       markFetchStart(fetchKey);
       
       try {
-
         const projectLabels = await getProjectLabels(projectId);
         const labelsData = projectLabels || [];
         setAvailableLabels(labelsData);
-        
-        // Cache the successful result
         markFetchComplete(fetchKey, labelsData);
-
         
-        // Use the labels from the task prop instead of fetching separately
-        // The task should already contain its labels from the server
         if (task.labels && task.labels.length > 0) {
           setLabels(task.labels);
         } else if (task.tags && task.tags.length > 0) {
-          // Fallback to tags if labels property doesn't exist
           setLabels(task.tags);
         }
       } catch (error) {
-        console.error('❌ [TASK_DETAIL_CLIENT] Failed to fetch project labels:', error);
+        console.error('Failed to fetch project labels:', error);
         setAvailableLabels([]);
         markFetchError(fetchKey);
       }
     };
 
     fetchProjectLabels();
-  }, [task.projectId, task.project?.id]); // Only depend on project ID
+  }, [task.projectId, task.project?.id]);
 
   // Fetch task attachments
   useEffect(() => {
@@ -297,7 +286,6 @@ export default function TaskDetailClient({
 
     const fetchKey = `task-attachments-${taskId}`;
     
-    // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       const cachedData = getCachedData(fetchKey);
       if (cachedData) {
@@ -312,16 +300,12 @@ export default function TaskDetailClient({
       markFetchStart(fetchKey);
       
       try {
-
         const taskAttachments = await getTaskAttachments(taskId);
         const attachmentsData = taskAttachments || [];
         setAttachments(attachmentsData);
-        
-        // Cache the successful result
         markFetchComplete(fetchKey, attachmentsData);
-
       } catch (error) {
-        console.error('❌ [TASK_DETAIL_CLIENT] Failed to fetch task attachments:', error);
+        console.error('Failed to fetch task attachments:', error);
         setAttachments([]);
         markFetchError(fetchKey);
       } finally {
@@ -330,7 +314,7 @@ export default function TaskDetailClient({
     };
 
     fetchAttachments();
-  }, [taskId]); // Only depend on task ID
+  }, [taskId]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -349,33 +333,12 @@ export default function TaskDetailClient({
     };
   }, []);
 
-  // Refresh functions for real-time updates
-  const refreshAttachments = async () => {
-    try {
-      const taskAttachments = await getTaskAttachments(taskId);
-      setAttachments(taskAttachments || []);
-    } catch (error) {
-      console.error("Failed to refresh attachments:", error);
-    }
-  };
-
-  const refreshComments = () => {
-    // This will be called from TaskComments component
-    // when a comment is added, updated, or deleted
-  };
-
-  const refreshSubtasks = () => {
-    // This will be called from Subtasks component
-    // when a subtask is added, updated, or deleted
-  };
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
     try {
-      // File validation
       const maxFileSize = 10 * 1024 * 1024; // 10MB
       const allowedTypes = [
         'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -434,7 +397,6 @@ export default function TaskDetailClient({
       const successfulUploads = results.filter(Boolean);
       
       if (successfulUploads.length > 0) {
-        // Refresh attachments list
         const updatedAttachments = await getTaskAttachments(taskId);
         setAttachments(updatedAttachments || []);
         
@@ -484,8 +446,6 @@ export default function TaskDetailClient({
       async () => {
         try {
           await deleteAttachment(attachmentId, currentUser.id);
-          
-          // Refresh attachments list
           const updatedAttachments = await getTaskAttachments(taskId);
           setAttachments(updatedAttachments || []);
           
@@ -685,23 +645,19 @@ export default function TaskDetailClient({
         return;
       }
 
-      // Create the label first
       const newLabel = await createLabel({
         name: newLabelName.trim(),
         color: newLabelColor,
         projectId: projectId
       });
       
-      // Add to available labels
       setAvailableLabels([...availableLabels, newLabel]);
       
-      // Assign to current task
       await assignLabelToTask({
         taskId: taskId,
         labelId: newLabel.id
       });
       
-      // Add to task labels
       setLabels([...labels, newLabel]);
       setIsAddingLabel(false);
       setNewLabelName("");
@@ -783,7 +739,6 @@ export default function TaskDetailClient({
     try {
       const blob = await downloadAttachment(attachmentId);
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -791,7 +746,6 @@ export default function TaskDetailClient({
       document.body.appendChild(link);
       link.click();
       
-      // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -806,506 +760,574 @@ export default function TaskDetailClient({
   };
 
   return (
-    <div className="min-h-screen bg-stone-100 dark:bg-stone-950">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
+    <div className="min-h-screen bg-[var(--background)]">
+      <div className="max-w-7xl mx-auto p-4">
+        {/* Header - Following your breadcrumb pattern */}
         <div className="mb-6">
-          <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400 mb-2">
-            <Link href={`/${workspaceSlug}`} className="hover:text-stone-700 dark:hover:text-stone-300">
-              {task.workspace.name}
+          {/* <div className="flex items-center gap-2 text-sm mb-4">
+            <Link href={`/${workspaceSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
+              {task?.workspace?.name || task?.project?.workspace?.name || 'Workspace'}
             </Link>
-            <span>/</span>
-            <Link href={`/${workspaceSlug}/${projectSlug}`} className="hover:text-stone-700 dark:hover:text-stone-300">
-              {task.project.name}
+            <span className="text-[var(--muted-foreground)]">/</span>
+            <Link href={`/${workspaceSlug}/${projectSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
+              {task?.project?.name || 'Project'}
             </Link>
-            <span>/</span>
-            <Link href={`/${workspaceSlug}/${projectSlug}/tasks`} className="hover:text-stone-700 dark:hover:text-stone-300">
+            <span className="text-[var(--muted-foreground)]">/</span>
+            <Link href={`/${workspaceSlug}/${projectSlug}/tasks`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
               Tasks
             </Link>
-            <span>/</span>
-            <span>Task {taskId}</span>
-          </div>
+            <span className="text-[var(--muted-foreground)]">/</span>
+            <span className="text-[var(--foreground)] font-medium">Task {taskId}</span>
+          </div> */}
+          
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100">
+              <h1 className="text-xl font-bold text-[var(--foreground)]">
                 {task.title}
               </h1>
               <div className="flex items-center gap-2">
-                <Badge variant={getStatusVariant(task.status)}>
+                <Badge
+                  className={`text-[10px] font-semibold border-none py-0.5 rounded-full capitalize text-center tracking-wide shadow-sm ${getStatusConfig(task.status)}`}
+                >
                   {typeof task.status === "object" ? task.status?.name || "Unknown" : task.status}
                 </Badge>
-                <Badge variant={getPriorityVariant(task.priority)}>
+                <Badge
+                  className={`text-[10px] font-semibold border-none py-0.5 rounded-full capitalize text-center tracking-wide shadow-sm ${getPriorityConfig(task.priority)}`}
+                >
                   {typeof task.priority === "object" ? task.priority?.name || "Unknown" : task.priority} Priority
                 </Badge>
               </div>
             </div>
             <Link href={`/${workspaceSlug}/${projectSlug}/tasks`}>
-              <Button variant="secondary" size="sm" className="flex items-center gap-2">
-                <HiArrowLeft size={14} />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="relative h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2 text-sm"
+              >
+                <HiArrowLeft className="w-4 h-4" />
                 Back to Tasks
               </Button>
             </Link>
           </div>
         </div>
 
+        {/* Error Display */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
-          </div>
+          <Alert variant="destructive" className="mb-6 bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
+            <HiExclamationTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
+        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Task Details Section */}
-            <Card>
-              <SectionHeader icon={HiDocumentText} title="Task Details" />
-              {isEditingTask ? (
-                <form onSubmit={handleSaveTaskEdit} className="space-y-4">
-                  <div>
-                    <Label>Title</Label>
-                    <Input
-                      type="text"
-                      value={editTaskData.title}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleTaskFieldChange("title", e.target.value)}
-                      placeholder="Task title"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Description</Label>
-                    <Textarea
-                      value={editTaskData.description}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleTaskFieldChange("description", e.target.value)}
-                      rows={4}
-                      placeholder="Task description"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label>Status</Label>
-                      <Select
-                        value={editTaskData.status}
-                        // onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleTaskFieldChange("status", e.target.value)}
-                      >
-                        <option value="Todo">Todo</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Review">Review</option>
-                        <option value="Done">Done</option>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Priority</Label>
-                      <Select
-                        value={editTaskData.priority}
-                        // onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleTaskFieldChange("priority", e.target.value)}
-                      >
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Highest">Highest</option>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Due Date</Label>
-                      <Input
-                        type="date"
-                        value={editTaskData.dueDate}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleTaskFieldChange("dueDate", e.target.value)}
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-6">
+                <SectionHeader icon={HiDocumentText} title="Task Details" />
+                {isEditingTask ? (
+                  <form onSubmit={handleSaveTaskEdit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-[var(--foreground)] font-medium">Description</Label>
+                      <Textarea
+                        value={editTaskData.description}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleTaskFieldChange("description", e.target.value)}
+                        rows={4}
+                        placeholder="Task description"
+                        className="border-input bg-background text-[var(--foreground)] resize-none"
                       />
                     </div>
-                  </div>
 
-                  <div className="flex justify-end gap-3">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleCancelTaskEdit}
-                      disabled={loading}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={loading}
-                      className="flex items-center gap-2"
-                    >
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Changes"
-                      )}
-                    </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[var(--foreground)] font-medium">Status</Label>
+                        <Select value={editTaskData.status} onValueChange={(value) => handleTaskFieldChange("status", value)}>
+                          <SelectTrigger className="h-9 w-[120px] border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
+                            <SelectValue placeholder="Select status">
+                              {editTaskData.status || 'Select status'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="border-none bg-[var(--card)]">
+                            <SelectItem value="Todo">Todo</SelectItem>
+                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            <SelectItem value="Review">Review</SelectItem>
+                            <SelectItem value="Done">Done</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[var(--foreground)] font-medium">Priority</Label>
+                        <Select value={editTaskData.priority} onValueChange={(value) => handleTaskFieldChange("priority", value)}>
+                          <SelectTrigger className="h-9 w-[120px] border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
+                            <SelectValue placeholder="Select priority">
+                              {editTaskData.priority || 'Select priority'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="border-none bg-[var(--card)]">
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                            <SelectItem value="Highest">Highest</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[var(--foreground)] font-medium">Due Date</Label>
+                        <Input
+                          type="date"
+                          value={editTaskData.dueDate}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleTaskFieldChange("dueDate", e.target.value)}
+                          className="h-9 border-input bg-background text-[var(--foreground)]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancelTaskEdit}
+                        disabled={loading}
+                        className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="h-9 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-[var(--primary-foreground)] border-t-transparent rounded-full animate-spin"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Changes"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="prose prose-sm max-w-none">
+                    <p className="text-[var(--muted-foreground)] leading-relaxed">
+                      {task.description || "No description provided."}
+                    </p>
                   </div>
-                </form>
-              ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <p className="text-stone-700 dark:text-stone-300">
-                    {task.description || "No description provided."}
-                  </p>
-                </div>
-              )}
+                )}
+              </CardContent>
             </Card>
 
             {/* Subtasks Section */}
-            <Card>
-              <Subtasks
-                taskId={taskId}
-                projectId={task.projectId || task.project?.id}
-                onSubtaskAdded={() => {}}
-                onSubtaskUpdated={() => {}}
-                onSubtaskDeleted={() => {}}
-                showConfirmModal={showConfirmModal}
-              />
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-6">
+                <Subtasks
+                  taskId={taskId}
+                  projectId={task.projectId || task.project?.id}
+                  onSubtaskAdded={() => {}}
+                  onSubtaskUpdated={() => {}}
+                  onSubtaskDeleted={() => {}}
+                  showConfirmModal={showConfirmModal}
+                />
+              </CardContent>
             </Card>
 
             {/* Attachments Section */}
-            <Card>
-              <SectionHeader icon={HiPaperClip} title={`Attachments (${attachments.length})`} />
-              <div>
-                {loadingAttachments ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600"></div>
-                    <span className="ml-2 text-sm text-stone-500 dark:text-stone-400">Loading attachments...</span>
-                  </div>
-                ) : attachments.length > 0 ? (
-                  <div className="space-y-2 mb-4">
-                    {attachments.map((attachment: any) => (
-                      <div
-                        key={attachment.id}
-                        className="flex items-center justify-between p-3 border border-stone-200 dark:border-stone-700 rounded-lg bg-stone-50 dark:bg-stone-800"
-                      >
-                        <div className="flex items-center gap-2">
-                          <HiPaperClip size={16} className="text-stone-400" />
-                          <div>
-                            <p className="text-xs font-medium text-stone-900 dark:text-stone-100">
-                              {attachment.fileName}
-                            </p>
-                            <p className="text-xs text-stone-500 dark:text-stone-400">
-                              {formatFileSize(attachment.fileSize)} • {new Date(attachment.createdAt).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </p>
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-6">
+                <SectionHeader icon={HiPaperClip} title={`Attachments (${attachments.length})`} />
+                <div>
+                  {loadingAttachments ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+                      <span className="ml-2 text-sm text-[var(--muted-foreground)]">Loading attachments...</span>
+                    </div>
+                  ) : attachments.length > 0 ? (
+                    <div className="space-y-3 mb-6">
+                      {attachments.map((attachment: any) => (
+                        <div
+                          key={attachment.id}
+                          className="flex items-center justify-between p-3 border border-[var(--border)] rounded-lg bg-[var(--muted)]/30 hover:bg-[var(--accent)] transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <HiPaperClip className="w-4 h-4 text-[var(--muted-foreground)]" />
+                            <div>
+                              <p className="text-sm font-medium text-[var(--foreground)]">
+                                {attachment.fileName}
+                              </p>
+                              <p className="text-xs text-[var(--muted-foreground)]">
+                                {formatFileSize(attachment.fileSize)} • {formatDate(attachment.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleDownloadAttachment(attachment.id, attachment.fileName)}
+                              className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                            >
+                              Download
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteAttachment(attachment.id)}
+                              className="h-8 border-none bg-[var(--destructive)]/5 hover:bg-[var(--destructive)]/10 text-[var(--destructive)]"
+                            >
+                              <HiTrash className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="secondary" 
-                            size="sm"
-                            onClick={() => handleDownloadAttachment(attachment.id, attachment.fileName)}
-                          >
-                            Download
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteAttachment(attachment.id)}
-                          >
-                            <HiTrash size={12} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="flex flex-col space-y-3">
-                  <input
-                    type="file"
-                    id="file-upload"
-                    multiple
-                    onChange={handleFileUpload}
-                    disabled={isUploading}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="file-upload"
-                    className={`inline-flex items-center justify-center w-full p-4 border-2 border-dashed border-stone-300 dark:border-stone-600 rounded-lg text-xs cursor-pointer transition-colors ${
-                      isUploading
-                        ? "text-stone-400 cursor-not-allowed border-stone-200"
-                        : "text-stone-500 dark:text-stone-400 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400"
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <HiPaperClip size={20} />
-                      <span className="font-medium">
-                        {isUploading ? "Uploading files..." : "Click to upload files"}
-                      </span>
-                      <span className="text-xs text-stone-400">
-                        PNG, JPG, PDF up to 10MB
-                      </span>
+                      ))}
                     </div>
-                  </label>
+                  ) : null}
+
+                  <div className="flex flex-col space-y-3">
+                    <input
+                      type="file"
+                      id="file-upload"
+                      multiple
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="file-upload"
+                      className={`inline-flex items-center justify-center w-full p-6 border-2 border-dashed border-[var(--border)] rounded-lg text-sm cursor-pointer transition-colors ${
+                        isUploading
+                          ? "text-[var(--muted-foreground)] cursor-not-allowed border-[var(--muted)]"
+                          : "text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/5"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <HiPaperClip className="w-6 h-6" />
+                        <span className="font-medium">
+                          {isUploading ? "Uploading files..." : "Click to upload files"}
+                        </span>
+                        <span className="text-xs text-[var(--muted-foreground)]">
+                          PNG, JPG, PDF up to 10MB
+                        </span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              </CardContent>
             </Card>
 
             {/* Comments Section */}
-            <Card>
-              <TaskComments
-                taskId={taskId}
-                onCommentAdded={() => {}}
-                onCommentUpdated={() => {}}
-                onCommentDeleted={() => {}}
-              />
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-6">
+                <TaskComments
+                  taskId={taskId}
+                  onCommentAdded={() => {}}
+                  onCommentUpdated={() => {}}
+                  onCommentDeleted={() => {}}
+                />
+              </CardContent>
             </Card>
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             {/* Assignment Section */}
-            <Card>
-              <SectionHeader icon={HiUsers} title="Assignment" />
-              <div className="space-y-4">
-                <div className="relative" ref={assigneeRef}>
-                  <Label>Assignee</Label>
-                  {assignee ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                      className="w-full flex items-center justify-between p-2 border border-stone-300 dark:border-stone-600 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <UserAvatar name={assignee.firstName ? assignee.firstName + " " + (assignee.lastName || "") : "U"} />
-                        <span className="text-xs font-medium text-stone-900 dark:text-stone-100 truncate">
-                          {assignee.username || assignee.firstName + " " + assignee.lastName}
-                        </span>
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-6">
+                <SectionHeader icon={HiUsers} title="Assignment" />
+                <div className="space-y-4">
+                  <div className="relative" ref={assigneeRef}>
+                    <Label className="text-[var(--foreground)] font-medium mb-2 block">Assignee</Label>
+                    {assignee ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
+                        className="w-full flex items-center justify-between p-3 border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            user={{
+                              firstName: assignee.firstName || '',
+                              lastName: assignee.lastName || '',
+                              avatar: assignee.avatar,
+                            }}
+                            size="sm"
+                          />
+                          <span className="text-sm font-medium text-[var(--foreground)]">
+                            {assignee.username || `${assignee.firstName} ${assignee.lastName}`}
+                          </span>
+                        </div>
+                        <HiChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
+                        className="w-full p-3 border border-[var(--border)] rounded-lg text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors text-left text-sm"
+                      >
+                        Select assignee...
+                      </button>
+                    )}
+
+                    {isAssigneeDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-[var(--card)] shadow-lg rounded-lg border border-[var(--border)] max-h-48 overflow-y-auto">
+                        {assignee && (
+                          <button
+                            type="button"
+                            onClick={() => handleAssigneeChange(null)}
+                            className="w-full px-3 py-2 text-left text-sm text-[var(--destructive)] hover:bg-[var(--destructive)]/10 flex items-center gap-2"
+                          >
+                            <HiXMark className="w-4 h-4" />
+                            Unassign
+                          </button>
+                        )}
+                        {availableUsers.map((user) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onClick={() => handleAssigneeChange(user)}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-[var(--accent)] flex items-center gap-3 ${
+                              assignee?.id === user.id ? "bg-[var(--primary)]/10" : ""
+                            }`}
+                          >
+                            <UserAvatar
+                              user={{
+                                firstName: user.firstName || '',
+                                lastName: user.lastName || '',
+                                avatar: user.avatar,
+                              }}
+                              size="sm"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-medium text-[var(--foreground)]">
+                                {user.username || `${user.firstName} ${user.lastName}`}
+                              </div>
+                              <div className="text-xs text-[var(--muted-foreground)]">
+                                {user.role || "Member"}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                      <HiChevronDown size={16} className="text-stone-400" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                      className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg text-stone-500 dark:text-stone-400 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors text-left text-xs"
-                    >
-                      Select assignee...
-                    </button>
-                  )}
-
-                  {isAssigneeDropdownOpen && (
-                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-stone-800 shadow-lg rounded-lg border border-stone-200 dark:border-stone-700 max-h-48 overflow-y-auto">
-                      {assignee && (
-                        <button
-                          type="button"
-                          onClick={() => handleAssigneeChange(null)}
-                          className="w-full px-3 py-2 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                        >
-                          <HiXMark size={14} />
-                          Unassign
-                        </button>
-                      )}
-                      {availableUsers.map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => handleAssigneeChange(user)}
-                          className={`w-full px-3 py-2 text-left text-xs hover:bg-stone-50 dark:hover:bg-stone-700 flex items-center gap-2 ${
-                            assignee?.id === user.id ? "bg-amber-50 dark:bg-amber-900/20" : ""
-                          }`}
-                        >
-                          <UserAvatar name={user.firstName ? user.firstName + " " + (user.lastName || "") : "U"} />
-                          <div className="min-w-0">
-                            <div className="font-medium text-stone-900 dark:text-stone-100 truncate">
-                              {user.username || user.firstName + " " + user.lastName}
-                            </div>
-                            <div className="text-xs text-stone-500 dark:text-stone-400">
-                              {user.role || "Member"}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="relative" ref={reporterRef}>
-                  <Label>Reporter</Label>
-                  {reporter ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsReporterDropdownOpen(!isReporterDropdownOpen)}
-                      className="w-full flex items-center justify-between p-2 border border-stone-300 dark:border-stone-600 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <UserAvatar name={reporter.firstName ? reporter.firstName + " " + (reporter.lastName || "") : "U"} />
-                        <span className="text-xs font-medium text-stone-900 dark:text-stone-100 truncate">
-                          {reporter.username || reporter.firstName + " " + reporter.lastName}
-                        </span>
-                      </div>
-                      <HiChevronDown size={16} className="text-stone-400" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsReporterDropdownOpen(!isReporterDropdownOpen)}
-                      className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg text-stone-500 dark:text-stone-400 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors text-left text-xs"
-                    >
-                      Select reporter...
-                    </button>
-                  )}
-
-                  {isReporterDropdownOpen && (
-                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-stone-800 shadow-lg rounded-lg border border-stone-200 dark:border-stone-700 max-h-48 overflow-y-auto">
-                      {reporter && (
-                        <button
-                          type="button"
-                          onClick={() => handleReporterChange(null)}
-                          className="w-full px-3 py-2 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                        >
-                          <HiXMark size={14} />
-                          Remove reporter
-                        </button>
-                      )}
-                      {availableUsers.map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => handleReporterChange(user)}
-                          className={`w-full px-3 py-2 text-left text-xs hover:bg-stone-50 dark:hover:bg-stone-700 flex items-center gap-2 ${
-                            reporter?.id === user.id ? "bg-amber-50 dark:bg-amber-900/20" : ""
-                          }`}
-                        >
-                          <UserAvatar name={user.firstName ? user.firstName + " " + (user.lastName || "") : "U"} />
-                          <div className="min-w-0">
-                            <div className="font-medium text-stone-900 dark:text-stone-100 truncate">
-                              {user.username || user.firstName + " " + user.lastName}
-                            </div>
-                            <div className="text-xs text-stone-500 dark:text-stone-400">
-                              {user.role || "Member"}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {!assignee && !reporter && (
-                  <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-800">
-                    Please assign at least one assignee or reporter
+                    )}
                   </div>
-                )}
-              </div>
+
+                  <div className="relative" ref={reporterRef}>
+                    <Label className="text-[var(--foreground)] font-medium mb-2 block">Reporter</Label>
+                    {reporter ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsReporterDropdownOpen(!isReporterDropdownOpen)}
+                        className="w-full flex items-center justify-between p-3 border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            user={{
+                              firstName: reporter.firstName || '',
+                              lastName: reporter.lastName || '',
+                              avatar: reporter.avatar,
+                            }}
+                            size="sm"
+                          />
+                          <span className="text-sm font-medium text-[var(--foreground)]">
+                            {reporter.username || `${reporter.firstName} ${reporter.lastName}`}
+                          </span>
+                        </div>
+                        <HiChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsReporterDropdownOpen(!isReporterDropdownOpen)}
+                        className="w-full p-3 border border-[var(--border)] rounded-lg text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors text-left text-sm"
+                      >
+                        Select reporter...
+                      </button>
+                    )}
+
+                    {isReporterDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-[var(--card)] shadow-lg rounded-lg border border-[var(--border)] max-h-48 overflow-y-auto">
+                        {reporter && (
+                          <button
+                            type="button"
+                            onClick={() => handleReporterChange(null)}
+                            className="w-full px-3 py-2 text-left text-sm text-[var(--destructive)] hover:bg-[var(--destructive)]/10 flex items-center gap-2"
+                          >
+                            <HiXMark className="w-4 h-4" />
+                            Remove reporter
+                          </button>
+                        )}
+                        {availableUsers.map((user) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onClick={() => handleReporterChange(user)}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-[var(--accent)] flex items-center gap-3 ${
+                              reporter?.id === user.id ? "bg-[var(--primary)]/10" : ""
+                            }`}
+                          >
+                            <UserAvatar
+                              user={{
+                                firstName: user.firstName || '',
+                                lastName: user.lastName || '',
+                                avatar: user.avatar,
+                              }}
+                              size="sm"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-medium text-[var(--foreground)]">
+                                {user.username || `${user.firstName} ${user.lastName}`}
+                              </div>
+                              <div className="text-xs text-[var(--muted-foreground)]">
+                                {user.role || "Member"}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {!assignee && !reporter && (
+                    <Alert className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
+                      <HiExclamationTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        Please assign at least one assignee or reporter
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
             </Card>
 
             {/* Actions Section */}
-            <Card>
-              <SectionHeader icon={HiCog} title="Actions" />
-              <div className="space-y-3">
-                <Button
-                  onClick={handleEditTask}
-                  variant="secondary"
-                  className="w-full flex items-center gap-2"
-                >
-                  <HiPencil size={14} />
-                  Edit Task
-                </Button>
-                <Button
-                  onClick={handleDeleteTask}
-                  variant="danger"
-                  className="w-full flex items-center gap-2"
-                >
-                  <HiTrash size={14} />
-                  Delete Task
-                </Button>
-              </div>
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-6">
+                <SectionHeader icon={HiCog} title="Actions" />
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleEditTask}
+                    variant="outline"
+                    className="w-full h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center gap-2"
+                  >
+                    <HiPencil className="w-4 h-4" />
+                    Edit Task
+                  </Button>
+                  <Button
+                    onClick={handleDeleteTask}
+                    variant="outline"
+                    className="w-full h-9 border-none bg-[var(--destructive)]/5 hover:bg-[var(--destructive)]/10 text-[var(--destructive)] flex items-center gap-2"
+                  >
+                    <HiTrash className="w-4 h-4" />
+                    Delete Task
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
 
             {/* Labels Section */}
-            <Card>
-              <SectionHeader icon={HiTag} title={`Labels (${labels.length})`} />
-              <div>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {labels.map((label: any) => (
-                    <Badge key={label.id}>
-                      {label.name}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Available labels from project */}
-                {availableLabels.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs text-stone-500 dark:text-stone-400 mb-2">Available labels:</div>
-                    <div className="flex flex-wrap gap-1">
-                      {availableLabels
-                        .filter(label => !labels.find((l: any) => l.id === label.id))
-                        .map((label: any) => (
-                          <button
-                            key={label.id}
-                            type="button"
-                            onClick={() => handleAssignExistingLabel(label)}
-                            className="text-xs px-2 py-1 rounded border border-stone-300 dark:border-stone-600 hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
-                          >
-                            {label.name}
-                          </button>
-                        ))}
-                    </div>
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-6">
+                <SectionHeader icon={HiTag} title={`Labels (${labels.length})`} />
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {labels.map((label: any) => (
+                      <Badge
+                        key={label.id}
+                        className={
+                          `text-[10px] font-semibold border-none py-0.5 rounded-full capitalize text-center tracking-wide shadow-sm ` +
+                          (label.color
+                            ? `bg-[${label.color}]/10 text-[${label.color}]`
+                            : 'bg-[var(--muted)] text-[var(--muted-foreground)]')
+                        }
+                      >
+                        {label.name}
+                      </Badge>
+                    ))}
                   </div>
-                )}
 
-                {isAddingLabel ? (
-                  <form onSubmit={handleAddLabel} className="space-y-3">
-                    <Input
-                      type="text"
-                      value={newLabelName}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewLabelName(e.target.value)}
-                      placeholder="Label name"
-                      autoFocus
-                    />
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={newLabelColor}
-                        // onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewLabelColor(e.target.value)}
-                        // className="flex-1"
-                      >
-                        {labelColors.map((color) => (
-                          <option key={color.value} value={color.value}>
-                            {color.name}
-                          </option>
-                        ))}
-                      </Select>
-                      <Button type="submit" disabled={!newLabelName.trim()} size="sm">
-                        Add
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          setIsAddingLabel(false);
-                          setNewLabelName("");
-                          setNewLabelColor("#3B82F6");
-                        }}
-                      >
-                        Cancel
-                      </Button>
+                  {/* Available labels from project */}
+                  {availableLabels.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-sm text-[var(--muted-foreground)] mb-2">Available labels:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {availableLabels
+                          .filter(label => !labels.find((l: any) => l.id === label.id))
+                          .map((label: any) => (
+                            <button
+                              key={label.id}
+                              type="button"
+                              onClick={() => handleAssignExistingLabel(label)}
+                              className="text-sm px-3 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)] transition-colors"
+                            >
+                              {label.name}
+                            </button>
+                          ))}
+                      </div>
                     </div>
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingLabel(true)}
-                    className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 flex items-center gap-1"
-                  >
-                    <HiPlus size={12} />
-                    Add new label
-                  </button>
-                )}
-              </div>
+                  )}
+
+                  {isAddingLabel ? (
+                    <form onSubmit={handleAddLabel} className="space-y-3">
+                      <Input
+                        type="text"
+                        value={newLabelName}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewLabelName(e.target.value)}
+                        placeholder="Label name"
+                        autoFocus
+                        className="h-9 border-input bg-background text-[var(--foreground)]"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Select value={newLabelColor} onValueChange={setNewLabelColor}>
+                          <SelectTrigger className="flex-1 h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
+                            <SelectValue placeholder="Select color" />
+                          </SelectTrigger>
+                          <SelectContent className="border-none bg-[var(--card)]">
+                            {labelColors.map((color) => (
+                              <SelectItem key={color.value} value={color.value}>
+                                {color.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          type="submit" 
+                          disabled={!newLabelName.trim()} 
+                          size="sm"
+                          className="h-9 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)]"
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsAddingLabel(false);
+                            setNewLabelName("");
+                            setNewLabelColor("#3B82F6");
+                          }}
+                          className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingLabel(true)}
+                      className="text-sm text-[var(--primary)] hover:text-[var(--primary)]/80 flex items-center gap-1 transition-colors"
+                    >
+                      <HiPlus className="w-4 h-4" />
+                      Add new label
+                    </button>
+                  )}
+                </div>
+              </CardContent>
             </Card>
           </div>
         </div>
@@ -1324,4 +1346,4 @@ export default function TaskDetailClient({
       />
     </div>
   );
-}
+} 

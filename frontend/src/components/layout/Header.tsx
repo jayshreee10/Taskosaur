@@ -34,26 +34,89 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "./ModeToggle";
 import { NewProjectModal } from "@/components/projects/NewProjectModal";
+import { notificationApi } from "@/utils/api/notificationApi";
+import { organizationApi } from "@/utils/api/organizationApi";
+
 
 export default function Header() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  
+  // ✅ Add notification states
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const pathname = usePathname();
-  const { getCurrentUser, logout, checkOrganizationAndRedirect } = useAuth();
+  const { 
+    getCurrentUser, 
+    logout, 
+    checkOrganizationAndRedirect,
+  } = useAuth();
 
-  useEffect(() => {
+ useEffect(() => {
+  const initializeComponent = async () => {
     setIsClient(true);
     const user = getCurrentUser();
     setCurrentUser(user);
-  }, [getCurrentUser]);
+    
+    // Only fetch notifications if user exists
+    if (!user?.id) {
+      console.log('No user found, skipping notification fetch');
+      return;
+    }
+
+    const currentOrgId = localStorage.getItem("currentOrganizationId")
+    console.log('Current organization:', currentOrgId);
+    
+    if (!currentOrgId) {
+      console.log('No organization found, skipping notification fetch');
+      return;
+    }
+
+    try {
+      setLoadingNotifications(true);
+      
+      const response = await notificationApi.getNotificationsByUserAndOrganization(
+        user.id, // Use user directly instead of currentUser
+        currentOrgId,
+        {
+          isRead: false,
+          page: 1,      
+          limit: 3       
+        }
+      );
+
+      setNotifications(response.notifications);
+      setUnreadCount(response.pagination.totalCount);
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+      setNotifications([]);
+      setUnreadCount(0);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  initializeComponent();
+}, []); // Keep getCurrentUser dependency
+
 
   // Check if user has organization access
-  const hasOrganizationAccess = isClient
-    ? checkOrganizationAndRedirect()
-    : false;
+  // Fix: use state and effect, do not use await in function body
+  const [hasOrganizationAccess, setHasOrganizationAccess] = useState(false);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (isClient) {
+        const redirectPath = await checkOrganizationAndRedirect();
+        setHasOrganizationAccess(redirectPath !== '/organization');
+      }
+    };
+    checkAccess();
+  }, [isClient, checkOrganizationAndRedirect]);
 
   const isExactGlobalRoute =
     pathname === "/workspaces" ||
@@ -83,6 +146,16 @@ export default function Header() {
       )
     ) {
       return "global-nested";
+    }
+
+    // Handle workspace homepage route (e.g., /workspace-slug)
+    if (
+      pathParts.length === 1 &&
+      !["dashboard", "workspaces", "activity", "settings", "tasks"].includes(
+        pathParts[0]
+      )
+    ) {
+      return "workspace";
     }
 
     if (
@@ -196,6 +269,39 @@ export default function Header() {
     }
   };
 
+  // ✅ Helper function to format notification time
+  const formatNotificationTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  // ✅ Handle marking notification as read
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      await notificationApi.markNotificationAsRead(notificationId);
+      
+      // Update local state
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
+
+  // ✅ Get user initials for notification avatars
+  const getNotificationUserInitials = (user: any) => {
+    if (!user?.firstName && !user?.lastName) return 'U';
+    return `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`.toUpperCase();
+  };
+
   const getInitials = () => {
     if (!isClient || !currentUser) return "U";
 
@@ -241,7 +347,7 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[var(--border)]/40 bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
+    <header className="sticky top-0 z-40 w-full shadow-sm bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6">
         {/* Left Section - Create Button (only show if has organization access) */}
         <div className="flex items-center">
@@ -255,7 +361,7 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="default"
-                    className="relative h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg"
+                    className="cursor-pointer relative h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg"
                   >
                     <HiPlus className="w-4 h-4 mr-2 flex-shrink-0" />
                     <span className="hidden sm:inline">Create</span>
@@ -263,7 +369,7 @@ export default function Header() {
                   </Button>
                 </DropdownMenuTrigger>
 
-                <DropdownMenuContent
+                {/* <DropdownMenuContent
                   className="w-80 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm"
                   align="start"
                   sideOffset={8}
@@ -273,7 +379,7 @@ export default function Header() {
                       Create New
                     </h3>
                   </div>
-                </DropdownMenuContent>
+                </DropdownMenuContent> */}
 
                 <DropdownMenuContent
                   className="w-80 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm"
@@ -289,37 +395,39 @@ export default function Header() {
                   <div className="p-2">
                     {contextLevel === "global" && (
                       <>
-                        <DropdownMenuItem asChild>
+                        <DropdownMenuItem
+                          asChild
+                          className="flex items-center gap-2 px-2 rounded cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200"
+                        >
                           <Link
                             href="/workspaces/new"
-                            className="flex items-center gap-4 px-4 py-4 cursor-pointer rounded-lg hover:bg-[var(--accent)]/50 transition-all duration-200"
+                            className="flex items-center w-full"
                           >
-                            <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                              <HiCommandLine className="w-5 h-5 text-[var(--primary)]" />
+                            <div className="w-6 h-6 rounded bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                              <HiCommandLine className="size-3 text-[var(--primary)]" />
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-semibold text-[var(--foreground)] mb-1">
+                            <div className="text-left flex-1 min-w-0 ml-2">
+                              <div className="text-xs font-semibold text-[var(--foreground)] mb-0">
                                 New Workspace
                               </div>
-                              <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                              <div className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
                                 Create a workspace for your team
                               </div>
                             </div>
                           </Link>
                         </DropdownMenuItem>
-
                         <DropdownMenuItem
-                          className="flex items-center gap-4 px-4 py-4 cursor-pointer rounded-lg hover:bg-[var(--accent)]/50 transition-all duration-200"
+                          className="flex items-center gap-2 px-2 rounded cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200"
                           onClick={() => setShowNewProjectModal(true)}
                         >
-                          <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                            <HiRocketLaunch className="w-5 h-5 text-[var(--primary)]" />
+                          <div className="w-6 h-6 rounded bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                            <HiRocketLaunch className="size-3 text-[var(--primary)]" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-[var(--foreground)] mb-1">
+                          <div className="text-left flex-1 min-w-0 ml-2">
+                            <div className="text-xs font-semibold text-[var(--foreground)] mb-0">
                               New Project
                             </div>
-                            <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                            <div className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
                               Start a new project
                             </div>
                           </div>
@@ -328,19 +436,22 @@ export default function Header() {
                     )}
 
                     {contextLevel === "workspace" && (
-                      <DropdownMenuItem asChild>
+                      <DropdownMenuItem
+                        asChild
+                        className="flex items-center gap-2 px-2 rounded cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200"
+                      >
                         <Link
                           href={`/${workspaceSlug}/projects/new`}
-                          className="flex items-center gap-4 px-4 py-4 cursor-pointer rounded-lg hover:bg-[var(--accent)]/50 transition-all duration-200"
+                          className="flex items-center w-full"
                         >
-                          <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                            <HiRocketLaunch className="w-5 h-5 text-[var(--primary)]" />
+                          <div className="w-6 h-6 rounded bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                            <HiRocketLaunch className="size-3 text-[var(--primary)]" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-[var(--foreground)] mb-1">
+                          <div className="text-left flex-1 min-w-0 ml-2">
+                            <div className="text-xs font-semibold text-[var(--foreground)] mb-0">
                               New Project
                             </div>
-                            <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                            <div className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
                               Start a new project
                             </div>
                           </div>
@@ -349,19 +460,22 @@ export default function Header() {
                     )}
 
                     {contextLevel === "project" && (
-                      <DropdownMenuItem asChild>
+                      <DropdownMenuItem
+                        asChild
+                        className="flex items-center gap-2 px-2 rounded cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200"
+                      >
                         <Link
                           href={`/${workspaceSlug}/${projectSlug}/tasks/new`}
-                          className="flex items-center gap-4 px-4 py-4 cursor-pointer rounded-lg hover:bg-[var(--accent)]/50 transition-all duration-200"
+                          className="flex items-center w-full"
                         >
-                          <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                            <HiPlus className="w-5 h-5 text-[var(--primary)]" />
+                          <div className="w-6 h-6 rounded bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                            <HiPlus className="size-3 text-[var(--primary)]" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-[var(--foreground)] mb-1">
+                          <div className="text-left flex-1 min-w-0 ml-2">
+                            <div className="text-xs font-semibold text-[var(--foreground)] mb-0">
                               New Task
                             </div>
-                            <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                            <div className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
                               Add a task to this project
                             </div>
                           </div>
@@ -381,34 +495,105 @@ export default function Header() {
         {/* Right Section - Conditional rendering based on organization access */}
         <div className="flex items-center gap-2">
           {/* Organization Selector (only show if has organization access) */}
-          {hasOrganizationAccess &&
-            (isExactGlobalRoute ||
-              contextLevel === "workspace" ||
-              contextLevel === "workspace-nested") && <OrganizationSelector />}
+          {hasOrganizationAccess && <OrganizationSelector />}
 
-          {/* Notifications (only show if has organization access) */}
+          {/* ✅ Updated Notifications Dropdown */}
           {hasOrganizationAccess && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative h-9 w-9 hover:bg-[var(--accent)]/50 transition-colors rounded-lg flex items-center justify-center"
+                  className="cursor-pointer relative h-7 w-7 hover:bg-[var(--accent)] transition-colors rounded-md flex items-center justify-center"
                 >
-                  <HiBell className="w-5 h-5" />
-                  <Badge
-                    variant="destructive"
-                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs font-medium min-w-[20px] bg-[var(--destructive)] text-[var(--destructive-foreground)]"
-                  >
-                    3
-                  </Badge>
+                  <HiBell className="w-4 h-4 text-[var(--muted-foreground)]" />
+                  {unreadCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[10px] font-medium min-w-[16px] bg-red-500 text-white border-0"
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Badge>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
-              <NotificationCenter />
+              <DropdownMenuContent
+                className="w-80 p-0 bg-[var(--card)] border border-[var(--border)] shadow-lg rounded-lg mt-1"
+                align="end"
+                sideOffset={4}
+              >
+                <div className="py-3 px-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-bold text-[var(--foreground)]">Notifications</span>
+                    <span className="text-xs font-medium text-[var(--muted-foreground)]">{unreadCount}</span>
+                  </div>
+                  
+                  {loadingNotifications ? (
+                    <div className="space-y-2">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex items-start gap-3 p-3 animate-pulse">
+                          <div className="w-8 h-8 bg-[var(--muted)] rounded-full"></div>
+                          <div className="flex-1 space-y-1">
+                            <div className="h-4 bg-[var(--muted)] rounded w-3/4"></div>
+                            <div className="h-3 bg-[var(--muted)] rounded w-1/2"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="text-center py-8">
+                      <HiBell className="w-8 h-8 text-[var(--muted-foreground)] mx-auto mb-2" />
+                      <p className="text-sm text-[var(--muted-foreground)]">No new notifications</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 max-h-80 overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className="flex items-start gap-3 p-3 hover:bg-[var(--accent)] rounded-lg transition-colors cursor-pointer"
+                          onClick={() => handleMarkAsRead(notification.id)}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {notification.createdByUser 
+                              ? getNotificationUserInitials(notification.createdByUser)
+                              : 'S'
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-[var(--foreground)] mb-1 line-clamp-1">
+                              {notification.title}
+                            </div>
+                            <div className="text-xs text-[var(--muted-foreground)] mb-1 line-clamp-2">
+                              {notification.message}
+                            </div>
+                            <div className="text-xs text-[var(--muted-foreground)]">
+                              {formatNotificationTime(notification.createdAt)}
+                            </div>
+                          </div>
+                          {/* Priority indicator */}
+                          {(notification.priority === 'HIGH' || notification.priority === 'URGENT') && (
+                            <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 mt-2"></div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {unreadCount > 3 && (
+                    <div className="pt-3 border-t border-gray-100 text-center">
+                      <Link 
+                        href="/notifications"
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 rounded px-3 py-1.5 hover:bg-blue-100 transition-colors inline-block"
+                      >
+                        View All {unreadCount} Notifications
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </DropdownMenuContent>
             </DropdownMenu>
           )}
 
-          {/* Theme Toggle (always show) */}
           <ModeToggle />
 
           {/* Separator (only show if has organization access) */}
@@ -421,15 +606,15 @@ export default function Header() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 h-9 px-2 hover:bg-[var(--accent)]/50 transition-colors min-w-0 rounded-lg"
+                className="cursor-pointer flex items-center gap-2 h-9 px-2 hover:bg-[var(--accent)]/50 transition-colors min-w-0 rounded-md"
               >
                 <Avatar className="h-7 w-7 flex-shrink-0">
-                  <AvatarFallback className="bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold">
+                  <AvatarFallback className="bg-[var(--primary)] text-[var(--primary-foreground)] text-[13px] font-semibold">
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden md:flex text-left min-w-0 flex-1">
-                  <div className="text-sm font-medium text-[var(--foreground)] leading-none truncate max-w-[100px]">
+                  <div className="text-sm font-medium text-[var(--foreground)] leading-none truncate max-w-[80px]">
                     {getFullName()}
                   </div>
                 </div>
@@ -438,27 +623,27 @@ export default function Header() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent
-              className="w-80 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm"
+              className="w-60 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm"
               align="end"
-              sideOffset={8}
+              sideOffset={6}
             >
               {/* User Profile Header */}
-              <div className="flex items-center gap-4 p-5 bg-gradient-to-r from-[var(--primary)]/5 to-[var(--primary)]/10 border-b border-[var(--border)]/30">
-                <Avatar className="h-14 w-14 flex-shrink-0 ring-2 ring-[var(--primary)]/20">
-                  <AvatarFallback className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 text-[var(--primary-foreground)] font-bold text-lg">
+              <div className="flex items-center gap-4 px-4 py-2 bg-gradient-to-r from-[var(--primary)]/5 to-[var(--primary)]/10 border-b border-[var(--border)]/30">
+                <Avatar className="size-7 flex-shrink-0 ring-1 ring-[var(--primary)]/20">
+                  <AvatarFallback className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 text-[var(--primary-foreground)] font-bold text-sm">
                     {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="text-base font-bold text-[var(--foreground)] truncate mb-1">
+                  <div className="text-sm font-bold text-[var(--foreground)] truncate mb-0">
                     {isClient ? getFullName() : "User"}
                   </div>
-                  <div className="text-sm text-[var(--muted-foreground)] truncate mb-2">
+                  <div className="text-xs text-[var(--muted-foreground)] truncate mb-0">
                     {isClient && currentUser?.email ? currentUser.email : ""}
                   </div>
                   <Badge
                     variant="secondary"
-                    className="text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/20"
+                    className="text-[12px] font-medium bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/20 px-2 mt-2 "
                   >
                     Admin
                   </Badge>
@@ -472,17 +657,14 @@ export default function Header() {
                   <DropdownMenuItem asChild>
                     <Link
                       href="/settings"
-                      className="flex items-center gap-4 px-4 py-4 rounded-lg cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200"
+                      className="flex items-center gap-2 px-2  rounded cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                        <HiCog className="w-5 h-5 text-[var(--primary)]" />
+                      <div className="w-6 h-6 rounded bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                        <HiCog className="size-3 text-[var(--primary)]" />
                       </div>
                       <div className="text-left flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-[var(--foreground)] mb-1">
+                        <div className="text-xs font-semibold text-[var(--foreground)] mb-0">
                           Settings
-                        </div>
-                        <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                          Manage your account preferences
                         </div>
                       </div>
                     </Link>
@@ -491,22 +673,19 @@ export default function Header() {
 
                 {/* Show separator only if settings is shown */}
                 {hasOrganizationAccess && (
-                  <DropdownMenuSeparator className="my-2" />
+                  <DropdownMenuSeparator className="my-1" />
                 )}
 
                 {/* Logout (always show) */}
                 <DropdownMenuItem
-                  className="flex items-center gap-4 px-4 py-4 rounded-lg text-[var(--destructive)] hover:bg-[var(--destructive)]/10 focus:text-[var(--destructive)] cursor-pointer transition-all duration-200"
+                  className="flex items-center gap-2 px-2  rounded text-[var(--destructive)] hover:bg-[var(--destructive)]/10 focus:text-[var(--destructive)] cursor-pointer transition-all duration-200"
                   onClick={handleLogout}
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--destructive)]/10 flex items-center justify-center flex-shrink-0">
-                    <RiLogoutCircleRLine className="w-5 h-5 text-[var(--destructive)]" />
+                  <div className="w-6 h-6 rounded bg-[var(--destructive)]/10 flex items-center justify-center flex-shrink-0">
+                    <RiLogoutCircleRLine className="size-3 text-[var(--destructive)]" />
                   </div>
                   <div className="text-left flex-1 min-w-0">
-                    <div className="text-sm font-semibold mb-1">Logout</div>
-                    <div className="text-xs text-[var(--destructive)]/70 leading-relaxed">
-                      Sign out of your account
-                    </div>
+                    <div className="text-xs font-semibold mb-0">Logout</div>
                   </div>
                 </DropdownMenuItem>
               </div>
@@ -516,11 +695,13 @@ export default function Header() {
       </div>
 
       {/* New Project Modal */}
-      <NewProjectModal
-        isOpen={showNewProjectModal}
-        onClose={() => setShowNewProjectModal(false)}
-        onSubmit={handleCreateProject}
-      />
+      {hasOrganizationAccess && (
+        <NewProjectModal
+          isOpen={showNewProjectModal}
+          onClose={() => setShowNewProjectModal(false)}
+          onSubmit={handleCreateProject}
+        />
+      )}
     </header>
   );
 }

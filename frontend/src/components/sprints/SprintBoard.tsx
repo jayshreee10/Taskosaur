@@ -3,17 +3,74 @@
 import React, { useState, useEffect } from 'react';
 import { Task, Sprint, TaskStatus } from '@/types/tasks';
 import TaskColumn from '@/components/tasks/TaskColumn';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import SprintSelector from './SprintSelector';
 import SprintProgress from './SprintProgress';
-
+import {
+  HiPlay,
+  HiCheck,
+  HiClock,
+  HiCalendar,
+  HiFlag,
+  HiChartBar,
+  HiUsers,
+  HiClipboardDocumentList
+} from 'react-icons/hi2';
+import { HiLightningBolt } from "react-icons/hi";
 interface SprintBoardProps {
   projectId: string;
   sprintId?: string;
 }
 
-export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
+const LoadingSkeleton = () => (
+  <div className="space-y-6">
+    <div className="animate-pulse">
+      <div className="h-8 bg-[var(--muted)] rounded w-1/3 mb-4"></div>
+      <div className="h-6 bg-[var(--muted)] rounded w-1/2 mb-6"></div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-[var(--card)] rounded-[var(--card-radius)] border-none p-4">
+            <div className="h-6 bg-[var(--muted)] rounded mb-4"></div>
+            <div className="space-y-3">
+              {[...Array(3)].map((_, j) => (
+                <div key={j} className="h-20 bg-[var(--muted)] rounded"></div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
+const getSprintStatusConfig = (status: string) => {
+  switch (status) {
+    case 'PLANNED':
+      return { 
+        className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-none',
+        icon: HiClock 
+      };
+    case 'ACTIVE':
+      return { 
+        className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-none',
+        icon: HiPlay 
+      };
+    case 'COMPLETED':
+      return { 
+        className: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-none',
+        icon: HiCheck 
+      };
+    default:
+      return { 
+        className: 'bg-[var(--muted)] text-[var(--muted-foreground)] border-none',
+        icon: HiClock 
+      };
+  }
+};
+
+export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
   const [currentSprint, setCurrentSprint] = useState<Sprint | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statuses, setStatuses] = useState<TaskStatus[]>([]);
@@ -283,7 +340,11 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
   const formatDate = (dateString: string) => {
     if (!currentDate) return 'Loading...';
     try {
-      return new Date(dateString).toLocaleDateString();
+      return new Date(dateString).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
     } catch {
       return 'Invalid date';
     }
@@ -360,47 +421,114 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
   };
 
   if (isLoading) {
+    return <LoadingSkeleton />;
+  }
+
+  if (!currentSprint) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="text-center py-12">
+        <div className="w-16 h-16 bg-[var(--muted)] rounded-xl flex items-center justify-center mx-auto mb-4">
+          <HiLightningBolt className="w-8 h-8 text-[var(--muted-foreground)]" />
+        </div>
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+          No Sprint Selected
+        </h3>
+        <p className="text-sm text-[var(--muted-foreground)]">
+          Please select a sprint to view the board
+        </p>
       </div>
     );
   }
 
+  const sprintStatusConfig = getSprintStatusConfig(currentSprint.status);
+  const StatusIcon = sprintStatusConfig.icon;
+
+  // Calculate sprint statistics
+  const completedTasks = tasks.filter(task => task.status?.category === 'DONE').length;
+  const totalStoryPoints = tasks.reduce((sum, task) => sum + (task.storyPoints || 0), 0);
+  const completedStoryPoints = tasks
+    .filter(task => task.status?.category === 'DONE')
+    .reduce((sum, task) => sum + (task.storyPoints || 0), 0);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
-          <SprintSelector
-            currentSprint={currentSprint}
-            sprints={sprints}
-            onSprintChange={handleSprintChange}
-          />
-        </div>
-        <div className="flex space-x-3">
-          {currentSprint?.status === 'PLANNED' && (
-            <Button onClick={handleStartSprint}>
-              Start Sprint
-            </Button>
-          )}
-          {currentSprint?.status === 'ACTIVE' && (
-            <Button onClick={handleCompleteSprint} variant="secondary">
-              Complete Sprint
-            </Button>
-          )}
-        </div>
-      </div>
+      {/* Sprint Header Card */}
+      <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Sprint Info */}
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[var(--primary)] flex items-center justify-center text-[var(--primary-foreground)] font-semibold flex-shrink-0">
+                <HiLightningBolt className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-xl font-bold text-[var(--foreground)]">
+                    {currentSprint.name}
+                  </h2>
+                  <Badge className={sprintStatusConfig.className}>
+                    <StatusIcon className="w-3 h-3 mr-1" />
+                    {currentSprint.status}
+                  </Badge>
+                </div>
+                <p className="text-sm text-[var(--muted-foreground)] mb-3">
+                  {currentSprint.goal}
+                </p>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--muted-foreground)]">
+                  <div className="flex items-center gap-1">
+                    <HiCalendar className="w-4 h-4" />
+                    {formatDate(currentSprint.startDate)} - {formatDate(currentSprint.endDate)}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <HiClipboardDocumentList className="w-4 h-4" />
+                    {completedTasks}/{tasks.length} tasks
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <HiFlag className="w-4 h-4" />
+                    {completedStoryPoints}/{totalStoryPoints} points
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sprint Actions */}
+            <div className="flex items-center gap-3">
+              <SprintSelector
+                currentSprint={currentSprint}
+                sprints={sprints}
+                onSprintChange={handleSprintChange}
+              />
+              
+              {currentSprint.status === 'PLANNED' && (
+                <Button 
+                  onClick={handleStartSprint}
+                  className="h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
+                >
+                  <HiPlay className="w-4 h-4" />
+                  Start Sprint
+                </Button>
+              )}
+              
+              {currentSprint.status === 'ACTIVE' && (
+                <Button 
+                  onClick={handleCompleteSprint} 
+                  variant="outline"
+                  className="h-9 px-4 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center gap-2"
+                >
+                  <HiCheck className="w-4 h-4" />
+                  Complete Sprint
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Sprint Progress */}
-      {currentSprint && (
-        <SprintProgress
-          selectedSprint={currentSprint.id}
-        />
-      )}
+      <SprintProgress selectedSprint={currentSprint.id} />
 
       {/* Sprint Board */}
-      <div className="flex gap-6 overflow-x-auto pb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[600px]">
         {statuses.map(status => (
           <TaskColumn
             key={status.id}
@@ -416,32 +544,62 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
         ))}
       </div>
 
-      {/* Sprint Info */}
-      {currentSprint && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Sprint Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Sprint Goal
-              </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {currentSprint.goal}
-              </p>
+      {/* Sprint Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <HiClipboardDocumentList className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-[var(--foreground)]">
+                  {completedTasks}/{tasks.length}
+                </p>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Tasks Completed
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Duration
-              </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {formatDate(currentSprint.startDate)} - {formatDate(currentSprint.endDate)}
-              </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                <HiFlag className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-[var(--foreground)]">
+                  {completedStoryPoints}/{totalStoryPoints}
+                </p>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Story Points
+                </p>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+                <HiChartBar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-[var(--foreground)]">
+                  {tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0}%
+                </p>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Completion Rate
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

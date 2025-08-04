@@ -8,7 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import slugify from 'slugify';
-
+import { DEFAULT_SPRINT } from '../../constants/defaultWorkflow';
 @Injectable()
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
@@ -23,6 +23,7 @@ export class ProjectsService {
       strict: true,
     });
     let slug = baseSlug;
+
     // Find all projects with similar slug
     const existing = await this.prisma.project.findMany({
       where: {
@@ -31,6 +32,7 @@ export class ProjectsService {
         },
       },
     });
+
     if (existing.length > 0) {
       let maxSuffix = 0;
       existing.forEach((p) => {
@@ -42,13 +44,50 @@ export class ProjectsService {
       });
       slug = `${baseSlug}-${maxSuffix + 1}`;
     }
+
+    // Fetch workspace to get organization ID
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: createProjectDto.workspaceId },
+      select: { organizationId: true },
+    });
+
+    if (!workspace) {
+      throw new NotFoundException('Workspace not found');
+    }
+
+    // Find the default workflow for the organization
+    const defaultWorkflow = await this.prisma.workflow.findFirst({
+      where: {
+        organizationId: workspace.organizationId,
+        isDefault: true,
+      },
+    });
+
+    if (!defaultWorkflow) {
+      throw new NotFoundException(
+        'Default workflow not found for organization',
+      );
+    }
+
     try {
       return await this.prisma.project.create({
         data: {
           ...createProjectDto,
           slug,
+          workflowId: defaultWorkflow.id,
           createdBy: userId,
           updatedBy: userId,
+          // Create default sprint inline
+          sprints: {
+            create: {
+              name: DEFAULT_SPRINT.name,
+              goal: DEFAULT_SPRINT.goal,
+              status: DEFAULT_SPRINT.status,
+              isDefault: DEFAULT_SPRINT.isDefault,
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          },
         },
         include: {
           workspace: {
@@ -62,6 +101,23 @@ export class ProjectsService {
                   name: true,
                   slug: true,
                 },
+              },
+            },
+          },
+          workflow: {
+            select: {
+              id: true,
+              name: true,
+              isDefault: true,
+              statuses: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                  category: true,
+                  position: true,
+                },
+                orderBy: { position: 'asc' },
               },
             },
           },
@@ -80,6 +136,17 @@ export class ProjectsService {
               firstName: true,
               lastName: true,
             },
+          },
+          sprints: {
+            select: {
+              id: true,
+              name: true,
+              goal: true,
+              status: true,
+              startDate: true,
+              endDate: true,
+            },
+            orderBy: { createdAt: 'asc' },
           },
           _count: {
             select: {
@@ -152,6 +219,23 @@ export class ProjectsService {
             },
           },
         },
+        workflow: {
+          select: {
+            id: true,
+            name: true,
+            isDefault: true,
+            statuses: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                category: true,
+                position: true,
+              },
+              orderBy: { position: 'asc' },
+            },
+          },
+        },
         members: {
           include: {
             user: {
@@ -163,65 +247,6 @@ export class ProjectsService {
                 avatar: true,
               },
             },
-          },
-        },
-        tasks: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            type: true,
-            priority: true,
-            status: {
-              select: {
-                id: true,
-                name: true,
-                color: true,
-                category: true,
-              },
-            },
-            assignee: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                avatar: true,
-              },
-            },
-            createdAt: true,
-            updatedAt: true,
-          },
-          orderBy: {
-            taskNumber: 'desc',
-          },
-        },
-        sprints: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            startDate: true,
-            endDate: true,
-            _count: {
-              select: {
-                tasks: true,
-              },
-            },
-          },
-        },
-        labels: {
-          select: {
-            id: true,
-            name: true,
-            color: true,
-            description: true,
-          },
-        },
-        _count: {
-          select: {
-            members: true,
-            tasks: true,
-            sprints: true,
           },
         },
       },
@@ -365,5 +390,177 @@ export class ProjectsService {
       }
       throw error;
     }
+  }
+  // Simple search without pagination
+  async findBySearch(
+    workspaceId?: string,
+    organizationId?: string,
+    search?: string,
+  ): Promise<Project[]> {
+    const whereClause: any = {};
+
+    if (workspaceId) {
+      whereClause.workspaceId = workspaceId;
+    } else if (organizationId) {
+      whereClause.workspace = {
+        organizationId,
+      };
+    }
+
+    // Add search filter
+    if (search && search.trim()) {
+      whereClause.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          key: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+
+    return this.prisma.project.findMany({
+      where: whereClause,
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+            tasks: true,
+            sprints: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  // Search with pagination
+  async findWithPagination(
+    workspaceId?: string,
+    organizationId?: string,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    projects: Project[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }> {
+    // Build where clause
+    const whereClause: any = {};
+
+    if (workspaceId) {
+      whereClause.workspaceId = workspaceId;
+    } else if (organizationId) {
+      whereClause.workspace = {
+        organizationId,
+      };
+    }
+
+    // Add search filter
+    if (search && search.trim()) {
+      whereClause.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          key: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+
+    // Get total count and paginated results
+    const [totalCount, projects] = await Promise.all([
+      this.prisma.project.count({ where: whereClause }),
+      this.prisma.project.findMany({
+        where: whereClause,
+        include: {
+          workspace: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              organization: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              members: true,
+              tasks: true,
+              sprints: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      projects,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
   }
 }

@@ -14,8 +14,8 @@ const dev = process.env.NODE_ENV !== 'production'
 const app = next({ dev })
 const handle = app.getRequestHandler()
 
-const useUnixSocket = process.env.FE_UNIX_SOCKET === '1' || process.env.FE_UNIX_SOCKET_PATH
-const socketPath = process.env.FE_UNIX_SOCKET_PATH || join(__dirname, 'tmp', 'taskosaur-frontend.sock')
+const useUnixSocket = process.env.UNIX_SOCKET === '1' || process.env.UNIX_SOCKET_PATH
+const socketPath = process.env.UNIX_SOCKET_PATH || join(__dirname, 'tmp', 'taskosaur-frontend.sock')
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {

@@ -1,21 +1,25 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
-import { notFound, useRouter } from 'next/navigation';
-import { useTask } from '@/contexts/task-context';
-import { useWorkspaceContext } from '@/contexts/workspace-context';
-import { useProjectContext } from '@/contexts/project-context';
-import { useAuth } from '@/contexts/auth-context';
-import { useGlobalFetchPrevention } from '@/hooks/useGlobalFetchPrevention';
-import TaskDetailClient from '@/components/tasks/TaskDetailClient';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import '@/styles/components/tasks.css';
+import { useState, useEffect, use } from "react";
+import { notFound, useRouter } from "next/navigation";
+import { useTask } from "@/contexts/task-context";
+import { useWorkspaceContext } from "@/contexts/workspace-context";
+import { useProjectContext } from "@/contexts/project-context";
+import { useAuth } from "@/contexts/auth-context";
+import { useGlobalFetchPrevention } from "@/hooks/useGlobalFetchPrevention";
+import TaskDetailClient from "@/components/tasks/TaskDetailClient";
 import {
-  HiExclamationTriangle,
-  HiArrowLeft
-} from 'react-icons/hi2';
-
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import "@/styles/components/tasks.css";
+import { HiExclamationTriangle, HiArrowLeft } from "react-icons/hi2";
+import { TokenManager } from "@/lib/api";
 interface Props {
   params: Promise<{
     workspaceSlug: string;
@@ -29,17 +33,17 @@ export default function TaskDetailPage({ params }: Props) {
   const [project, setProject] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Properly unwrap params using React.use()
   const resolvedParams = use(params);
   const { workspaceSlug, taskId } = resolvedParams;
   const router = useRouter();
-  
+
   const { getTaskById } = useTask();
   const { getWorkspaceBySlug } = useWorkspaceContext();
   const { getProjectsByWorkspace } = useProjectContext();
   const { getCurrentUser } = useAuth();
-  
+
   // Global fetch prevention hook
   const {
     shouldPreventFetch,
@@ -47,7 +51,7 @@ export default function TaskDetailPage({ params }: Props) {
     markFetchComplete,
     markFetchError,
     getCachedData,
-    reset
+    reset,
   } = useGlobalFetchPrevention();
 
   // Generate slug from project name
@@ -64,13 +68,13 @@ export default function TaskDetailPage({ params }: Props) {
 
   useEffect(() => {
     if (!workspaceSlug || !taskId) {
-      setError('Invalid URL parameters');
+      setError("Invalid URL parameters");
       setIsLoading(false);
       return;
     }
 
     const fetchKey = `task-detail-workspace-${workspaceSlug}/tasks/${taskId}`;
-    
+
     // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       // Try to get cached data
@@ -83,7 +87,7 @@ export default function TaskDetailPage({ params }: Props) {
         return;
       }
     }
-    
+
     // Reset state for new fetch
     setTask(null);
     setWorkspace(null);
@@ -96,36 +100,43 @@ export default function TaskDetailPage({ params }: Props) {
       markFetchStart(fetchKey);
 
       try {
-        const token = localStorage.getItem("token");
+        const token = TokenManager.getAccessToken();
         if (!token) {
-          throw new Error('No authentication token found');
+          throw new Error("No authentication token found");
         }
 
         // Check if user is authenticated
         const currentUser = getCurrentUser();
         if (!currentUser) {
-          throw new Error('Please log in to view this task');
+          throw new Error("Please log in to view this task");
+        }
+        const organizationId = localStorage.getItem("currentOrganizationId");
+        if (!organizationId) {
+          throw new Error("No organization ID found");
         }
 
-
-
-        // Fetch workspace first
-        const workspaceData = await getWorkspaceBySlug(workspaceSlug, token);
+        // Fetch workspace by slug to get the UUID
+        const workspaceData = await getWorkspaceBySlug(
+          workspaceSlug,
+          organizationId
+        );
         if (!workspaceData) {
-          throw new Error('Workspace not found');
+          throw new Error("Workspace not found");
         }
         setWorkspace(workspaceData);
 
         // Fetch task by ID
         const taskData = await getTaskById(taskId);
         if (!taskData) {
-          throw new Error('Task not found');
+          throw new Error("Task not found");
         }
 
-        // Fetch projects to find the project this task belongs to
+        // Fetch projects using workspace UUID
         const projectsData = await getProjectsByWorkspace(workspaceData.id);
-        const taskProject = projectsData?.find((p: any) => p.id === taskData.projectId);
-        
+        const taskProject = projectsData?.find(
+          (p: any) => p.id === taskData.projectId
+        );
+
         if (taskProject) {
           setProject(taskProject);
         }
@@ -133,15 +144,17 @@ export default function TaskDetailPage({ params }: Props) {
         // Enhance task data with workspace and project info
         const enhancedTask = {
           ...taskData,
-          project: taskProject ? {
-            id: taskProject.id,
-            name: taskProject.name,
-            slug: generateProjectSlug(taskProject.name)
-          } : null,
+          project: taskProject
+            ? {
+                id: taskProject.id,
+                name: taskProject.name,
+                slug: generateProjectSlug(taskProject.name),
+              }
+            : null,
           workspace: {
             id: workspaceData.id,
             name: workspaceData.name,
-            slug: workspaceData.slug || workspaceSlug
+            slug: workspaceData.slug || workspaceSlug,
           },
           // Add default values for fields that might not come from API
           comments: (taskData as any).comments || [],
@@ -149,23 +162,25 @@ export default function TaskDetailPage({ params }: Props) {
           subtasks: (taskData as any).subtasks || [],
           tags: (taskData as any).tags || [],
           reporter: (taskData as any).reporter || null,
-          updatedAt: (taskData as any).updatedAt || (taskData as any).createdAt || new Date().toISOString(),
+          updatedAt:
+            (taskData as any).updatedAt ||
+            (taskData as any).createdAt ||
+            new Date().toISOString(),
         };
 
         setTask(enhancedTask);
-        
+
         // Mark fetch as complete and cache the data
         markFetchComplete(fetchKey, {
           task: enhancedTask,
           workspace: workspaceData,
-          project: taskProject
+          project: taskProject,
         });
-        
-
-        
       } catch (error) {
-        console.error('❌ [TASK_DETAIL_WORKSPACE] Error fetching data:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load task data');
+        console.error("❌ [TASK_DETAIL_WORKSPACE] Error fetching data:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to load task data"
+        );
         markFetchError(fetchKey);
       } finally {
         setIsLoading(false);
@@ -179,7 +194,7 @@ export default function TaskDetailPage({ params }: Props) {
   const retryFetch = () => {
     const fetchKey = `task-detail-workspace-${workspaceSlug}/tasks/${taskId}`;
     reset(fetchKey);
-    
+
     // Reset state
     setTask(null);
     setWorkspace(null);
@@ -244,7 +259,7 @@ export default function TaskDetailPage({ params }: Props) {
             </CardHeader>
             <CardContent>
               <CardDescription className="task-detail-error-message">
-                {error || 'The task you are looking for could not be found.'}
+                {error || "The task you are looking for could not be found."}
               </CardDescription>
               <div className="task-detail-error-actions mt-4 flex gap-2">
                 <Button
@@ -255,11 +270,7 @@ export default function TaskDetailPage({ params }: Props) {
                   <HiArrowLeft size={14} />
                   Go back
                 </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={retryFetch}
-                >
+                <Button variant="secondary" size="sm" onClick={retryFetch}>
                   Try again
                 </Button>
               </div>
@@ -271,7 +282,7 @@ export default function TaskDetailPage({ params }: Props) {
   }
 
   // Generate project slug for the TaskDetailClient
-  const projectSlug = project ? generateProjectSlug(project.name) : '';
+  const projectSlug = project ? generateProjectSlug(project.name) : "";
 
   return (
     <TaskDetailClient

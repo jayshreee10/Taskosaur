@@ -18,6 +18,10 @@ import {
   OrganizationMember,
   ProjectStats
 } from '@/utils/api/projectApi';
+import { 
+  getCurrentOrganizationId, 
+  getCurrentWorkspaceId 
+} from '@/utils/hierarchyContext';
 
 interface ProjectState {
   projects: Project[];
@@ -60,6 +64,10 @@ interface ProjectContextType extends ProjectState {
   // Helper methods
   isUserProjectMember: (projectId: string, userId: string) => boolean;
   getProjectMemberRole: (projectId: string, userId: string) => string | null;
+
+  // Enhanced methods with automatic hierarchy context
+  getCurrentWorkspaceProjects: () => Promise<Project[]>; // Uses current workspace
+  getCurrentOrganizationMembers: () => Promise<OrganizationMember[]>; // Uses current organization
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -329,7 +337,24 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         member.projectId === projectId && member.userId === userId
       );
       return member?.role || null;
-    }
+    },
+
+    // Enhanced methods with automatic hierarchy context
+    getCurrentWorkspaceProjects: async (): Promise<Project[]> => {
+      const workspaceId = getCurrentWorkspaceId();
+      if (!workspaceId) {
+        throw new Error("No workspace selected. Please select a workspace first.");
+      }
+      return await contextValue.getProjectsByWorkspace(workspaceId);
+    },
+
+    getCurrentOrganizationMembers: async (): Promise<OrganizationMember[]> => {
+      const organizationId = getCurrentOrganizationId();
+      if (!organizationId) {
+        throw new Error("No organization selected. Please select an organization first.");
+      }
+      return await contextValue.getOrganizationMembers(organizationId);
+    },
 
   }), [projectState, handleApiOperation]);
 

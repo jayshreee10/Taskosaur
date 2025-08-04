@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useOrganization } from "@/contexts/organization-context";
+import { setCurrentOrganizationId } from "@/utils/hierarchyContext";
 import { HiChevronDown, HiCheck, HiCog } from "react-icons/hi2";
 import { HiOfficeBuilding } from "react-icons/hi";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/auth-context";
 
 interface Organization {
@@ -128,13 +130,18 @@ export default function OrganizationSelector({
   const handleOrganizationSelect = (organization: Organization) => {
     setCurrentOrganization(organization);
 
-    localStorage.setItem("currentOrganizationId", organization.id);
+    // This will set the new organization ID and automatically clear workspace/project context
+    setCurrentOrganizationId(organization.id);
 
     window.dispatchEvent(new CustomEvent("organizationChanged"));
 
     if (onOrganizationChange) {
       onOrganizationChange(organization);
     }
+
+    // Navigate to dashboard when organization changes
+    // This ensures user doesn't stay on workspace/project pages that belong to the old organization
+    router.replace("/dashboard");
   };
 
   const getInitials = (name: string) => {
@@ -158,62 +165,53 @@ export default function OrganizationSelector({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="flex items-center gap-3 px-3 py-2 h-9 min-w-[180px] bg-[var(--background)] hover:bg-[var(--accent)]/50 transition-all duration-200 rounded-lg"
+          className="cursor-pointer flex items-center gap-2 h-9 px-2 hover:bg-[var(--accent)]/50 transition-colors min-w-0 rounded-md"
         >
-          {currentOrganization ? (
-            <>
-              <Avatar className="h-6 w-6 flex-shrink-0">
-                <AvatarFallback className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 text-[var(--primary-foreground)] text-xs font-semibold">
-                  {getInitials(currentOrganization.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-left flex-1 min-w-0">
-                <p className="text-sm font-medium text-[var(--foreground)] truncate leading-tight">
-                  {currentOrganization.name}
-                </p>
-                <p className="text-xs text-[var(--muted-foreground)] truncate leading-tight">
-                  {currentOrganization._count?.members || 0} members
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <Avatar className="h-6 w-6 flex-shrink-0">
-                <AvatarFallback className="bg-[var(--muted)]">
-                  <HiOfficeBuilding
-                    size={14}
-                    className="text-[var(--muted-foreground)]"
-                  />
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm text-[var(--muted-foreground)] truncate">
-                Select Organization
-              </span>
+          <Avatar className="h-7 w-7 flex-shrink-0">
+            <AvatarFallback className="bg-[var(--primary)] text-[var(--primary-foreground)] text-[13px] font-semibold">
+              {currentOrganization ? getInitials(currentOrganization.name) : "O"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="hidden md:flex text-left min-w-0 flex-1">
+            <div className="text-sm font-medium text-[var(--foreground)] leading-none truncate max-w-[80px]">
+              {currentOrganization ? currentOrganization.name : "Organization"}
             </div>
-          )}
-
-          <HiChevronDown
-            size={14}
-            className="text-[var(--muted-foreground)] flex-shrink-0"
-          />
+          </div>
+          <HiChevronDown className="w-4 h-4 text-[var(--muted-foreground)] flex-shrink-0" />
         </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className="w-80 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm"
-        align="start"
-        sideOffset={8}
+        className="w-60 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm"
+        align="end"
+        sideOffset={6}
       >
-        <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[var(--primary)]/5 to-[var(--primary)]/10 border-b border-[var(--border)]/30">
-          <span className="text-sm font-semibold text-[var(--foreground)]">
-            Organizations
-          </span>
-          <span className="text-xs text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded-md">
-            {organizations.length} total
-          </span>
+        {/* Organization Profile Header */}
+        <div className="flex items-center gap-4 px-4 py-2 bg-gradient-to-r from-[var(--primary)]/5 to-[var(--primary)]/10 border-b border-[var(--border)]/30">
+          <Avatar className="size-7 flex-shrink-0 ring-1 ring-[var(--primary)]/20">
+            <AvatarFallback className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 text-[var(--primary-foreground)] font-bold text-sm">
+              {currentOrganization ? getInitials(currentOrganization.name) : "O"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-[var(--foreground)] truncate mb-0">
+              {currentOrganization ? currentOrganization.name : "Organization"}
+            </div>
+            <div className="text-xs text-[var(--muted-foreground)] truncate mb-0">
+              {currentOrganization ? `${currentOrganization._count?.members || 0} members` : ""}
+            </div>
+            <Badge
+              variant="secondary"
+              className="text-[12px] font-medium bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/20 px-2 mt-2 "
+            >
+              Org
+            </Badge>
+          </div>
         </div>
 
+        {/* Menu Items */}
         <div className="p-2">
+          {/* List organizations */}
           {organizations.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <div className="w-12 h-12 rounded-lg bg-[var(--muted)] flex items-center justify-center mx-auto mb-4">
@@ -235,55 +233,52 @@ export default function OrganizationSelector({
                 <DropdownMenuItem
                   key={organization.id}
                   onClick={() => handleOrganizationSelect(organization)}
-                  className={`flex items-center gap-4 px-4 py-4 rounded-lg cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-2 rounded cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200 ${
                     currentOrganization?.id === organization.id
                       ? "bg-[var(--primary)]/10 border border-[var(--primary)]/20"
                       : ""
                   }`}
                 >
-                  <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-[var(--primary)]/20">
-                    <AvatarFallback className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 text-[var(--primary-foreground)] text-sm font-bold">
+                  <Avatar className="h-7 w-7 flex-shrink-0 ring-1 ring-[var(--primary)]/20">
+                    <AvatarFallback className="bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 text-[var(--primary-foreground)] font-bold text-sm">
                       {getInitials(organization.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left min-w-0">
-                    <p className="text-sm font-semibold text-[var(--foreground)] truncate mb-1">
+                    <div className="text-xs font-semibold text-[var(--foreground)] mb-0">
                       {organization.name}
-                    </p>
-                    <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                      {organization._count?.members || 0} members •{" "}
-                      {organization._count?.workspaces || 0} workspaces
-                    </p>
+                    </div>
+                    <div className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
+                      {organization._count?.members || 0} members
+                    </div>
                   </div>
                   {currentOrganization?.id === organization.id && (
-                    <div className="w-6 h-6 rounded-full bg-[var(--primary)] flex items-center justify-center flex-shrink-0">
+                    <div className="size-2 rounded-full bg-[var(--primary)] flex items-center justify-center flex-shrink-0">
                       <HiCheck
-                        size={14}
-                        className="text-[var(--primary-foreground)]"
+                        size={8}
+                        className="text-[var(--primary-foreground)] "
                       />
                     </div>
                   )}
                 </DropdownMenuItem>
               ))}
 
-              <DropdownMenuSeparator className="my-2" />
-
-              <DropdownMenuItem
-                onClick={() => router.push("/settings/organizations")}
-                className="flex items-center gap-4 px-4 py-4 rounded-lg cursor-pointer text-[var(--primary)] hover:bg-[var(--primary)]/10 transition-all duration-200"
-              >
-                <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
-                  <HiCog size={16} className="text-[var(--primary)]" />
-                </div>
-                <div className="text-left flex-1">
-                  <div className="text-sm font-semibold">
-                    Manage Organizations
+              <DropdownMenuSeparator className="my-1" />
+              <div className="pt-2 pb-1 px-2 border-t border-[var(--border)] bg-[var(--background)]/80 sticky bottom-0">
+                <DropdownMenuItem
+                  onClick={() => router.push("/settings/organizations")}
+                  className="flex items-center gap-2 w-full rounded cursor-pointer hover:bg-[var(--accent)]/50 transition-all duration-200 py-2 px-2"
+                >
+                  <div className="w-6 h-6 rounded bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <HiCog className="size-3 text-[var(--primary)]" />
                   </div>
-                  <div className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                    Settings and preferences
+                  <div className="text-left flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-[var(--foreground)] mb-0">
+                      Manage Organizations
+                    </div>
                   </div>
-                </div>
-              </DropdownMenuItem>
+                </DropdownMenuItem>
+              </div>
             </>
           )}
         </div>

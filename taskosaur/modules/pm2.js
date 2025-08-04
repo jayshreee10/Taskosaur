@@ -2,6 +2,19 @@ const pm2 = require('pm2');
 const path = require('path');
 
 /**
+ * Filter out undefined or empty environment variables
+ */
+function filterEnvVars(envObj) {
+    const filtered = {};
+    for (const [key, value] of Object.entries(envObj)) {
+        if (value !== undefined && value !== null && value !== '') {
+            filtered[key] = value;
+        }
+    }
+    return filtered;
+}
+
+/**
  * Start a PM2 process
  */
 async function startPm2Process(name, script, cwd, env = {}) {
@@ -113,59 +126,45 @@ async function startAllServices(config, isDev = false) {
         await connectPm2();
         await deleteAllProcesses();
 
-        const backendScript = isDev ? 'npm run start:dev' : 'npm run start:prod';
-        const frontendScript = isDev ? 'npm run dev' : 'npm run start';
+        const backendScript = isDev ? 'node taskosaur.js be:npm run start:dev -- --preserveWatchOutput' : 'node taskosaur.js be:npm run start:prod';
+        const frontendScript = isDev ? 'node taskosaur.js fe:npm run dev -- --preserveWatchOutput' : 'node taskosaur.js fe:npm run start';
 
         const backendPromise = startPm2Process(
             'backend',
             backendScript,
-            'backend',
-            {
-                BE_UNIX_SOCKET: config.BE_UNIX_SOCKET,
-                BE_SOCKET_PATH: config.BE_SOCKET_PATH,
-                PORT: config.APP_BE_PORT,
-                HOST: config.APP_BE_HOST,
-                NODE_ENV: isDev ? 'development' : 'production',
-            }
+            '.'
         );
 
         const frontendPromise = startPm2Process(
             'frontend', 
             frontendScript,
-            'frontend',
-            {
-                FE_UNIX_SOCKET: config.FE_UNIX_SOCKET,
-                FE_SOCKET_PATH: config.FE_SOCKET_PATH,
-                PORT: config.APP_FE_PORT,
-                HOST: config.APP_FE_HOST,
-                NODE_ENV: isDev ? 'development' : 'production',
-            }
+            '.'
         );
 
         const proxyPromise = startPm2Process(
             'proxy',
             'node proxy.js',
             '.',
-            { 
+            filterEnvVars({ 
                 APP_HOST: config.APP_HOST,
                 APP_PORT: config.APP_PORT,
-                APP_BE_HOST: config.APP_BE_HOST,
-                APP_BE_PORT: config.APP_BE_PORT,
-                APP_FE_HOST: config.APP_FE_HOST,
-                APP_FE_PORT: config.APP_FE_PORT,
+                BE_HOST: config.BE_HOST,
+                BE_PORT: config.BE_PORT,
+                FE_HOST: config.FE_HOST,
+                FE_PORT: config.FE_PORT,
                 FE_UNIX_SOCKET: config.FE_UNIX_SOCKET,
                 BE_UNIX_SOCKET: config.BE_UNIX_SOCKET,
-                FE_SOCKET_PATH: config.FE_SOCKET_PATH,
-                BE_SOCKET_PATH: config.BE_SOCKET_PATH
-            }
+                FE_UNIX_SOCKET_PATH: config.FE_UNIX_SOCKET_PATH,
+                BE_UNIX_SOCKET_PATH: config.BE_UNIX_SOCKET_PATH
+            })
         );
 
         await Promise.all([backendPromise, frontendPromise, proxyPromise]);
 
         console.log('\n✅ All services started successfully!');
         console.log(`🔗 Proxy: http://${config.APP_HOST}:${config.APP_PORT}`);
-        console.log(`🌐 Frontend: Unix socket at ${config.FE_SOCKET_PATH}`);
-        console.log(`🔙 Backend: Unix socket at ${config.BE_SOCKET_PATH}\n`);
+        console.log(`🌐 Frontend: Unix socket at ${config.FE_UNIX_SOCKET_PATH}`);
+        console.log(`🔙 Backend: Unix socket at ${config.BE_UNIX_SOCKET_PATH}\n`);
 
         return true;
     } catch (error) {

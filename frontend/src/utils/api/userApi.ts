@@ -10,6 +10,7 @@ export interface UpdateUserData {
   language?: string;
   status?: string;
   emailVerified?: boolean;
+  avatar?:string;
   preferences?: {
     theme?: string;
     notifications?: {

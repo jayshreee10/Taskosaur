@@ -7,6 +7,7 @@ import { Workflow, StatusCategory } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
+import { DEFAULT_TASK_STATUSES } from 'src/constants/defaultWorkflow';
 
 @Injectable()
 export class WorkflowsService {
@@ -17,7 +18,7 @@ export class WorkflowsService {
     userId: string,
   ): Promise<Workflow> {
     return this.prisma.$transaction(async (tx) => {
-      // If this is set as default, unset other defaults in the same organization
+      
       if (createWorkflowDto.isDefault) {
         await tx.workflow.updateMany({
           where: {
@@ -67,30 +68,8 @@ export class WorkflowsService {
         },
       });
 
-      // Create default statuses for new workflow
-      const defaultStatuses = [
-        {
-          name: 'To Do',
-          color: '#42526E',
-          category: StatusCategory.TODO,
-          position: 1,
-        },
-        {
-          name: 'In Progress',
-          color: '#0052CC',
-          category: StatusCategory.IN_PROGRESS,
-          position: 2,
-        },
-        {
-          name: 'Done',
-          color: '#00875A',
-          category: StatusCategory.DONE,
-          position: 3,
-        },
-      ];
-
       await tx.taskStatus.createMany({
-        data: defaultStatuses.map((status) => ({
+        data: DEFAULT_TASK_STATUSES.map((status) => ({
           ...status,
           workflowId: workflow.id,
           createdBy: userId,
@@ -115,6 +94,44 @@ export class WorkflowsService {
             slug: true,
           },
         },
+        _count: {
+          select: {
+            statuses: true,
+            transitions: true,
+          },
+        },
+      },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async findAllByOrganizationSlug(slug: string): Promise<Workflow[]> {
+    if (!slug) {
+      throw new Error('Organization slug must be provided');
+    }
+
+    // First, find the organization by slug
+    const organization = await this.prisma.organization.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+
+    if (!organization) {
+      throw new Error(`Organization with slug "${slug}" not found`);
+    }
+
+    return this.prisma.workflow.findMany({
+      where: { organizationId: organization.id },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        statuses: true, // include all workflow statuses
+        transitions: true, // include transitions if applicable
         _count: {
           select: {
             statuses: true,

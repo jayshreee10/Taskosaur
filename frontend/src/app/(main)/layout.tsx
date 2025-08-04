@@ -31,7 +31,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ProtectedRoute requireOrganization={true}>
+    <ProtectedRoute>
       <OrganizationProvider>
         <WorkspaceProvider>
         <ProjectProvider>

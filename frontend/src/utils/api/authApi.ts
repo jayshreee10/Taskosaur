@@ -12,7 +12,7 @@ export interface LoginData {
   email: string;
   password: string;
 }
-api;
+
 
 export interface User {
   id: string;
@@ -21,13 +21,16 @@ export interface User {
   lastName: string;
   username: string;
   role: string;
+  avatar:string;
 }
 
 export interface AuthResponse extends AuthTokenResponse {
   user?: User;
   message?: string;
 }
-
+export interface UploadFileResponse {
+  url: string;
+}
 export const authApi = {
   register: async (userData: UserData): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>("/auth/register", userData);
@@ -100,5 +103,23 @@ export const authApi = {
     const user = authApi.getCurrentUser();
     const hasTokens = TokenManager.getAccessToken();
     return !!(hasTokens && user);
+  },
+  uploadFileToS3: async (file: File, key: string): Promise<UploadFileResponse> => {
+    const presignResponse = await api.get<{ url: string }>(
+      "/s3/presigned-put-url",
+      {
+        params: { key },
+      }
+    );
+    const uploadUrl = presignResponse.data.url;
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type,
+      },
+      body: file,
+    });
+    if (!uploadResponse.ok) throw new Error("Upload to S3 failed");
+    return { url: uploadUrl.split("?")[0] };
   },
 };

@@ -1,134 +1,174 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Sprint } from '@/types/tasks';
-
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  
+} from '@/components/ui/dropdown-menu';
+import {
+  HiPlay,
+  HiClock,
+  HiCheck,
+  HiChevronDown,
+  HiCalendar,
+} from 'react-icons/hi2';
+import { HiLightningBolt } from "react-icons/hi";
+import { Button } from '@/components/ui/button';
 interface SprintSelectorProps {
   currentSprint: Sprint | null;
   sprints: Sprint[];
   onSprintChange: (sprint: Sprint) => void;
 }
 
+const getSprintStatusConfig = (status: string) => {
+  switch (status) {
+    case 'ACTIVE':
+      return { 
+        className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-none',
+        icon: HiPlay,
+        color: 'text-green-600 dark:text-green-400'
+      };
+    case 'PLANNED':
+      return { 
+        className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-none',
+        icon: HiClock,
+        color: 'text-blue-600 dark:text-blue-400'
+      };
+    case 'COMPLETED':
+      return { 
+        className: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-none',
+        icon: HiCheck,
+        color: 'text-gray-600 dark:text-gray-400'
+      };
+    default:
+      return { 
+        className: 'bg-[var(--muted)] text-[var(--muted-foreground)] border-none',
+        icon: HiClock,
+        color: 'text-[var(--muted-foreground)]'
+      };
+  }
+};
+
 export default function SprintSelector({ currentSprint, sprints, onSprintChange }: SprintSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const getSprintStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'PLANNED':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'COMPLETED':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return 'Invalid date';
     }
   };
 
-  const getSprintStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return (
-          <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M10,16.5L6,13L7.5,11.5L10,14L16.5,7.5L18,9L10,16.5Z" />
-          </svg>
-        );
-      case 'PLANNED':
-        return (
-          <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6Z" />
-          </svg>
-        );
-      case 'COMPLETED':
-        return (
-          <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z" />
-          </svg>
-        );
-      default:
-        return null;
-    }
-  };
+  const currentSprintConfig = currentSprint ? getSprintStatusConfig(currentSprint.status) : null;
+  const CurrentIcon = currentSprintConfig?.icon || HiClock;
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
-        <div className="flex items-center space-x-2">
-          {currentSprint && getSprintStatusIcon(currentSprint.status)}
-          <div className="text-left">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {currentSprint?.name || 'No Active Sprint'}
-            </h2>
-            {currentSprint && (
-              <div className="flex items-center space-x-2 mt-1">
-                <span className={`px-2 py-1 text-xs rounded-full ${getSprintStatusColor(currentSprint.status)}`}>
-                  {currentSprint.status}
-                </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {new Date(currentSprint.startDate).toLocaleDateString()} - {new Date(currentSprint.endDate).toLocaleDateString()}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-        <svg 
-          className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10">
-          <div className="p-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-              Select Sprint
-            </h3>
-            <div className="space-y-2">
-              {sprints.map(sprint => (
-                <button
-                  key={sprint.id}
-                  onClick={() => {
-                    onSprintChange(sprint);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full flex items-start space-x-3 p-3 rounded-lg border-2 transition-all ${
-                    currentSprint?.id === sprint.id
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                      : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <div className="flex-shrink-0">
-                    {getSprintStatusIcon(sprint.status)}
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="font-medium text-gray-900 dark:text-white">
-                      {sprint.name}
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      {sprint.goal}
-                    </div>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getSprintStatusColor(sprint.status)}`}>
-                        {sprint.status}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(sprint.startDate).toLocaleDateString()} - {new Date(sprint.endDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              ))}
+    <div className="w-full max-w-xs">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            
+            className="w-full h-9 flex items-center gap-3 px-4 py-2 rounded-lg  bg-[var(--gray-100)] hover:bg-[var(--accent)] text-left min-w-[220px] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
+            aria-haspopup="true"
+          >
+            <div className={`size-6 rounded-lg flex items-center justify-center ${currentSprint ? 'bg-[var(--primary)]/10' : 'bg-[var(--muted)]'}`}>
+              <CurrentIcon className={`size-3 ${currentSprintConfig?.color || 'text-[var(--muted-foreground)]'}`} />
             </div>
-          </div>
-        </div>
-      )}
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-[var(--foreground)] truncate">
+                {currentSprint?.name || 'No Active Sprint'}
+              </div>
+              
+            </div>
+            <HiChevronDown className="w-4 h-4 text-[var(--muted-foreground)] transition-transform duration-200 flex-shrink-0 group-data-[state=open]:rotate-180" />
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent 
+          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] max-h-64 overflow-y-auto bg-[var(--card)] border-none rounded-lg shadow-xl p-0"
+          align="start"
+          sideOffset={8}
+        >
+          {sprints.length === 0 ? (
+            <div className="text-center py-6 px-3">
+              <div className="w-8 h-8 mx-auto mb-2 rounded-lg bg-[var(--muted)] flex items-center justify-center">
+                <HiLightningBolt className="w-4 h-4 text-[var(--muted-foreground)]" />
+              </div>
+              <p className="text-xs font-medium text-[var(--foreground)] mb-1">
+                No sprints available
+              </p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Create your first sprint
+              </p>
+            </div>
+          ) : (
+            <div className="p-2 space-y-1">
+              {sprints.map((sprint) => {
+                const sprintConfig = getSprintStatusConfig(sprint.status);
+                const SprintIcon = sprintConfig.icon;
+                const isSelected = currentSprint?.id === sprint.id;
+                
+                return (
+                  <DropdownMenuItem
+                    key={sprint.id}
+                    className={`p-0 cursor-pointer focus:bg-transparent ${
+                      isSelected ? '' : ''
+                    }`}
+                    onClick={() => onSprintChange(sprint)}
+                  >
+                    <div className={`w-full p-3 rounded-lg  transition-all duration-200 ${
+                      isSelected
+                        ? 'bg-[var(--primary)]/10 border-[var(--primary)]/20 shadow-sm'
+                        : 'bg-[var(--card)]  hover:bg-[var(--accent)] hover:border-[var(--primary)]/20'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'bg-[var(--primary)]/20' : 'bg-[var(--muted)]'
+                        }`}>
+                          <SprintIcon className={`w-3 h-3 ${sprintConfig.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-[var(--foreground)] truncate">
+                              {sprint.name}
+                            </span>
+                            {isSelected && (
+                              <div className="w-3 h-3 rounded-full bg-[var(--primary)] flex items-center justify-center flex-shrink-0">
+                                <HiCheck className="w-2 h-2 text-[var(--primary-foreground)]" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge className={`text-[10px] px-1.5 py-0.5 ${sprintConfig.className}`}>
+                              {sprint.status}
+                            </Badge>
+                            <span className="text-[10px] text-[var(--muted-foreground)] flex items-center gap-1">
+                              <HiCalendar className="w-2.5 h-2.5" />
+                              {formatDate(sprint.startDate)} - {formatDate(sprint.endDate)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {sprint.goal && (
+                        <div className="text-[10px] text-[var(--muted-foreground)] mt-2 line-clamp-1">
+                          {sprint.goal}
+                        </div>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                );
+              })}
+            </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

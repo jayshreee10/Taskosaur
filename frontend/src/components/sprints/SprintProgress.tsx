@@ -258,7 +258,7 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
   const timePercentage = getTimePercentage();
   const statusCounts = getTasksByStatus();
   const daysRemaining = getDaysRemaining();
-  const sprintDuration = getSprintDuration();
+  // const sprintDuration = getSprintDuration();
   const sprintProgress = getSprintProgress();
 
   return (

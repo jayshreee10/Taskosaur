@@ -30,8 +30,10 @@ import { AutomationModule } from './modules/automation/automation.module';
 import { GanttModule } from './modules/gantt/gantt.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { SeederModule } from './seeder/seeder.module';
-import { ActivityLogInterceptor } from './modules/activity-log/interceptors/activity-log.interceptor';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
+import { ActivityNotificationInterceptor } from './common/interceptor/activity-notification.interceptor';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { S3Module } from './modules/s3/s3.module';
 // import { EmailModule } from './modules/email/email.module';
 // import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
@@ -67,7 +69,9 @@ import { ActivityLogModule } from './modules/activity-log/activity-log.module';
     GanttModule,
     QueueModule,
     SeederModule,
-    ActivityLogModule
+    ActivityLogModule,
+    NotificationsModule,
+    S3Module
     // EmailModule,
     // SchedulerModule,
   ],
@@ -80,7 +84,7 @@ import { ActivityLogModule } from './modules/activity-log/activity-log.module';
     },
     {
       provide: APP_INTERCEPTOR,
-      useClass: ActivityLogInterceptor,
+      useClass: ActivityNotificationInterceptor,
     },
   ],
 })

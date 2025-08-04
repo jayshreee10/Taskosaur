@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Task } from '@prisma/client';
+import { Task, TaskPriority } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -8,7 +8,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createTaskDto: CreateTaskDto): Promise<Task> {
+  async create(createTaskDto: CreateTaskDto, userId: string): Promise<Task> {
     const project = await this.prisma.project.findUnique({
       where: { id: createTaskDto.projectId },
       select: { slug: true },
@@ -17,7 +17,8 @@ export class TasksService {
     if (!project) {
       throw new NotFoundException('Project not found');
     }
-
+    const sprintResult = await this.prisma.sprint.findFirst({where:{isDefault: true}})
+    const sprintId = sprintResult?.id || null
     const taskCount = await this.prisma.task.count({
       where: { projectId: createTaskDto.projectId },
     });
@@ -28,8 +29,10 @@ export class TasksService {
     return this.prisma.task.create({
       data: {
         ...createTaskDto,
+        createdBy: userId,
         taskNumber,
         slug: key,
+        sprintId: sprintId,
       },
       include: {
         project: {
@@ -687,21 +690,121 @@ export class TasksService {
     });
   }
 
-  async findByOrganization(orgId: string): Promise<Task[]> {
+  async findByOrganization(
+    orgId: string,
+    assigneeId?: string,
+    priority?: TaskPriority,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    tasks: Task[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }> {
     const workspaces = await this.prisma.workspace.findMany({
       where: { organizationId: orgId },
       select: { id: true },
     });
+
     const workspaceIds = workspaces.map((w) => w.id);
-    if (workspaceIds.length === 0) return [];
+    if (workspaceIds.length === 0) {
+      return {
+        tasks: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalCount: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      };
+    }
+
     const projects = await this.prisma.project.findMany({
       where: { workspaceId: { in: workspaceIds } },
       select: { id: true },
     });
+
     const projectIds = projects.map((p) => p.id);
-    if (projectIds.length === 0) return [];
-    return this.prisma.task.findMany({
-      where: { projectId: { in: projectIds } },
+    if (projectIds.length === 0) {
+      return {
+        tasks: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalCount: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      };
+    }
+
+    // Build whereClause
+    const whereClause: any = {
+      projectId: { in: projectIds },
+    };
+
+    // Priority filter
+    if (priority) {
+      whereClause.priority = priority;
+    }
+
+    // Search filter - ✅ Removed 'key' field
+    if (search && search.trim()) {
+      whereClause.OR = [
+        {
+          title: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        // ❌ Removed key field since it doesn't exist
+      ];
+    }
+
+    // Handle user filters with search
+    if (assigneeId) {
+      const userFilters = [
+        { assigneeId: assigneeId },
+        { reporterId: assigneeId },
+        // ❌ Removed createdBy since it doesn't exist in Task model
+      ];
+
+      if (search && search.trim()) {
+        // Combine search OR conditions with user AND conditions
+        whereClause.AND = [
+          { OR: whereClause.OR }, // Search conditions
+          { OR: userFilters }, // User conditions
+        ];
+        delete whereClause.OR; // Remove top-level OR since we're using AND
+      } else {
+        // No search, just user filters
+        whereClause.OR = userFilters;
+      }
+    }
+
+    // ✅ Fixed count query - removed select parameter
+    const totalCount = await this.prisma.task.count({
+      where: whereClause,
+    });
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const skip = (page - 1) * limit;
+
+    const tasks = await this.prisma.task.findMany({
+      where: whereClause,
       include: {
         project: { select: { id: true, name: true, slug: true } },
         assignee: {
@@ -726,6 +829,250 @@ export class TasksService {
         _count: { select: { childTasks: true, comments: true } },
       },
       orderBy: { taskNumber: 'desc' },
+      skip,
+      take: limit,
     });
+
+    return {
+      tasks,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
   }
+
+  async findTodaysTasks(
+    organizationId: string,
+    filters: {
+      assigneeId?: string;
+      reporterId?: string;
+      userId?: string;
+    } = {},
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    tasks: Task[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }> {
+    // Get today's date range (start and end of today)
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Get workspaces for the organization
+    const workspaces = await this.prisma.workspace.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+
+    const workspaceIds = workspaces.map((w) => w.id);
+    if (workspaceIds.length === 0) {
+      return {
+        tasks: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalCount: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      };
+    }
+
+    const projects = await this.prisma.project.findMany({
+      where: { workspaceId: { in: workspaceIds } },
+      select: { id: true },
+    });
+
+    const projectIds = projects.map((p) => p.id);
+    if (projectIds.length === 0) {
+      return {
+        tasks: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalCount: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      };
+    }
+
+    // Build where clause
+    const whereClause: any = {
+      projectId: { in: projectIds },
+      OR: [
+        // Tasks due today
+        {
+          dueDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+        // Tasks created today
+        {
+          createdAt: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+        // Tasks updated today
+        {
+          updatedAt: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+        // Tasks completed today
+        {
+          completedAt: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+      ],
+    };
+    const userFilters: any[] = [];
+
+    if (filters.assigneeId) {
+      userFilters.push({ assigneeId: filters.assigneeId });
+    }
+
+    if (filters.reporterId) {
+      userFilters.push({ reporterId: filters.reporterId });
+    }
+
+    if (filters.userId) {
+      userFilters.push(
+        { assigneeId: filters.userId },
+        { reporterId: filters.userId },
+        { createdBy: filters.userId },
+      );
+    }
+
+    if (userFilters.length > 0) {
+      whereClause.AND = [{ OR: whereClause.OR }, { OR: userFilters }];
+      delete whereClause.OR;
+    }
+
+    // Get total count and paginated results
+    const [totalCount, tasks] = await Promise.all([
+      this.prisma.task.count({ where: whereClause }),
+      this.prisma.task.findMany({
+        where: whereClause,
+        include: {
+          project: {
+            select: {
+              id: true,
+              name: true,
+              workspace: {
+                select: {
+                  id: true,
+                  name: true,
+                  organizationId: true,
+                },
+              },
+            },
+          },
+          assignee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+              email: true,
+            },
+          },
+          reporter: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+              email: true, // ✅ Added email for consistency
+            },
+          },
+          status: {
+            select: { id: true, name: true, color: true, category: true },
+          },
+          sprint: {
+            select: { id: true, name: true, status: true },
+          },
+          parentTask: {
+            select: { id: true, title: true, type: true }, // ✅ Added key field
+          },
+          _count: {
+            select: { childTasks: true, comments: true, timeEntries: true },
+          },
+        },
+        orderBy: [
+          { dueDate: 'asc' }, // Tasks due soon first
+          { updatedAt: 'desc' }, // Recently updated tasks
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      tasks,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  // src/modules/tasks/tasks.service.ts
+async addComment(taskId: string, comment: string, userId: string) {
+  // First, verify the task exists
+  const task = await this.prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, title: true },
+  });
+
+  if (!task) {
+    throw new NotFoundException('Task not found');
+  }
+
+  // Create the comment (assuming you have a TaskComment model)
+  const newComment = await this.prisma.taskComment.create({
+    data: {
+      content: comment,
+      taskId: taskId,
+      authorId: userId,
+    },
+    include: {
+      author: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          avatar: true,
+        },
+      },
+    },
+  });
+
+  return newComment;
+}
+
 }

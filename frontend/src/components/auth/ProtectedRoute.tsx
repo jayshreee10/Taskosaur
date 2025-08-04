@@ -8,13 +8,13 @@ import { useEffect, useState, useCallback } from "react";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   redirectTo?: string;
-  requireOrganization?: boolean; // Add this prop to control organization requirement
+  requireOrganization?: boolean;
 }
 
 export default function ProtectedRoute({
   children,
   redirectTo = "/login",
-  requireOrganization = true, // Default to requiring organization
+  requireOrganization = false,
 }: ProtectedRouteProps) {
   const {
     getCurrentUser,
@@ -26,41 +26,28 @@ export default function ProtectedRoute({
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const checkAuthStatus = useCallback((): {
-    isAuth: boolean;
-    redirectPath?: string;
-  } => {
+  const checkAuthStatus = useCallback(async (): Promise<{ isAuth: boolean; redirectPath?: string }> => {
     try {
-      console.log("=== PROTECTED ROUTE AUTH CHECK ===");
-
       // Check tokens first
       const accessToken = TokenManager.getAccessToken();
       const currentUser = getCurrentUser();
       const contextAuth = contextIsAuthenticated;
-
-      console.log("Access Token:", !!accessToken);
-      console.log("Current User:", !!currentUser);
-      console.log("Context Auth:", contextAuth);
-
       const isAuth = !!(accessToken && currentUser && contextAuth);
-      console.log("Basic Auth Status:", isAuth);
 
       if (!isAuth) {
         return { isAuth: false, redirectPath: redirectTo };
       }
 
-      // If organization is required, check for it
-      if (requireOrganization) {
-        const orgRedirectPath = checkOrganizationAndRedirect();
-        console.log("Organization check result:", orgRedirectPath);
-
-        // If orgRedirectPath is '/organizations', it means user needs to select organization
-        if (!orgRedirectPath) {
-          return { isAuth: false, redirectPath: "/organizations" };
+      // Always check organization after auth
+      if (typeof checkOrganizationAndRedirect === 'function') {
+        const orgRedirect = await checkOrganizationAndRedirect();
+        if (orgRedirect === '/organization') {
+          return { isAuth: true, redirectPath: '/organization' };
+        }
+        if (orgRedirect === '/dashboard') {
+          return { isAuth: true, redirectPath: '/dashboard' };
         }
       }
-
-      console.log("Final Auth Status: Fully authenticated");
       return { isAuth: true };
     } catch (error) {
       console.error("Protected route auth check error:", error);
@@ -69,40 +56,25 @@ export default function ProtectedRoute({
   }, [
     contextIsAuthenticated,
     getCurrentUser,
-    checkOrganizationAndRedirect,
-    requireOrganization,
     redirectTo,
+    checkOrganizationAndRedirect,
   ]);
 
   useEffect(() => {
     if (authLoading) {
-      console.log("Auth context is still loading...");
       return;
     }
 
-    const performAuthCheck = () => {
-      console.log("Performing auth check...");
-
+    const performAuthCheck = async () => {
       try {
-        const { isAuth, redirectPath } = checkAuthStatus();
+        const { isAuth, redirectPath } = await checkAuthStatus();
         setIsAuthenticated(isAuth);
 
-        if (!isAuth && redirectPath) {
-          console.log(
-            "User not authenticated/authorized, redirecting to:",
-            redirectPath
-          );
-
-          // Only clear tokens if redirecting to login (not organization page)
+        if (redirectPath) {
           if (redirectPath === redirectTo) {
             TokenManager.clearTokens();
           }
-
           router.push(redirectPath);
-        } else {
-          console.log(
-            "User authenticated and authorized, showing protected content"
-          );
         }
       } catch (error) {
         console.error("Protected route check error:", error);
@@ -133,10 +105,8 @@ export default function ProtectedRoute({
   }
 
   if (!isAuthenticated) {
-    console.log("Not authenticated/authorized, not rendering children");
     return null;
   }
 
-  console.log("Rendering protected content");
   return <>{children}</>;
 }

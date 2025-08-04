@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -31,8 +32,11 @@ import {
   HiPhoto,
   HiBell,
   HiExclamationTriangle,
-  HiArchiveBox
+  HiArchiveBox,
+  HiTrash,
+  HiChevronLeft
 } from 'react-icons/hi2';
+import Link from 'next/link';
 
 interface WorkspaceData {
   id: string;
@@ -145,7 +149,31 @@ export default function WorkspaceSettingsPage(props: Props) {
           return;
         }
         
-        setWorkspace(data);
+        // Patch: Normalize data to WorkspaceData shape if needed
+        const normalized: WorkspaceData = {
+          id: data.id,
+          name: data.name,
+          slug: data.slug,
+          description: data.description || '',
+          avatar: null,
+          color: data.color || '#6366F1',
+          settings: {
+            timeTracking: false,
+            notifications: { email: false, slack: false },
+            defaultTaskAssignee: ''
+          },
+          organizationId: data.organizationId,
+          createdAt: data.createdAt || '',
+          updatedAt: data.updatedAt || '',
+          organization: {
+            id: '',
+            name: '',
+            slug: '',
+            avatar: null
+          },
+          _count: { members: 0, projects: 0 }
+        };
+        setWorkspace(normalized);
         isInitializedRef.current = true;
         
       } catch (error) {
@@ -230,7 +258,31 @@ export default function WorkspaceSettingsPage(props: Props) {
       };
 
       const updatedWorkspace = await updateWorkspace(workspace.id, updateData);
-      setWorkspace(updatedWorkspace);
+      const normalized: WorkspaceData = {
+        id: updatedWorkspace.id,
+        name: updatedWorkspace.name,
+        slug: updatedWorkspace.slug,
+        description: updatedWorkspace.description || '',
+        avatar: null,
+        color: updatedWorkspace.color || '#6366F1',
+        settings: {
+          timeTracking: false,
+          notifications: { email: false, slack: false },
+          defaultTaskAssignee: ''
+        },
+        organizationId: updatedWorkspace.organizationId,
+        createdAt: updatedWorkspace.createdAt || '',
+        updatedAt: updatedWorkspace.updatedAt || '',
+        organization: {
+          id: '',
+          name: '',
+          slug: '',
+          avatar: null
+        },
+        _count: { members: 0, projects: 0 }
+      };
+      setWorkspace(normalized);
+      alert('Workspace updated successfully!');
       
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to update workspace');
@@ -247,6 +299,7 @@ export default function WorkspaceSettingsPage(props: Props) {
 
     try {
       await deleteWorkspace(workspace.id);
+      alert('Workspace deleted successfully!');
       router.push('/dashboard');
       
     } catch (error) {
@@ -260,10 +313,25 @@ export default function WorkspaceSettingsPage(props: Props) {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary"></div>
-            <span className="ml-2 text-muted-foreground">Loading workspace settings...</span>
+        <div className="max-w-7xl mx-auto p-4">
+          <div className="animate-pulse space-y-4">
+            {/* Header skeleton */}
+            <div className="h-4 bg-[var(--muted)] rounded w-1/3 mb-4"></div>
+            <div className="h-6 bg-[var(--muted)] rounded w-1/4 mb-2"></div>
+            <div className="h-4 bg-[var(--muted)] rounded w-1/2 mb-6"></div>
+            
+            {/* Tabs skeleton */}
+            <div className="h-10 bg-[var(--muted)] rounded mb-4"></div>
+            
+            {/* Card skeleton */}
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] border-none p-4">
+              <div className="h-5 bg-[var(--muted)] rounded w-1/4 mb-4"></div>
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-10 bg-[var(--muted)] rounded"></div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -273,14 +341,19 @@ export default function WorkspaceSettingsPage(props: Props) {
   if (error) {
     return (
       <div className="min-h-screen bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto p-6">
-          <Alert variant="destructive">
+        <div className="max-w-7xl mx-auto p-4">
+          <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
             <HiExclamationTriangle className="h-4 w-4" />
             <AlertTitle>Error Loading Workspace Settings</AlertTitle>
             <AlertDescription>
               {error}
               <div className="mt-4">
-                <Button onClick={retryFetch} variant="outline" size="sm">
+                <Button 
+                  onClick={retryFetch} 
+                  variant="outline" 
+                  size="sm"
+                  className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                >
                   Try Again
                 </Button>
               </div>
@@ -292,250 +365,367 @@ export default function WorkspaceSettingsPage(props: Props) {
   }
 
   if (!workspace) {
-    return null;
+    return (
+      <div className="min-h-screen bg-[var(--background)]">
+        <div className="max-w-7xl mx-auto p-4">
+          <div className="text-center py-12">
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">
+              Workspace not found
+            </h2>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-4">
+        
+        {/* Compact Header - Following project settings pattern */}
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-foreground mb-1 flex items-center gap-2">
-            <HiCog6Tooth size={20} />
-            {workspace.name} Settings
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your workspace configuration and preferences.
-          </p>
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm mb-4">
+            <Link href="/dashboard" className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
+              Dashboard
+            </Link>
+            <span className="text-[var(--muted-foreground)]">/</span>
+            <Link href={`/${workspaceSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
+              {workspace.name}
+            </Link>
+            <span className="text-[var(--muted-foreground)]">/</span>
+            <span className="text-[var(--foreground)] font-medium">Settings</span>
+          </div>
+          
+          {/* Header with back button */}
+          <div className="flex items-center gap-3 mb-2">
+            <Link href={`/${workspaceSlug}`}>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="h-9 w-9 p-0 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+              >
+                <HiChevronLeft className="w-4 h-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold text-[var(--foreground)]">
+                Workspace Settings
+              </h1>
+              <p className="text-sm text-[var(--muted-foreground)] mt-1">
+                Manage your workspace configuration and preferences
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HiPhoto size={16} />
-                Workspace Information
-              </CardTitle>
-              <CardDescription>Basic information about your workspace.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSave} className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Workspace Avatar</Label>
-                  <div className="flex items-center gap-4">
-                    <WorkspaceAvatar workspace={{...workspace, avatar: workspace.avatar || undefined}} size="lg" />
-                    <Button variant="outline" size="sm">
-                      Change avatar
-                    </Button>
-                  </div>
-                </div>
+        {/* Tabs - Theme consistent */}
+        <Tabs defaultValue="general" className="space-y-4">
+          <TabsList className="h-10 bg-[var(--muted)] rounded-lg p-1">
+            <TabsTrigger 
+              value="general" 
+              className="flex items-center gap-2 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
+            >
+              <HiCog6Tooth className="w-4 h-4" />
+              General
+            </TabsTrigger>
+            <TabsTrigger 
+              value="preferences" 
+              className="flex items-center gap-2 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
+            >
+              <HiBell className="w-4 h-4" />
+              Preferences
+            </TabsTrigger>
+            <TabsTrigger 
+              value="danger" 
+              className="flex items-center gap-2 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
+            >
+              <HiExclamationTriangle className="w-4 h-4" />
+              Danger Zone
+            </TabsTrigger>
+          </TabsList>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="workspace-name">Workspace name *</Label>
-                    <Input
-                      id="workspace-name"
-                      name="workspace-name"
-                      defaultValue={workspace.name}
-                      required
-                    />
+          {/* General Tab */}
+          <TabsContent value="general">
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                  <HiPhoto className="w-5 h-5 text-[var(--primary)]" />
+                  Workspace Information
+                </CardTitle>
+                <CardDescription className="text-[var(--muted-foreground)]">
+                  Basic information about your workspace
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {error && (
+                  <Alert variant="destructive" className="mb-4 bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
+                    <HiExclamationTriangle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                
+                <form onSubmit={handleSave} className="space-y-6">
+                  {/* Workspace Avatar */}
+                  <div className="space-y-3">
+                    <Label className="text-[var(--foreground)] font-medium">Workspace Avatar</Label>
+                    <div className="flex items-center gap-4">
+                      <WorkspaceAvatar workspace={{...workspace, avatar: workspace.avatar || undefined}} size="lg" />
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                      >
+                        Change Avatar
+                      </Button>
+                    </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="workspace-url">Workspace URL</Label>
-                    <div className="flex rounded-lg border border-border overflow-hidden">
-                      <span className="inline-flex items-center px-3 bg-muted text-muted-foreground text-sm border-r border-border">
-                        {workspace.organization.slug}.taskosaur.com/
-                      </span>
+                  
+                  {/* Name and URL */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="workspace-name" className="text-[var(--foreground)] font-medium">Workspace Name *</Label>
                       <Input
-                        id="workspace-url"
-                        value={workspace.slug}
-                        disabled
-                        className="flex-1 bg-muted text-muted-foreground border-0"
+                        id="workspace-name"
+                        name="workspace-name"
+                        defaultValue={workspace.name}
+                        required
+                        className="h-9 border-input bg-background text-[var(--foreground)]"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Workspace URL cannot be changed after creation.
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="workspace-url" className="text-[var(--foreground)] font-medium">Workspace URL</Label>
+                      <div className="flex rounded-lg border border-[var(--border)] overflow-hidden h-9">
+                        <span className="inline-flex items-center px-3 bg-[var(--muted)] text-[var(--muted-foreground)] text-sm border-r border-[var(--border)]">
+                          {workspace.organization.slug}.taskosaur.com/
+                        </span>
+                        <Input
+                          id="workspace-url"
+                          value={workspace.slug}
+                          disabled
+                          className="flex-1 bg-[var(--muted)] text-[var(--muted-foreground)] border-0 h-full"
+                        />
+                      </div>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        Workspace URL cannot be changed after creation
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-[var(--foreground)] font-medium">Description</Label>
+                    <Textarea
+                      id="description"
+                      name="description"
+                      rows={3}
+                      defaultValue={workspace.description}
+                      placeholder="Brief description of your workspace..."
+                      className="border-input bg-background text-[var(--foreground)] resize-none"
+                    />
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      This will be displayed on your workspace profile
                     </p>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    rows={3}
-                    defaultValue={workspace.description}
-                    placeholder="Brief description of your workspace..."
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This will be displayed on your workspace profile.
-                  </p>
-                </div>
                 
-                <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+                  {/* Save Button */}
+                  <div className="flex justify-end pt-4">
+                    <Button 
+                      type="submit" 
+                      disabled={saving}
+                      className="h-9 px-6 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg"
+                    >
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HiBell size={16} />
-                Workspace Preferences
-              </CardTitle>
-              <CardDescription>Configure workspace-specific settings.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSave} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="default-role">Default role for new members</Label>
-                    <Select defaultValue={workspace.settings?.defaultTaskAssignee || "member"}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select default role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="member">Member</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="project-manager">Project Manager</SelectItem>
-                      </SelectContent>
-                    </Select>
+          {/* Preferences Tab */}
+          <TabsContent value="preferences">
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
+                  <HiBell className="w-5 h-5 text-[var(--primary)]" />
+                  Workspace Preferences
+                </CardTitle>
+                <CardDescription className="text-[var(--muted-foreground)]">
+                  Configure workspace-specific settings and notifications
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <form onSubmit={handleSave} className="space-y-6">
+                  {/* Default Settings */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="default-role" className="text-[var(--foreground)] font-medium">Default role for new members</Label>
+                      <Select defaultValue={workspace.settings?.defaultTaskAssignee || "member"}>
+                        <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
+                          <SelectValue placeholder="Select default role" />
+                        </SelectTrigger>
+                        <SelectContent className="border-none bg-[var(--card)]">
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="viewer">Viewer</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="manager">Manager</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="visibility" className="text-[var(--foreground)] font-medium">Workspace visibility</Label>
+                      <Select>
+                        <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
+                          <SelectValue placeholder="Select visibility" />
+                        </SelectTrigger>
+                        <SelectContent className="border-none bg-[var(--card)]">
+                          <SelectItem value="private">Private - Only invited members can access</SelectItem>
+                          <SelectItem value="public">Public - Anyone in your organization can access</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="visibility">Workspace visibility</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select visibility" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="private">Private - Only invited members can access</SelectItem>
-                        <SelectItem value="public">Public - Anyone in your organization can access</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Feature Settings</Label>
-                  <div className="space-y-4 mt-3">
-                    {[{ 
-                        key: 'email-notifications', 
-                        label: 'Email notifications', 
-                        description: 'Send email notifications for workspace activities',
-                        defaultChecked: workspace.settings?.notifications?.email || false
-                      },
-                      { 
-                        key: 'slack-notifications', 
-                        label: 'Slack integration', 
-                        description: 'Enable Slack notifications and integrations',
-                        defaultChecked: workspace.settings?.notifications?.slack || false
-                      },
-                      { 
-                        key: 'time-tracking', 
-                        label: 'Time tracking', 
-                        description: 'Enable time tracking features for tasks and projects',
-                        defaultChecked: workspace.settings?.timeTracking || false
-                      }
-                    ].map((setting) => (
-                      <div key={setting.key} className="flex items-start gap-3">
-                        <Checkbox
-                          id={setting.key}
-                          name={setting.key}
-                          defaultChecked={setting.defaultChecked}
-                        />
-                        <div className="space-y-1">
-                          <Label htmlFor={setting.key} className="text-sm font-medium">
-                            {setting.label}
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            {setting.description}
-                          </p>
+                  {/* Feature Settings */}
+                  <div className="space-y-3">
+                    <Label className="text-[var(--foreground)] font-medium">Feature Settings</Label>
+                    <div className="space-y-4 mt-3">
+                      {[{ 
+                          key: 'email-notifications', 
+                          label: 'Email notifications', 
+                          description: 'Send email notifications for workspace activities',
+                          defaultChecked: workspace.settings?.notifications?.email || false
+                        },
+                        { 
+                          key: 'slack-notifications', 
+                          label: 'Slack integration', 
+                          description: 'Enable Slack notifications and integrations',
+                          defaultChecked: workspace.settings?.notifications?.slack || false
+                        },
+                        { 
+                          key: 'time-tracking', 
+                          label: 'Time tracking', 
+                          description: 'Enable time tracking features for tasks and projects',
+                          defaultChecked: workspace.settings?.timeTracking || false
+                        }
+                      ].map((setting) => (
+                        <div key={setting.key} className="flex items-start gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--muted)]/30">
+                          <Checkbox
+                            id={setting.key}
+                            name={setting.key}
+                            defaultChecked={setting.defaultChecked}
+                            className="mt-0.5"
+                          />
+                          <div className="space-y-1">
+                            <Label htmlFor={setting.key} className="text-sm font-medium text-[var(--foreground)] cursor-pointer">
+                              {setting.label}
+                            </Label>
+                            <p className="text-xs text-[var(--muted-foreground)]">
+                              {setting.description}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Preferences'}
+                  
+                  {/* Save Button */}
+                  <div className="flex justify-end pt-4">
+                    <Button 
+                      type="submit" 
+                      disabled={saving}
+                      className="h-9 px-6 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg"
+                    >
+                      {saving ? 'Saving...' : 'Save Preferences'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Danger Zone Tab */}
+          <TabsContent value="danger">
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-[var(--destructive)] flex items-center gap-2">
+                  <HiExclamationTriangle className="w-5 h-5" />
+                  Danger Zone
+                </CardTitle>
+                <CardDescription className="text-[var(--muted-foreground)]">
+                  Permanent actions that cannot be undone
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-4">
+                {/* Archive Workspace */}
+                <div className="flex items-center justify-between p-4 border border-[var(--border)] rounded-lg bg-[var(--muted)]/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[var(--muted)] flex items-center justify-center">
+                      <HiArchiveBox className="w-5 h-5 text-[var(--muted-foreground)]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[var(--foreground)] mb-1">Archive Workspace</h4>
+                      <p className="text-xs text-[var(--muted-foreground)]">Make this workspace read-only. No new changes can be made.</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center gap-2"
+                  >
+                    <HiArchiveBox className="w-4 h-4" />
+                    Archive
                   </Button>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="border-destructive">
-            <CardHeader className="bg-destructive/10">
-              <CardTitle className="text-destructive flex items-center gap-2 mb-1">
-                <HiExclamationTriangle size={16} />
-                Danger Zone
-              </CardTitle>
-              <CardDescription className="text-destructive/70">
-                Permanent actions that cannot be undone.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-6">
-              <div className="flex items-start justify-between p-4 border border-border rounded-lg">
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-1">Archive workspace</h4>
-                  <p className="text-xs text-muted-foreground">
-                    Archiving a workspace will make it read-only. No new changes can be made, but you can still view all data.
-                  </p>
+                
+                {/* Delete Workspace */}
+                <div className="flex items-center justify-between p-4 border border-[var(--destructive)]/20 rounded-lg bg-[var(--destructive)]/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[var(--destructive)]/10 flex items-center justify-center">
+                      <HiTrash className="w-5 h-5 text-[var(--destructive)]" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[var(--foreground)] mb-1">Delete Workspace</h4>
+                      <p className="text-xs text-[var(--muted-foreground)]">Permanently remove this workspace and all its data. This cannot be undone.</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    className="h-9 bg-[var(--destructive)] hover:bg-[var(--destructive)]/90 text-[var(--destructive-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
+                  >
+                    <HiTrash className="w-4 h-4" />
+                    Delete Workspace
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-4 flex-shrink-0 flex items-center gap-1"
-                >
-                  <HiArchiveBox size={14} />
-                  Archive
-                </Button>
-              </div>
-              
-              <div className="flex items-start justify-between p-4 border border-destructive/20 rounded-lg bg-destructive/5">
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-1">Delete workspace</h4>
-                  <p className="text-xs text-muted-foreground">
-                    Once you delete a workspace, all of its data will be permanently removed. This action cannot be undone.
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  className="ml-4 flex-shrink-0"
-                >
-                  Delete Workspace
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
+        {/* Delete Confirmation Dialog - Theme consistent */}
         <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md bg-[var(--card)] border-none rounded-[var(--card-radius)] shadow-lg">
             <DialogHeader>
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-destructive/10 mb-4">
-                <HiExclamationTriangle className="h-6 w-6 text-destructive" />
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-[var(--destructive)]/10 mb-4">
+                <HiExclamationTriangle className="h-6 w-6 text-[var(--destructive)]" />
               </div>
-              <DialogTitle className="text-center">Delete Workspace</DialogTitle>
-              <DialogDescription className="text-center">
-                Are you sure you want to delete "{workspace.name}"? This action cannot be undone and will permanently remove all projects, tasks, and data associated with this workspace.
+              <DialogTitle className="text-center text-lg font-semibold text-[var(--destructive)]">
+                Delete Workspace
+              </DialogTitle>
+              <DialogDescription className="text-center text-[var(--muted-foreground)]">
+                Are you sure you want to delete <span className="font-semibold text-[var(--foreground)]">"{workspace.name}"</span>? This action cannot be undone and will permanently remove all projects, tasks, and data associated with this workspace.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="gap-2">
+            <DialogFooter className="gap-2 mt-4 flex flex-row">
               <Button
                 variant="outline"
                 onClick={() => setDeleteConfirmOpen(false)}
-                className="flex-1"
+                className="flex-1 h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
               >
                 Cancel
               </Button>
@@ -543,7 +733,7 @@ export default function WorkspaceSettingsPage(props: Props) {
                 variant="destructive"
                 onClick={handleDelete}
                 disabled={deleteLoading}
-                className="flex-1"
+                className="flex-1 h-9 bg-[var(--destructive)] hover:bg-[var(--destructive)]/90 text-[var(--destructive-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg"
               >
                 {deleteLoading ? 'Deleting...' : 'Delete Workspace'}
               </Button>

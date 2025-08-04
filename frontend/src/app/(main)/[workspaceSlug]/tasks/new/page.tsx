@@ -40,7 +40,6 @@ interface Props {
 export default function NewTaskPage({ params }: Props) {
   const {
     createTask,
-    loading: taskLoading,
     error: taskError,
     clearError,
     getAllTaskStatuses,
@@ -50,6 +49,8 @@ export default function NewTaskPage({ params }: Props) {
     getProjectLabels,
     assignMultipleLabelsToTask,
   } = useTask();
+  // Local loading state for task submission
+  const [taskLoading, setTaskLoading] = useState(false);
   const { getAllUsers, getCurrentUser, isAuthenticated } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -432,6 +433,7 @@ export default function NewTaskPage({ params }: Props) {
     }
 
     setIsSubmitting(true);
+    setTaskLoading(true);
     clearError();
 
     try {
@@ -536,6 +538,7 @@ export default function NewTaskPage({ params }: Props) {
       });
     } finally {
       setIsSubmitting(false);
+      setTaskLoading(false);
     }
   };
 

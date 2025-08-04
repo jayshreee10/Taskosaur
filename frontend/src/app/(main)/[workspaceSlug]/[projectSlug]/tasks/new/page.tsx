@@ -82,7 +82,7 @@ export default function NewTaskPage({ params }: Props) {
 
   const {
     createTask,
-    loading: taskLoading,
+    isLoading: taskLoading,
     error: taskError,
     clearError,
     getAllTaskStatuses,
@@ -680,7 +680,7 @@ export default function NewTaskPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-4 space-y-6">
         {/* Header */}
         <div className="mb-6">
           <Breadcrumb className="mb-2">
@@ -704,9 +704,13 @@ export default function NewTaskPage({ params }: Props) {
           </Breadcrumb>
           
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-foreground">Create New Task</h1>
+            <h1 className="text-md font-semibold text-[var(--foreground)]">Create New Task</h1>
             <Link href={`/${workspaceSlug}/${projectSlug}/tasks`}>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 whitespace-nowrap hover:bg-[var(--primary)]"
+              >
                 <HiArrowLeft size={14} />
                 Back to Tasks
               </Button>
@@ -719,11 +723,11 @@ export default function NewTaskPage({ params }: Props) {
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Basic Information Section */}
-              <Card>
-                <CardHeader>
+              <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none">
+                <CardHeader className="border-none pb-0">
                   <TaskSectionHeader icon={HiDocumentText} title="Basic Information" />
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 p-4 border-none">
                   <div className="space-y-2">
                     <Label htmlFor="title">Task Title *</Label>
                     <Input
@@ -732,6 +736,7 @@ export default function NewTaskPage({ params }: Props) {
                       value={formData.title}
                       onChange={handleChange}
                       placeholder="What needs to be done?"
+                      className="border-none"
                     />
                   </div>
 
@@ -814,8 +819,8 @@ export default function NewTaskPage({ params }: Props) {
               </Card>
 
               {/* Form Actions */}
-              <Card>
-                <CardContent className="p-6">
+              <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none">
+                <CardContent className="p-4 border-none">
                   <div className="flex items-center justify-end gap-3">
                     <Link href={`/${workspaceSlug}/${projectSlug}/tasks`}>
                       <Button variant="outline">
@@ -848,11 +853,11 @@ export default function NewTaskPage({ params }: Props) {
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             {/* Task Configuration Section */}
-            <Card>
-              <CardHeader>
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none">
+              <CardHeader className="border-none pb-0">
                 <TaskSectionHeader icon={HiCog} title="Task Configuration" />
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-4 border-none">
                 <div className="space-y-2">
                   <Label htmlFor="project">Project *</Label>
                   <Select value={formData.projectId || ""} onValueChange={(value) => setFormData(prev => ({...prev, projectId: value}))}>
@@ -938,11 +943,11 @@ export default function NewTaskPage({ params }: Props) {
             </Card>
 
             {/* Assignment Section */}
-            <Card>
-              <CardHeader>
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none">
+              <CardHeader className="border-none pb-0">
                 <TaskSectionHeader icon={HiUsers} title="Assignment" />
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-4 border-none">
                 <div className="space-y-2">
                   <Label>Assignee *</Label>
                   <ProjectMemberDropdown
@@ -983,11 +988,11 @@ export default function NewTaskPage({ params }: Props) {
             </Card>
 
             {/* Labels Section */}
-            <Card>
-              <CardHeader>
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none">
+              <CardHeader className="border-none pb-0">
                 <TaskSectionHeader icon={HiTag} title={`Labels (${labels.length})`} />
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-4 border-none">
                 <div className="flex flex-wrap gap-2">
                   {labels.map((label) => (
                     <Badge key={label.id} variant="secondary" className="flex items-center gap-1">

@@ -83,20 +83,6 @@ export function SignupContent() {
             Create your free account today and discover why thousands of teams 
             choose Taskosaur to streamline their workflow and achieve more.
           </p>
-
-          {/* Enhanced CTA Badge */}
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="inline-flex items-center space-x-3 bg-white/15 backdrop-blur-md border border-white/25 rounded-full px-4 lg:px-6 py-3 shadow-lg"
-          >
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-sm" />
-              <TrendingUp className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-white text-xs lg:text-sm font-semibold">Free forever • No credit card required</span>
-          </motion.div>
         </motion.div>
 
         {/* Enhanced Features Grid */}

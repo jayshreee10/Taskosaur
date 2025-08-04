@@ -7,20 +7,20 @@ const path = require('path');
 const {
     APP_HOST = '127.0.0.1',
     APP_PORT = '9100',
-    APP_BE_HOST = '127.0.0.1',
-    APP_BE_PORT = '9101',
-    APP_FE_HOST = '127.0.0.1',
-    APP_FE_PORT = '9102',
+    BE_HOST = '127.0.0.1',
+    BE_PORT = '9101',
+    FE_HOST = '127.0.0.1',
+    FE_PORT = '9102',
     FE_UNIX_SOCKET = '0',
     BE_UNIX_SOCKET = '0',
-    FE_SOCKET_PATH = path.join(__dirname, 'frontend', 'tmp', 'taskosaur-frontend.sock'),
-    BE_SOCKET_PATH = path.join(__dirname, 'backend', 'tmp', 'taskosaur-backend.sock'),
+    FE_UNIX_SOCKET_PATH = path.join(__dirname, 'frontend', 'tmp', 'taskosaur-frontend.sock'),
+    BE_UNIX_SOCKET_PATH = path.join(__dirname, 'backend', 'tmp', 'taskosaur-backend.sock'),
 } = process.env;
 
 const fastify = Fastify({ logger: true, trustProxy: true });
 
-const BE_UPSTREAM = BE_UNIX_SOCKET === '1' ? `unix+http://${encodeURIComponent(BE_SOCKET_PATH)}` : `http://${APP_BE_HOST}:${APP_BE_PORT}`;
-const FE_UPSTREAM = FE_UNIX_SOCKET === '1' ? `unix+http://${encodeURIComponent(FE_SOCKET_PATH)}` : `http://${APP_FE_HOST}:${APP_FE_PORT}`;
+const BE_UPSTREAM = BE_UNIX_SOCKET === '1' ? `unix+http://${encodeURIComponent(BE_UNIX_SOCKET_PATH)}` : `http://${BE_HOST}:${BE_PORT}`;
+const FE_UPSTREAM = FE_UNIX_SOCKET === '1' ? `unix+http://${encodeURIComponent(FE_UNIX_SOCKET_PATH)}` : `http://${FE_HOST}:${FE_PORT}`;
 
 // Proxy /api requests to backend
 fastify.register(proxy, {

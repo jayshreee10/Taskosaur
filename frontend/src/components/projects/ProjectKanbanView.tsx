@@ -61,10 +61,10 @@ const SimpleTaskCard: React.FC<SimpleTaskCardProps> = ({
       href={`/${workspaceSlug}/${projectSlug}/tasks/${task.id}`}
       className="block"
     >
-      <Card className="hover:border-primary-300 dark:hover:border-primary-700 hover:bg-secondary-50 dark:hover:bg-secondary-800 transition-all cursor-pointer">
+      <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4 hover:shadow-md hover:border-[var(--primary)] dark:hover:border-[var(--primary)]/80 transition-all cursor-pointer">
         <CardHeader className="pb-0">
           <CardTitle>
-            <span className="text-xs font-medium text-secondary-900 dark:text-secondary-100 mb-2 line-clamp-2">
+            <span className="text-xs font-medium text-[var(--foreground)] dark:text-[var(--foreground)] mb-2 line-clamp-2">
               {task.title}
             </span>
           </CardTitle>
@@ -74,7 +74,7 @@ const SimpleTaskCard: React.FC<SimpleTaskCardProps> = ({
             <PriorityBadge priority={task.priority} />
           </div>
           {task.dueDate && (
-            <div className="text-xs text-secondary-500 dark:text-secondary-400 flex items-center gap-1">
+            <div className="text-xs text-[var(--gray-500)] dark:text-[var(--gray-400)] flex items-center gap-1">
               <HiCalendar size={10} />
               Due: {formatDate(task.dueDate)}
             </div>
@@ -99,15 +99,15 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   projectSlug,
 }) => {
   return (
-    <Card>
+    <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4 flex flex-col justify-between">
       <CardHeader className="pb-0">
         <div className="flex justify-between items-center mb-4">
           <CardTitle>
-            <span className="text-sm font-medium text-secondary-900 dark:text-secondary-100">
+            <span className="text-sm font-semibold text-[var(--foreground)] dark:text-[var(--foreground)]">
               {statusName}
             </span>
           </CardTitle>
-          <span className="text-xs text-secondary-500 dark:text-secondary-400 bg-secondary-100 dark:bg-secondary-800 px-2 py-1 rounded-full">
+          <span className="text-xs text-[var(--gray-500)] dark:text-[var(--gray-400)] bg-[var(--gray-100)] dark:bg-[var(--gray-800)] px-2 py-1 rounded-full">
             {tasks.length}
           </span>
         </div>
@@ -123,13 +123,13 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
             />
           ))}
           {tasks.length === 0 && (
-            <div className="py-8 text-center text-secondary-400 dark:text-secondary-500 text-xs">
+            <div className="py-8 text-center text-[var(--gray-400)] dark:text-[var(--gray-500)] text-xs">
               No tasks
             </div>
           )}
           <Link 
             href={`/${workspaceSlug}/${projectSlug}/tasks/new?status=${statusName}`}
-            className="block w-full text-center text-xs text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200 py-3 border-2 border-dashed border-secondary-200 dark:border-secondary-700 rounded-lg hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
+            className="block w-full text-center text-xs font-medium text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors py-3 border-2 border-dashed border-[var(--border)] rounded-[var(--card-radius)] hover:border-[var(--primary)] dark:hover:border-[var(--primary)]/80"
           >
             <HiPlus size={12} className="inline mr-1" />
             Add task
@@ -171,7 +171,7 @@ export const ProjectKanbanView: React.FC<ProjectKanbanViewProps> = ({
   });
 
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 ${className || ''}`}>
+    <div className={`grid grid-cols-1 lg:grid-cols-4 gap-4 ${className || ''}`}>
       {Object.entries(tasksByStatus).map(([statusName, statusTasks]) => (
         <KanbanColumn
           key={statusName}

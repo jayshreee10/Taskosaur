@@ -95,7 +95,22 @@ export default function InviteMemberDropdown() {
       }
 
       const data = await getOrganizationMembers(organizationId);
-      setMembers(data || []);
+      // Map OrganizationMember[] to Member[] with safe defaults
+      const mappedMembers = (data || []).map((orgMember: any) => {
+        const user = orgMember.user || {};
+        return {
+          id: orgMember.id || '',
+          user: {
+            id: user.id || '',
+            email: user.email || orgMember.email || '',
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            avatar: user.avatar || '',
+          },
+          role: orgMember.role || '',
+        };
+      });
+      setMembers(mappedMembers);
     } catch (error) {
       console.error("Failed to fetch members:", error);
       setMembers([]);

@@ -51,8 +51,7 @@ export default function AuthRedirect({
         
         if (requireAuth) {
           if (isAuthenticated) {
-            // User is authenticated and page requires auth - redirect to dashboard
-            console.log('User authenticated, redirecting to:', redirectTo);
+            
             router.push(redirectTo);
             setShouldShowChildren(false);
           } else {

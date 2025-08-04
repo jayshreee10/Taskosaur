@@ -17,7 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TaskCommentsService } from './task-comments.service';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { UpdateTaskCommentDto } from './dto/update-task-comment.dto';
-import { LogActivity } from '../activity-log/decorator/log-activity.decorator';
+import { LogActivity } from 'src/common/decorator/log-activity.decorator';
 
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)

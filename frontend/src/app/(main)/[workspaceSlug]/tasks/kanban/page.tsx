@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { use } from 'react';
-import { WorkspaceContext } from '@/contexts/workspace-context';
-import { ProjectContext } from '@/contexts/project-context';
+import { useWorkspaceContext } from '@/contexts/workspace-context';
+import { useTask } from '@/contexts/task-context';
+import { useProjectContext } from '@/contexts/project-context';
 import { useAuth } from '@/contexts/auth-context';
 import TaskViewTabs from '@/components/tasks/TaskViewTabs';
 import TaskKanbanView from '@/components/tasks/views/TaskKanbanView';
@@ -85,16 +86,9 @@ export default function WorkspaceTasksKanbanPage({ params }: Props) {
   // Get authentication context
   const { isAuthenticated } = useAuth();
   
-  // Get contexts
-  const workspaceContext = useContext(WorkspaceContext);
-  const projectContext = useContext(ProjectContext);
-  
-  if (!workspaceContext || !projectContext) {
-    throw new Error('Workspace and Project contexts must be used within their respective providers');
-  }
-  
-  const { getWorkspaceBySlug } = workspaceContext;
-  const { getProjectsByWorkspace } = projectContext;
+  const { getWorkspaceBySlug } = useWorkspaceContext();
+  const { getTasksByWorkspace } = useTask();
+  const { getProjectsByWorkspace } = useProjectContext();
   
   const [workspace, setWorkspace] = useState<any>(null);
   const [workspaceProjects, setWorkspaceProjects] = useState<any[]>([]);
@@ -103,107 +97,92 @@ export default function WorkspaceTasksKanbanPage({ params }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedProject, setSelectedProject] = useState('all');
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  const fetchingRef = useRef(false);
+  const currentSlugRef = useRef<string>('');
+
+  const fetchData = useCallback(async () => {
+    try {
+      const slug = workspaceSlug;
+      
+      if (fetchingRef.current && currentSlugRef.current === slug) {
+        return;
+      }
+      
+      if (currentSlugRef.current === slug && dataLoaded && workspace) {
+        return;
+      }
+      
+      fetchingRef.current = true;
+      currentSlugRef.current = slug;
+      
+      setIsLoading(true);
+      setError('');
+      setDataLoaded(false);
+      
+      if (!isAuthenticated()) {
+        setError('Authentication required');
+        setIsLoading(false);
+        fetchingRef.current = false;
+        return;
+      }
+
+      const workspaceData = await getWorkspaceBySlug(slug);
+      
+      if (!workspaceData) {
+        setIsLoading(false);
+        fetchingRef.current = false;
+        return;
+      }
+
+      setWorkspace(workspaceData);
+
+      const [tasks, projects] = await Promise.all([
+        getTasksByWorkspace(workspaceData.id),
+        getProjectsByWorkspace(workspaceData.id)
+      ]);
+
+      setWorkspaceTasks(tasks || []);
+      setProjectsData(projects || []);
+      setWorkspaceProjects(projects || []);
+      
+      setDataLoaded(true);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+      fetchingRef.current = false;
+    }
+  }, [workspaceSlug, workspace, dataLoaded, getWorkspaceBySlug, getTasksByWorkspace, getProjectsByWorkspace, isAuthenticated]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Check authentication using context
-        if (!isAuthenticated()) {
-          console.error('Not authenticated, redirecting to login');
-          router.push('/login');
-          return;
-        }
-
-        console.log('Fetching workspace with slug:', workspaceSlug);
-
-        // Fetch workspace data using context method (no token needed)
-        const workspaceData = await getWorkspaceBySlug(workspaceSlug);
-        
-        if (!workspaceData) {
-          setError('Workspace not found');
-          return;
-        }
-        
-        setWorkspace(workspaceData);
-
-        // Fetch projects for this workspace (no token needed)
-        const allProjects = await getProjectsByWorkspace(workspaceData.id);
-        setProjectsData(allProjects);
-
-        // All projects are already filtered for this workspace
-        setWorkspaceProjects(allProjects);
-
-        // Generate mock tasks for workspace projects
-        const allTasks = allProjects.flatMap((project: any) => 
-          generateMockTasks(project, workspaceSlug)
-        );
-        
-        setWorkspaceTasks(allTasks);
-
-      } catch (error: any) {
-        console.error('Error fetching data:', error);
-        
-        if (error.message.includes('401') || error.message.includes('unauthorized')) {
-          setError('Unauthorized access. Please log in again.');
-          router.push('/login');
-        } else if (error.message.includes('404') || error.message.includes('not found')) {
-          setError('Workspace not found');
-        } else {
-          setError(`Failed to load data: ${error.message}`);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
+    if (currentSlugRef.current !== workspaceSlug) {
+      fetchingRef.current = false;
+      currentSlugRef.current = '';
+      setDataLoaded(false);
+      setWorkspace(null);
+      setWorkspaceTasks([]);
+      setProjectsData([]);
+      setWorkspaceProjects([]);
+    }
+    
     fetchData();
-  }, [workspaceSlug, getWorkspaceBySlug, getProjectsByWorkspace, router, isAuthenticated]);
+  }, [workspaceSlug, fetchData]);
 
-  // Generate mock tasks for projects
-  const generateMockTasks = (project: any, workspaceSlug: string) => {
-    const priorities = ['Low', 'Medium', 'High'];
-    const statuses = ['Todo', 'In Progress', 'Review', 'Done'];
-    const assignees = [
-      { name: 'John Doe', avatar: 'JD', id: '1' },
-      { name: 'Jane Smith', avatar: 'JS', id: '2' },
-      { name: 'Mike Johnson', avatar: 'MJ', id: '3' },
-      { name: 'Sarah Williams', avatar: 'SW', id: '4' },
-    ];
+  useEffect(() => {
+    return () => {
+      fetchingRef.current = false;
+      currentSlugRef.current = '';
+    };
+  }, []);
 
-    const taskTemplates = [
-      'Design wireframes',
-      'Implement authentication',
-      'Create component library',
-      'Setup CI/CD pipeline',
-      'Write unit tests',
-      'User testing',
-      'Code review'
-    ];
-
-    // Generate 3-5 tasks per project
-    const numTasks = Math.floor(Math.random() * 3) + 3;
-    return taskTemplates.slice(0, numTasks).map((template, index) => ({
-      id: `${project.id}-task-${index + 1}`,
-      title: `${project.name} - ${template}`,
-      description: `${template} for the ${project.name} project`,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      priority: priorities[Math.floor(Math.random() * priorities.length)],
-      assignee: Math.random() > 0.3 ? assignees[Math.floor(Math.random() * assignees.length)] : null,
-      dueDate: new Date(Date.now() + Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-      project: project.id,
-      projectData: {
-        id: project.id,
-        name: project.name,
-        key: project.key,
-        color: project.color,
-        slug: project.slug || project.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-        workspace: {
-          slug: workspaceSlug
-        }
-      }
-    }));
+  const retryFetch = () => {
+    fetchingRef.current = false;
+    currentSlugRef.current = '';
+    setDataLoaded(false);
+    fetchData();
   };
 
   // Filter tasks based on selected project
@@ -211,12 +190,12 @@ export default function WorkspaceTasksKanbanPage({ params }: Props) {
     ? workspaceTasks 
     : workspaceTasks.filter(task => task.project === selectedProject);
 
-  if (isLoading) {
+  if (isLoading || !dataLoaded) {
     return <LoadingSkeleton />;
   }
 
   if (error) {
-    return <ErrorState error={error} />;
+    return <ErrorState error={error} onBack={retryFetch} />;
   }
 
   if (!workspace) {
@@ -297,7 +276,7 @@ export default function WorkspaceTasksKanbanPage({ params }: Props) {
         </div>
 
         {/* Kanban Board */}
-        <div className="">
+        <div className="flex-1 min-h-0 flex flex-col">
           <TaskKanbanView 
             tasks={filteredTasks} 
             workspaceSlug={workspaceSlug} 

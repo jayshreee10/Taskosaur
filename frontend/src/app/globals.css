@@ -1,6 +1,27 @@
 @import "tailwindcss";
 
 /* Base layer for compatibility */
+/* Global text styles for uniformity */
+.text-heading {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.text-subheading {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.text-body {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.text-muted {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
 @layer base {
   :root {
     --radius: 0.65rem;
@@ -13,32 +34,22 @@
     --primary: oklch(0.606 0.25 292.717);
     --primary-foreground: oklch(0.969 0.016 293.756);
     --secondary: oklch(0.967 0.001 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.967 0.001 286.375);
-    --muted-foreground: oklch(0.552 0.016 285.938);
-    --accent: oklch(0.967 0.001 286.375);
-    --accent-foreground: oklch(0.21 0.006 285.885);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.969 0.016 293.756);
-    --border: oklch(0.92 0.004 286.32);
-    --input: oklch(0.92 0.004 286.32);
-    --ring: oklch(0.606 0.25 292.717);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);@import "tailwindcss";
-
-/* Base layer for compatibility */
-@layer base {
-  :root {
-    --radius: 0.65rem;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.141 0.005 285.823);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.141 0.005 285.823);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.141 0.005 285.823);
-    --primary: oklch(0.606 0.25 292.717);
-    --primary-foreground: oklch(0.969 0.016 293.756);
-    --secondary: oklch(0.967 0.001 286.375);
+        /* Custom dashboard colors */
+        --purple-500: #a855f7;
+        --purple-600: #9333ea;
+        --purple-700: #7e22ce;
+        --purple-100: #f3e8ff;
+        --orange-500: #f59e42;
+        --emerald-500: #10b981;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-500: #6b7280;
+        --gray-600: #4b5563;
+        --white: #fff;
+        --red-500: #ef4444;
+        --yellow-500: #facc15;
+        --green-500: #22c55e;
+        --card-radius: 0.75rem;
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.967 0.001 286.375);
     --muted-foreground: oklch(0.552 0.016 285.938);
@@ -51,270 +62,335 @@
     --ring: oklch(0.606 0.25 292.717);
     --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.141 0.005 285.823);
-    --sidebar-primary: oklch(0.606 0.25 292.717);
-    --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
-    --sidebar-accent: oklch(0.967 0.001 286.375);
-    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-    --sidebar-border: oklch(0.92 0.004 286.32);
-    --sidebar-ring: oklch(0.606 0.25 292.717);
+    @import "tailwindcss";
+    --yellow-100: oklch(0.98 0.05 90);
+    --yellow-600: oklch(0.75 0.2 90);
+    --slate-100: oklch(0.96 0.01 260);
+    --slate-300: oklch(0.85 0.03 260);
+    --slate-600: oklch(0.55 0.06 260);
+    --blue-100: oklch(0.96 0.05 250);
+    --blue-500: oklch(0.65 0.2 250);
 
-    /* WebKit/Safari color-scheme support */
-    color-scheme: light;
-    
-    /* WebKit specific variables for better compatibility */
-    --webkit-tap-highlight-color: transparent;
-    --webkit-touch-callout: none;
-  }
+    /* Base layer for compatibility */
+    @layer base {
+      :root {
+        --radius: 0.65rem;
+        --background: oklch(1 0 0);
+        --foreground: oklch(0.141 0.005 285.823);
+        --card: oklch(1 0 0);
+        --card-foreground: oklch(0.141 0.005 285.823);
+        --popover: oklch(1 0 0);
+        --popover-foreground: oklch(0.141 0.005 285.823);
+        --primary: oklch(0.606 0.25 292.717);
+        --primary-foreground: oklch(0.969 0.016 293.756);
+        --secondary: oklch(0.967 0.001 286.375);
+        --secondary-foreground: oklch(0.21 0.006 285.885);
+        --muted: oklch(0.967 0.001 286.375);
+        --muted-foreground: oklch(0.552 0.016 285.938);
+        --accent: oklch(0.967 0.001 286.375);
+        --accent-foreground: oklch(0.21 0.006 285.885);
+        --destructive: oklch(0.577 0.245 27.325);
+        --destructive-foreground: oklch(0.969 0.016 293.756);
+        --border: oklch(0.92 0.004 286.32);
+        --input: oklch(0.92 0.004 286.32);
+        --ring: oklch(0.606 0.25 292.717);
+        --hover: oklch(64.94% 0.14752 289.364);
+        --chart-1: oklch(0.646 0.222 41.116);
+        --chart-2: oklch(0.6 0.118 184.704);
+        --chart-3: oklch(0.398 0.07 227.392);
+        --chart-4: oklch(0.828 0.189 84.429);
+        --chart-5: oklch(0.769 0.188 70.08);
+        --sidebar: oklch(0.985 0 0);
+        --sidebar-foreground: oklch(0.141 0.005 285.823);
+        --sidebar-primary: oklch(0.606 0.25 292.717);
+        --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
+        --sidebar-accent: oklch(0.967 0.001 286.375);
+        --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+        --sidebar-border: oklch(0.92 0.004 286.32);
+        --sidebar-ring: oklch(0.606 0.25 292.717);
+        --yellow-100: oklch(0.25 0.1 90);
+        --yellow-600: oklch(0.85 0.15 90);
+        --slate-100: oklch(0.15 0.02 260);
+        --slate-300: oklch(0.65 0.05 260);
+        --slate-600: oklch(0.85 0.08 260);
+        --blue-100: oklch(0.15 0.05 250);
+        --blue-500: oklch(0.75 0.15 250);
+        --title-text: 1.25rem;
+        --text: 1rem;
+        --description-text: 0.875rem;
+        --slug-text: 0.75rem;
 
-  .dark {
-    --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.541 0.281 293.009);
-    --primary-foreground: oklch(0.969 0.016 293.756);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.141 0.005 285.823);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.541 0.281 293.009);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.21 0.006 285.885);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.541 0.281 293.009);
-    --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
-    --sidebar-accent: oklch(0.274 0.006 286.033);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.541 0.281 293.009);
+        /* WebKit/Safari color-scheme support */
+        color-scheme: light;
 
-    /* WebKit/Safari dark mode color-scheme */
-    color-scheme: dark;
-  }
+        /* WebKit specific variables for better compatibility */
+        --webkit-tap-highlight-color: transparent;
+        --webkit-touch-callout: none;
+      }
 
-  /* WebKit and cross-browser compatibility fixes */
-  *,
-  *::before,
-  *::after {
-    -webkit-box-sizing: border-box;
-    -moz-box-sizing: border-box;
-    box-sizing: border-box;
-  }
+      .dark {
+        --background: oklch(0.141 0.005 285.823);
+        --foreground: oklch(0.985 0 0);
+        --card: oklch(0.21 0.006 285.885);
+        --card-foreground: oklch(0.985 0 0);
+        --popover: oklch(0.21 0.006 285.885);
+        --popover-foreground: oklch(0.985 0 0);
+        --primary: oklch(0.541 0.281 293.009);
+        --primary-foreground: oklch(0.969 0.016 293.756);
+        --secondary: oklch(0.274 0.006 286.033);
+        /* Custom dashboard colors for dark mode */
+        --purple-500: #a855f7;
+        --purple-600: #9333ea;
+        --purple-700: #7e22ce;
+        --purple-100: #3b0764;
+        --orange-500: #f59e42;
+        --emerald-500: #10b981;
+        --gray-50: #18181b;
+        --gray-100: #27272a;
+        --gray-500: #6b7280;
+        --gray-600: #d1d5db;
+        --white: #18181b;
+        --red-500: #ef4444;
+        --yellow-500: #facc15;
+        --green-500: #22c55e;
+        --card-radius: 0.75rem;
+        --secondary-foreground: oklch(0.985 0 0);
+        --muted: oklch(0.274 0.006 286.033);
+        --muted-foreground: oklch(0.705 0.015 286.067);
+        --accent: oklch(0.274 0.006 286.033);
+        --accent-foreground: oklch(0.985 0 0);
+        --destructive: oklch(0.704 0.191 22.216);
+        --destructive-foreground: oklch(0.141 0.005 285.823);
+        --border: oklch(1 0 0 / 10%);
+        --input: oklch(1 0 0 / 15%);
+        --ring: oklch(0.541 0.281 293.009);
+        --chart-1: oklch(0.488 0.243 264.376);
+        --chart-2: oklch(0.696 0.17 162.48);
+        --chart-3: oklch(0.769 0.188 70.08);
+        --chart-4: oklch(0.627 0.265 303.9);
+        --chart-5: oklch(0.645 0.246 16.439);
+        --sidebar: oklch(0.21 0.006 285.885);
+        --sidebar-foreground: oklch(0.985 0 0);
+        --sidebar-primary: oklch(0.541 0.281 293.009);
+        --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
+        --sidebar-accent: oklch(0.274 0.006 286.033);
+        --sidebar-accent-foreground: oklch(0.985 0 0);
+        --sidebar-border: oklch(1 0 0 / 10%);
+        --sidebar-ring: oklch(0.541 0.281 293.009);
+        
 
-  /* WebKit scrollbar styling */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
+        /* WebKit/Safari dark mode color-scheme */
+        color-scheme: dark;
+      }
 
-  ::-webkit-scrollbar-track {
-    background: var(--muted);
-    border-radius: var(--radius);
-  }
+      /* WebKit and cross-browser compatibility fixes */
+      *,
+      *::before,
+      *::after {
+        -webkit-box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        box-sizing: border-box;
+      }
 
-  ::-webkit-scrollbar-thumb {
-    background: var(--muted-foreground);
-    border-radius: var(--radius);
-    opacity: 0.5;
-  }
+      /* WebKit scrollbar styling */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--border);
-    opacity: 0.8;
-  }
+      ::-webkit-scrollbar-track {
+        background: var(--muted);
+        border-radius: var(--radius);
+      }
 
-  /* WebKit appearance reset for form elements */
-  input,
-  button,
-  textarea,
-  select {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    -webkit-border-radius: 0;
-    border-radius: var(--radius);
-  }
+      ::-webkit-scrollbar-thumb {
+        background: var(--muted-foreground);
+        border-radius: var(--radius);
+        opacity: 0.5;
+      }
 
-  /* WebKit input placeholder styling */
-  ::-webkit-input-placeholder {
-    color: var(--muted-foreground);
-    opacity: 1;
-  }
-  
-  ::-moz-placeholder {
-    color: var(--muted-foreground);
-    opacity: 1;
-  }
-  
-  :-ms-input-placeholder {
-    color: var(--muted-foreground);
-    opacity: 1;
-  }
-  
-  ::placeholder {
-    color: var(--muted-foreground);
-    opacity: 1;
-  }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--border);
+        opacity: 0.8;
+      }
 
-  /* WebKit autofill styling */
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 30px var(--background) inset !important;
-    -webkit-text-fill-color: var(--foreground) !important;
-    transition: background-color 5000s ease-in-out 0s;
-  }
+      /* WebKit appearance reset for form elements */
+      input,
+      button,
+      textarea,
+      select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        -webkit-border-radius: 0;
+        border-radius: var(--radius);
+      }
 
-  /* WebKit focus outline reset */
-  button:focus,
-  input:focus,
-  textarea:focus,
-  select:focus {
-    outline: none;
-    -webkit-focus-ring-color: transparent;
-  }
+      /* WebKit input placeholder styling */
+      ::-webkit-input-placeholder {
+        color: var(--muted-foreground);
+        opacity: 1;
+      }
 
-  /* WebKit transform and animation support */
-  * {
-    -webkit-transform-style: preserve-3d;
-    transform-style: preserve-3d;
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-  }
+      ::-moz-placeholder {
+        color: var(--muted-foreground);
+        opacity: 1;
+      }
 
-  /* WebKit font smoothing */
-  body {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-  }
+      :-ms-input-placeholder {
+        color: var(--muted-foreground);
+        opacity: 1;
+      }
 
-  /* WebKit selection styling */
-  ::selection {
-    background-color: var(--primary);
-    color: var(--primary-foreground);
-  }
-  
-  ::-moz-selection {
-    background-color: var(--primary);
-    color: var(--primary-foreground);
-  }
+      ::placeholder {
+        color: var(--muted-foreground);
+        opacity: 1;
+      }
 
-  /* WebKit backdrop filter support */
-  .backdrop-blur,
-  .backdrop-blur-sm,
-  .backdrop-blur-md,
-  .backdrop-blur-lg {
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-  }
+      /* WebKit autofill styling */
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover,
+      input:-webkit-autofill:focus,
+      input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 30px var(--background) inset !important;
+        -webkit-text-fill-color: var(--foreground) !important;
+        transition: background-color 5000s ease-in-out 0s;
+      }
 
-  /* WebKit mask and clip-path support */
-  .bg-clip-text {
-    -webkit-background-clip: text;
-    background-clip: text;
-  }
+      /* WebKit focus outline reset */
+      button:focus,
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        -webkit-focus-ring-color: transparent;
+      }
 
-  /* WebKit touch and interaction improvements */
-  button,
-  [role="button"],
-  input[type="submit"],
-  input[type="button"] {
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
+      /* WebKit transform and animation support */
+      * {
+        -webkit-transform-style: preserve-3d;
+        transform-style: preserve-3d;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+      }
 
-  /* WebKit overflow scrolling for mobile */
-  .overflow-auto,
-  .overflow-scroll {
-    -webkit-overflow-scrolling: touch;
-  }
+      /* WebKit font smoothing */
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
 
-  /* WebKit gradient support fallbacks */
-  .bg-gradient-to-r,
-  .bg-gradient-to-l,
-  .bg-gradient-to-t,
-  .bg-gradient-to-b,
-  .bg-gradient-to-tr,
-  .bg-gradient-to-tl,
-  .bg-gradient-to-br,
-  .bg-gradient-to-bl {
-    background: -webkit-linear-gradient(var(--tw-gradient-stops));
-    background: -moz-linear-gradient(var(--tw-gradient-stops));
-    background: linear-gradient(var(--tw-gradient-stops));
-  }
+      /* WebKit selection styling */
+      ::selection {
+        background-color: var(--primary);
+        color: var(--primary-foreground);
+      }
 
-  /* WebKit animation performance */
-  .animate-spin,
-  .animate-pulse,
-  .animate-bounce {
-    -webkit-animation-fill-mode: both;
-    animation-fill-mode: both;
-    will-change: transform, opacity;
-  }
-}
+      ::-moz-selection {
+        background-color: var(--primary);
+        color: var(--primary-foreground);
+      }
 
-/* Base body styles with WebKit enhancements */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  line-height: 1.5;
-  -webkit-text-size-adjust: 100%;
-  -ms-text-size-adjust: 100%;
-  background-color: var(--background);
-  color: var(--foreground);
-}
+      /* WebKit backdrop filter support */
+      .backdrop-blur,
+      .backdrop-blur-sm,
+      .backdrop-blur-md,
+      .backdrop-blur-lg {
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+      }
 
-/* Additional WebKit-specific fixes for common issues */
-@supports (-webkit-appearance: none) {
-  /* Safari-specific styles */
-  input[type="search"] {
-    -webkit-appearance: textfield;
-  }
-  
-  input[type="search"]::-webkit-search-decoration,
-  input[type="search"]::-webkit-search-cancel-button {
-    -webkit-appearance: none;
-  }
-}
+      /* WebKit mask and clip-path support */
+      .bg-clip-text {
+        -webkit-background-clip: text;
+        background-clip: text;
+      }
 
-/* Firefox-specific fixes */
-@-moz-document url-prefix() {
-  input[type="number"] {
-    -moz-appearance: textfield;
-  }
-}
+      /* WebKit touch and interaction improvements */
+      button,
+      [role="button"],
+      input[type="submit"],
+      input[type="button"] {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
 
-/* Edge/IE-specific fixes */
-@supports (-ms-ime-align: auto) {
-  input {
-    -ms-clear: none;
-  }
-}
+      /* WebKit overflow scrolling for mobile */
+      .overflow-auto,
+      .overflow-scroll {
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* WebKit gradient support fallbacks */
+      .bg-gradient-to-r,
+      .bg-gradient-to-l,
+      .bg-gradient-to-t,
+      .bg-gradient-to-b,
+      .bg-gradient-to-tr,
+      .bg-gradient-to-tl,
+      .bg-gradient-to-br,
+      .bg-gradient-to-bl {
+        background: -webkit-linear-gradient(var(--tw-gradient-stops));
+        background: -moz-linear-gradient(var(--tw-gradient-stops));
+        background: linear-gradient(var(--tw-gradient-stops));
+      }
+
+      /* WebKit animation performance */
+      .animate-spin,
+      .animate-pulse,
+      .animate-bounce {
+        -webkit-animation-fill-mode: both;
+        animation-fill-mode: both;
+        will-change: transform, opacity;
+      }
+    }
+
+    /* Base body styles with WebKit enhancements */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji";
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      line-height: 1.5;
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+      background-color: var(--background);
+      color: var(--foreground);
+    }
+
+    /* Additional WebKit-specific fixes for common issues */
+    @supports (-webkit-appearance: none) {
+      /* Safari-specific styles */
+      input[type="search"] {
+        -webkit-appearance: textfield;
+      }
+
+      input[type="search"]::-webkit-search-decoration,
+      input[type="search"]::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+      }
+    }
+
+    /* Firefox-specific fixes */
+    @-moz-document url-prefix() {
+      input[type="number"] {
+        -moz-appearance: textfield;
+      }
+    }
+
+    /* Edge/IE-specific fixes */
+    @supports (-ms-ime-align: auto) {
+      input {
+        -ms-clear: none;
+      }
+    }
 
     --chart-3: oklch(0.398 0.07 227.392);
     --chart-4: oklch(0.828 0.189 84.429);
@@ -368,4 +444,359 @@ body {
 /* Base body styles */
 body {
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Enhanced Gantt Chart Styles */
+.gantt-wrapper {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+/* Ensure proper column alignment */
+.gantt-task-row {
+  display: flex;
+  align-items: center;
+}
+
+.gantt-task-info {
+  flex-shrink: 0;
+}
+
+.gantt-timeline-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.gantt-timeline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) var(--muted);
+}
+
+.gantt-timeline-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+
+.gantt-timeline-scroll::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 6px;
+}
+
+.gantt-timeline-scroll::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 6px;
+  border: 2px solid var(--muted);
+}
+
+.gantt-timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+
+.gantt-task-bar {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.gantt-task-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.gantt-task-bar:hover::before {
+  opacity: 1;
+}
+
+.gantt-task-row {
+  transition: background-color 0.2s ease;
+}
+
+.gantt-task-row:hover {
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    transparent 100%
+  );
+}
+
+.gantt-grid-line {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--border) 50%,
+    transparent 100%
+  );
+}
+
+.gantt-today-line {
+  background: linear-gradient(
+    to bottom,
+    var(--primary) 0%,
+    rgba(var(--primary-rgb), 0.5) 100%
+  );
+  box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.3);
+}
+
+.gantt-milestone {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  transition: transform 0.2s ease;
+}
+
+.gantt-milestone:hover {
+  transform: scale(1.2);
+}
+
+.gantt-tooltip {
+  backdrop-filter: blur(8px);
+  background: rgba(var(--popover-rgb), 0.95);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.gantt-progress-indicator {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.4) 100%
+  );
+  border-radius: 2px;
+}
+
+/* Animation for task bars */
+@keyframes gantt-task-load {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.gantt-task-bar-animate {
+  animation: gantt-task-load 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: left center;
+}
+
+/* Responsive Gantt styles */
+@media (max-width: 768px) {
+  .gantt-wrapper {
+    padding: 1rem;
+  }
+  
+  .gantt-task-info {
+    min-width: 160px;
+  }
+  
+  .gantt-timeline-header {
+    font-size: 0.75rem;
+  }
+}
+
+/* Line clamp utility for task titles */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Smooth scrolling for timeline */
+.gantt-smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced focus states */
+.gantt-focusable:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Status-specific gradients */
+.status-done {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.status-in-progress {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.status-review {
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+}
+
+.status-todo {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+/* Enhanced Calendar Styles */
+.calendar-day-task {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.calendar-day-task:hover {
+  transform: translateY(-1px);
+}
+
+/* Enhanced Kanban Board Styles */
+.kanban-wrapper {
+  background: linear-gradient(135deg, var(--background) 0%, var(--muted) 100%);
+}
+
+/* Custom scrollbar for Kanban columns */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(var(--muted-foreground-rgb, 107, 114, 128), 0.1);
+  border-radius: 4px;
+  margin: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--muted-foreground) 0%, rgba(var(--muted-foreground-rgb, 107, 114, 128), 0.7) 100%);
+  border-radius: 4px;
+  border: 1px solid rgba(var(--background-rgb, 255, 255, 255), 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+  transform: scale(1.1);
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
+
+/* Kanban card animations */
+.kanban-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+.kanban-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.kanban-card.dragging {
+  transform: rotate(3deg) scale(1.05);
+  z-index: 1000;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Kanban column animations */
+.kanban-column {
+  transition: all 0.2s ease;
+}
+
+.kanban-column.drag-over {
+  transform: scale(1.01);
+  background: linear-gradient(135deg, var(--primary) 0%, rgba(var(--primary-rgb, 139, 92, 246), 0.1) 100%);
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 4px rgba(var(--primary-rgb, 139, 92, 246), 0.1);
+}
+
+/* Status indicator animations */
+.status-indicator {
+  animation: pulse-status 2s infinite;
+}
+
+@keyframes pulse-status {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Priority badge animations */
+.priority-badge {
+  transition: all 0.2s ease;
+}
+
+.priority-badge:hover {
+  transform: scale(1.1) rotate(-2deg);
+}
+
+/* Task card shimmer effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.kanban-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  background-size: 200px 100%;
+  animation: shimmer 3s infinite;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.kanban-card:hover::before {
+  opacity: 1;
+}
+
+/* Loading animations */
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-up {
+  animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.fade-in-scale {
+  animation: fadeInScale 0.2s ease-out;
 }

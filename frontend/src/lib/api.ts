@@ -175,9 +175,9 @@ api.interceptors.response.use(
         console.error("Token refresh failed:", refreshError);
         TokenManager.clearTokens();
 
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
+        // if (typeof window !== "undefined") {
+        //   window.location.href = "/login";
+        // }
 
         return Promise.reject(new ApiAuthError("Authentication failed", 401));
       }

@@ -18,6 +18,7 @@ export enum EmailTemplate {
   SPRINT_STARTED = 'sprint-started',
   SPRINT_COMPLETED = 'sprint-completed',
   PASSWORD_RESET = 'password-reset',
+  PASSWORD_RESET_CONFIRMATION = 'password-reset-confirmation'
 }
 
 export enum EmailPriority {

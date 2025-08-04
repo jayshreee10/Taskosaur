@@ -1,24 +1,27 @@
 'use client';
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { use } from 'react';
-import { WorkspaceContext } from '@/contexts/workspace-context';
-import { ProjectContext } from '@/contexts/project-context';
+import { useWorkspaceContext } from '@/contexts/workspace-context';
+import { useTask } from '@/contexts/task-context';
+import { useProjectContext } from '@/contexts/project-context';
 import { useAuth } from '@/contexts/auth-context';
 import TaskViewTabs from '@/components/tasks/TaskViewTabs';
 import TaskGanttView from '@/components/tasks/views/TaskGanttView';
 import {
   HiPlus,
-  HiChevronDown,
   HiChartBarSquare,
   HiExclamationTriangle,
+  
 } from 'react-icons/hi2';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { HiX } from "react-icons/hi";
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 
 interface Props {
   params: Promise<{
@@ -27,15 +30,17 @@ interface Props {
 }
 
 const LoadingSkeleton = () => (
-  <div className="min-h-screen bg-background">
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="animate-pulse">
-        <div className="h-6 bg-muted rounded w-1/3 mb-2"></div>
-        <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
-        <div className="h-10 bg-muted rounded mb-4"></div>
-        <Card>
+  <div className="min-h-screen bg-[var(--background)]">
+    <div className="max-w-7xl mx-auto p-4">
+      <div className="animate-pulse space-y-6">
+        <div className="space-y-2">
+          <div className="h-6 bg-[var(--muted)] rounded w-1/3"></div>
+          <div className="h-4 bg-[var(--muted)] rounded w-1/2"></div>
+        </div>
+        <div className="h-10 bg-[var(--muted)] rounded"></div>
+        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none">
           <CardContent className="p-6">
-            <div className="h-96 bg-muted rounded"></div>
+            <div className="h-96 bg-[var(--muted)] rounded"></div>
           </CardContent>
         </Card>
       </div>
@@ -45,23 +50,35 @@ const LoadingSkeleton = () => (
 
 const ErrorState = ({ 
   error, 
-  onBack 
+  onRetry 
 }: { 
   error: string;
-  onBack?: () => void;
+  onRetry?: () => void;
 }) => (
-  <div className="min-h-screen bg-background">
-    <div className="max-w-7xl mx-auto p-6">
-      <Alert variant="destructive">
+  <div className="min-h-screen bg-[var(--background)]">
+    <div className="max-w-7xl mx-auto p-4">
+      <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
         <HiExclamationTriangle className="h-4 w-4" />
-        <AlertDescription className="flex flex-col gap-2">
+        <AlertDescription className="flex flex-col gap-3">
           <span>{error}</span>
-          <Link 
-            href="/workspaces"
-            className="text-sm text-primary hover:text-primary/80 underline"
-          >
-            Back to Workspaces
-          </Link>
+          <div className="flex items-center gap-2">
+            {onRetry && (
+              <Button 
+                onClick={onRetry}
+                variant="outline"
+                size="sm"
+                className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+              >
+                Try Again
+              </Button>
+            )}
+            <Link 
+              href="/workspaces"
+              className="text-sm text-[var(--primary)] hover:text-[var(--primary)]/80 underline"
+            >
+              Back to Workspaces
+            </Link>
+          </div>
         </AlertDescription>
       </Alert>
     </div>
@@ -69,23 +86,15 @@ const ErrorState = ({
 );
 
 export default function WorkspaceTasksGanttPage({ params }: Props) {
-  const router = useRouter();
   const resolvedParams = use(params);
   const { workspaceSlug } = resolvedParams;
   
   // Get authentication context
   const { isAuthenticated } = useAuth();
   
-  // Get contexts
-  const workspaceContext = useContext(WorkspaceContext);
-  const projectContext = useContext(ProjectContext);
-  
-  if (!workspaceContext || !projectContext) {
-    throw new Error('Workspace and Project contexts must be used within their respective providers');
-  }
-  
-  const { getWorkspaceBySlug } = workspaceContext;
-  const { getProjectsByWorkspace } = projectContext;
+  const { getWorkspaceBySlug } = useWorkspaceContext();
+  const { getTasksByWorkspace } = useTask();
+  const { getProjectsByWorkspace } = useProjectContext();
   
   const [workspace, setWorkspace] = useState<any>(null);
   const [workspaceProjects, setWorkspaceProjects] = useState<any[]>([]);
@@ -94,107 +103,93 @@ export default function WorkspaceTasksGanttPage({ params }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedProject, setSelectedProject] = useState('all');
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  const fetchingRef = useRef(false);
+  const currentSlugRef = useRef<string>('');
+
+  const fetchData = useCallback(async () => {
+    try {
+      const slug = workspaceSlug;
+      
+      if (fetchingRef.current && currentSlugRef.current === slug) {
+        return;
+      }
+      
+      if (currentSlugRef.current === slug && dataLoaded && workspace) {
+        return;
+      }
+      
+      fetchingRef.current = true;
+      currentSlugRef.current = slug;
+      
+      setIsLoading(true);
+      setError('');
+      setDataLoaded(false);
+      
+      if (!isAuthenticated()) {
+        setError('Authentication required');
+        setIsLoading(false);
+        fetchingRef.current = false;
+        return;
+      }
+
+      const workspaceData = await getWorkspaceBySlug(slug);
+      
+      if (!workspaceData) {
+        setError('Workspace not found. Please check the URL and try again.');
+        setIsLoading(false);
+        fetchingRef.current = false;
+        return;
+      }
+
+      setWorkspace(workspaceData);
+
+      const [tasks, projects] = await Promise.all([
+        getTasksByWorkspace(workspaceData.id),
+        getProjectsByWorkspace(workspaceData.id)
+      ]);
+
+      setWorkspaceTasks(tasks || []);
+      setProjectsData(projects || []);
+      setWorkspaceProjects(projects || []);
+      
+      setDataLoaded(true);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+      fetchingRef.current = false;
+    }
+  }, [workspaceSlug, workspace, dataLoaded, getWorkspaceBySlug, getTasksByWorkspace, getProjectsByWorkspace, isAuthenticated]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Check authentication using context
-        if (!isAuthenticated()) {
-          console.error('Not authenticated, redirecting to login');
-          router.push('/login');
-          return;
-        }
-
-        console.log('Fetching workspace with slug:', workspaceSlug);
-
-        // Fetch workspace data using context method (no token needed)
-        const workspaceData = await getWorkspaceBySlug(workspaceSlug);
-        
-        if (!workspaceData) {
-          setError('Workspace not found');
-          return;
-        }
-        
-        setWorkspace(workspaceData);
-
-        // Fetch projects for this workspace (no token needed)
-        const allProjects = await getProjectsByWorkspace(workspaceData.id);
-        setProjectsData(allProjects);
-
-        // All projects are already filtered for this workspace
-        setWorkspaceProjects(allProjects);
-
-        // Generate mock tasks for workspace projects
-        const allTasks = allProjects.flatMap((project: any) => 
-          generateMockTasks(project, workspaceSlug)
-        );
-        
-        setWorkspaceTasks(allTasks);
-
-      } catch (error: any) {
-        console.error('Error fetching data:', error);
-        
-        if (error.message.includes('401') || error.message.includes('unauthorized')) {
-          setError('Unauthorized access. Please log in again.');
-          router.push('/login');
-        } else if (error.message.includes('404') || error.message.includes('not found')) {
-          setError('Workspace not found');
-        } else {
-          setError(`Failed to load data: ${error.message}`);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
+    if (currentSlugRef.current !== workspaceSlug) {
+      fetchingRef.current = false;
+      currentSlugRef.current = '';
+      setDataLoaded(false);
+      setWorkspace(null);
+      setWorkspaceTasks([]);
+      setProjectsData([]);
+      setWorkspaceProjects([]);
+    }
+    
     fetchData();
-  }, [workspaceSlug, getWorkspaceBySlug, getProjectsByWorkspace, router, isAuthenticated]);
+  }, [workspaceSlug, fetchData]);
 
-  // Generate mock tasks for projects
-  const generateMockTasks = (project: any, workspaceSlug: string) => {
-    const priorities = ['Low', 'Medium', 'High'];
-    const statuses = ['Todo', 'In Progress', 'Review', 'Done'];
-    const assignees = [
-      { name: 'John Doe', avatar: 'JD', id: '1' },
-      { name: 'Jane Smith', avatar: 'JS', id: '2' },
-      { name: 'Mike Johnson', avatar: 'MJ', id: '3' },
-      { name: 'Sarah Williams', avatar: 'SW', id: '4' },
-    ];
+  useEffect(() => {
+    return () => {
+      fetchingRef.current = false;
+      currentSlugRef.current = '';
+    };
+  }, []);
 
-    const taskTemplates = [
-      'Design wireframes',
-      'Implement authentication',
-      'Create component library',
-      'Setup CI/CD pipeline',
-      'Write unit tests',
-      'User testing',
-      'Code review'
-    ];
-
-    // Generate 3-4 tasks per project
-    const numTasks = Math.floor(Math.random() * 2) + 3;
-    return taskTemplates.slice(0, numTasks).map((template, index) => ({
-      id: `${project.id}-task-${index + 1}`,
-      title: `${project.name} - ${template}`,
-      description: `${template} for the ${project.name} project`,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      priority: priorities[Math.floor(Math.random() * priorities.length)],
-      assignee: Math.random() > 0.3 ? assignees[Math.floor(Math.random() * assignees.length)] : null,
-      dueDate: new Date(Date.now() + Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-      project: project.id,
-      projectData: {
-        id: project.id,
-        name: project.name,
-        key: project.key,
-        color: project.color,
-        slug: project.slug || project.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-        workspace: {
-          slug: workspaceSlug
-        }
-      }
-    }));
+  const retryFetch = () => {
+    fetchingRef.current = false;
+    currentSlugRef.current = '';
+    setDataLoaded(false);
+    fetchData();
   };
 
   // Filter tasks based on selected project
@@ -202,12 +197,18 @@ export default function WorkspaceTasksGanttPage({ params }: Props) {
     ? workspaceTasks 
     : workspaceTasks.filter(task => task.project === selectedProject);
 
-  if (isLoading) {
+  // Get selected project name
+  const getSelectedProjectName = () => {
+    if (selectedProject === 'all') return null;
+    return workspaceProjects.find(p => p.id === selectedProject)?.name;
+  };
+
+  if (isLoading || !dataLoaded) {
     return <LoadingSkeleton />;
   }
 
   if (error) {
-    return <ErrorState error={error} />;
+    return <ErrorState error={error} onRetry={retryFetch} />;
   }
 
   if (!workspace) {
@@ -215,88 +216,136 @@ export default function WorkspaceTasksGanttPage({ params }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
+    <div className="min-h-screen bg-[var(--background)]">
+      <div className="max-w-7xl mx-auto p-4">
+        
+        {/* Compact Header - Following your theme patterns */}
         <div className="mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-lg font-semibold text-foreground mb-1 flex items-center gap-2">
-                <HiChartBarSquare size={20} />
-                {workspace.name} Tasks
+              <h1 className="text-xl font-bold text-[var(--foreground)] mb-1 flex items-center gap-2">
+                <HiChartBarSquare className="w-5 h-5" />
+                {workspace.name} Timeline
               </h1>
-              <p className="text-sm text-muted-foreground">
-                All tasks across all projects in {workspace.name} workspace.
+              <p className="text-sm text-[var(--muted-foreground)]">
+                View and manage tasks across all projects in this workspace
               </p>
             </div>
             
-            {/* Controls */}
+            {/* Controls - Theme consistent */}
             <div className="flex flex-wrap gap-3 items-center">
               {/* Project Filter */}
-              <div className="flex items-center gap-2">
-                <Select value={selectedProject} onValueChange={setSelectedProject}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {workspaceProjects.map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger className="w-[180px] h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent className="border-none bg-[var(--card)]">
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {workspaceProjects.map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {/* Add Task Button */}
-              <Button asChild>
+              <Button 
+                asChild 
+                className="h-9 px-4 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium rounded-lg"
+              >
                 <Link href={`/${workspaceSlug}/tasks/new`} className="flex items-center gap-2">
-                  <HiPlus size={16} />
+                  <HiPlus className="w-4 h-4" />
                   Add Task
                 </Link>
               </Button>
             </div>
           </div>
 
-          {/* Task Count and Filter Summary */}
-          <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-            <span>
-              {filteredTasks.length} of {workspaceTasks.length} tasks
+          {/* Task Count and Filter Summary - Compact */}
+          <div className="mt-4 flex items-center gap-4 text-sm text-[var(--muted-foreground)]">
+            <span className="font-medium text-[var(--foreground)]">
+              {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
             </span>
+            {workspaceTasks.length !== filteredTasks.length && (
+              <span className="text-[var(--muted-foreground)]">
+                of {workspaceTasks.length} total
+              </span>
+            )}
+            
             {selectedProject !== 'all' && (
               <div className="flex items-center gap-2">
                 <span>•</span>
                 <span>Filtered by:</span>
-                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground">
-                  {workspaceProjects.find(p => p.id === selectedProject)?.name || 'Project'}
-                </span>
-                <button
-                  onClick={() => setSelectedProject('all')}
-                  className="text-primary hover:text-primary/80 text-xs underline"
+                <Badge 
+                  variant="secondary" 
+                  className="bg-[var(--primary)]/10 text-[var(--primary)] border-none flex items-center gap-1"
                 >
-                  Clear filter
-                </button>
+                  {getSelectedProjectName() || 'Project'}
+                  <button
+                    onClick={() => setSelectedProject('all')}
+                    className="ml-1 hover:bg-[var(--primary)]/20 rounded-sm p-0.5 transition-colors"
+                    aria-label="Clear filter"
+                  >
+                    <HiX className="w-3 h-3" />
+                  </button>
+                </Badge>
               </div>
             )}
           </div>
         </div>
 
-        {/* View Tabs */}
-        <div className="mb-6">
+        {/* View Tabs - More compact */}
+        <div className="mb-4">
           <TaskViewTabs currentView="gantt" baseUrl={`/${workspaceSlug}/tasks`} />
         </div>
 
-        {/* Gantt Chart */}
-        <Card>
-          <CardContent className="gantt-wrapper p-6">
-            <TaskGanttView
-              tasks={filteredTasks}
-              workspaceSlug={workspaceSlug}
-              projectSlug=""
-            />
-          </CardContent>
-        </Card>
+        {/* Gantt Chart - Theme consistent */}
+        <div className="space-y-4">
+          {filteredTasks.length === 0 ? (
+            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+              <CardContent className="p-8 text-center">
+                <HiChartBarSquare className="w-16 h-16 mx-auto text-[var(--muted-foreground)] mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                  {selectedProject === 'all' ? 'No tasks found' : 'No tasks found in this project'}
+                </h3>
+                <p className="text-sm text-[var(--muted-foreground)] mb-4">
+                  {selectedProject === 'all' 
+                    ? 'Create your first task to start tracking project timelines.' 
+                    : 'This project doesn\'t have any tasks yet. Create one to get started.'}
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <Button 
+                    asChild 
+                    className="h-9 px-4 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90"
+                  >
+                    <Link href={`/${workspaceSlug}/tasks/new`} className="flex items-center gap-2">
+                      <HiPlus className="w-4 h-4" />
+                      Create Task
+                    </Link>
+                  </Button>
+                  {selectedProject !== 'all' && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => setSelectedProject('all')}
+                      className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
+                    >
+                      View All Tasks
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="gantt-wrapper">
+              <TaskGanttView
+                tasks={filteredTasks}
+                workspaceSlug={workspaceSlug}
+                projectSlug=""
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

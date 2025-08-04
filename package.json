@@ -4,13 +4,42 @@
     "description": "A Fastify-based reverse proxy with environment-based targets.",
     "main": "taskosaur.js",
     "scripts": {
-        "setup": "node taskosaur.js setup",
+        "setup": "node taskosaur.js setup && npm run be:install && npm run fe:install",
         "start": "node taskosaur.js run",
         "start:dev": "node taskosaur.js run --dev",
-        "db:migrate": "cd backend && npm run prisma:migrate:dev",
-        "db:reset": "cd backend && npm run prisma:reset",
-        "db:seed": "cd backend && npm run seed:core seed",
-        "db:generate": "cd backend && npm run prisma:generate"
+        "db:migrate": "node taskosaur.js be:npm run prisma:migrate:dev",
+        "db:reset": "node taskosaur.js be:npm run prisma:reset",
+        "db:seed": "node taskosaur.js be:npm run seed:core seed",
+        "db:generate": "node taskosaur.js be:npm run prisma:generate",
+        
+        "be:build": "node taskosaur.js be:npm run build",
+        "be:format": "node taskosaur.js be:npm run format",
+        "be:start": "node taskosaur.js be:npm run start",
+        "be:start:dev": "node taskosaur.js be:npm run start:dev",
+        "be:start:debug": "node taskosaur.js be:npm run start:debug",
+        "be:start:prod": "node taskosaur.js be:npm run start:prod",
+        "be:lint": "node taskosaur.js be:npm run lint",
+        "be:test": "node taskosaur.js be:npm run test",
+        "be:test:watch": "node taskosaur.js be:npm run test:watch",
+        "be:test:cov": "node taskosaur.js be:npm run test:cov",
+        "be:test:debug": "node taskosaur.js be:npm run test:debug",
+        "be:test:e2e": "node taskosaur.js be:npm run test:e2e",
+        "be:prisma:generate": "node taskosaur.js be:npm run prisma:generate",
+        "be:prisma:studio": "node taskosaur.js be:npm run prisma:studio",
+        "be:prisma:migrate:dev": "node taskosaur.js be:npm run prisma:migrate:dev",
+        "be:prisma:migrate:deploy": "node taskosaur.js be:npm run prisma:migrate:deploy",
+        "be:prisma:reset": "node taskosaur.js be:npm run prisma:reset",
+        "be:prisma": "node taskosaur.js be:npm run prisma",
+        "be:seed:core": "node taskosaur.js be:npm run seed:core",
+
+        "be:install": "cd backend && npm install",
+        "fe:install": "cd frontend && npm install",
+
+        "fe:dev": "node taskosaur.js fe:npm run dev",
+        "fe:build": "node taskosaur.js fe:npm run build",
+        "fe:start": "node taskosaur.js fe:npm run start",
+        "fe:lint": "node taskosaur.js fe:npm run lint",
+        "fe:start:dev": "node taskosaur.js fe:npm run start:dev"
     },
     "keywords": [
         "fastify",
@@ -27,6 +56,7 @@
         "pm2": "^6.0.8"
     },
     "devDependencies": {
+        "dotenv-cli": "^7.4.2",
         "nodemon": "^3.0.3"
     }
 }

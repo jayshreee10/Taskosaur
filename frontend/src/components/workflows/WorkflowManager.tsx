@@ -1,394 +1,578 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { TaskStatus, StatusCategory } from '@/types/tasks';
-import WorkflowEditor from './WorkflowEditor';
-import StatusConfiguration from './StatusConfiguration';
+import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { useOrganization } from "@/contexts/organization-context";
+import { CreateWorkflowData, UpdateWorkflowData, workflowsApi } from "@/utils/api/workflowsApi";
+import WorkflowEditor from "./WorkflowEditor";
+import StatusConfiguration from "./StatusConfiguration";
+import CreateWorkflowForm from "./CreateWorkflowForm";
 import {
-  HiArrowPath,
   HiPlus,
-  HiCog6Tooth,
-  HiChartBarSquare,
+  HiCog,
+  HiChartBar,
   HiEye,
-  HiPencilSquare,
+  HiPencil,
   HiTrash,
   HiCheck,
-  HiChevronRight
-} from 'react-icons/hi2';
+  HiChevronRight,
+  HiExclamationTriangle,
+  HiArrowPath,
+  
+} from "react-icons/hi2";
+import { HiViewGrid } from "react-icons/hi";
 
-interface Workflow {
-  id: string;
-  name: string;
-  description?: string;
-  projectId: string;
-  statuses: TaskStatus[];
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface WorkflowManagerProps {
-  projectId: string;
-}
-
-// Import shadcn UI components
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { TaskStatus } from "@/utils/api/taskStatusApi";
+import { Workflow } from "@/utils/api/organizationApi";
 
-export default function WorkflowManager({ projectId }: WorkflowManagerProps) {
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+interface WorkflowManagerProps {
+  organizationId?: string;
+  workflows: Workflow[];
+  isLoading?: boolean;
+  error?: string | null;
+  onCreateWorkflow?: (workflow: Workflow) => void;
+  onUpdateWorkflow?: (workflow: Workflow) => void;
+  onDeleteWorkflow?: (workflowId: string) => void;
+  onSetDefaultWorkflow?: (workflowId: string) => void;
+  isProjectLevel?: boolean;
+  onRefresh?: () => void;
+}
+
+const validateWorkflow = (workflow: any): workflow is Workflow => {
+  if (!workflow || typeof workflow !== "object") return false;
+  
+  const hasRequiredFields =
+    typeof workflow.id === "string" && 
+    typeof workflow.name === "string" &&
+    typeof workflow.organizationId === "string";
+
+  return hasRequiredFields;
+};
+
+const normalizeWorkflow = (workflow: any): Workflow => {
+  const statuses = Array.isArray(workflow?.statuses) ? workflow.statuses : [];
+  const transitions = Array.isArray(workflow?.transitions) ? workflow.transitions : [];
+  
+  const _count = {
+    statuses: statuses.length,
+    transitions: transitions.length,
+    tasks: workflow?._count?.tasks || 0,
+  };
+
+  return {
+    id: workflow.id,
+    name: workflow.name,
+    description: workflow.description || "",
+    organizationId: workflow.organizationId,
+    isDefault: workflow.isDefault || false,
+    statuses,
+    transitions,
+    _count,
+    createdAt: workflow.createdAt || new Date().toISOString(),
+    updatedAt: workflow.updatedAt || new Date().toISOString(),
+    createdBy: workflow.createdBy,
+    updatedBy: workflow.updatedBy,
+  };
+};
+
+export default function WorkflowManager({
+  workflows: rawWorkflows = [],
+  isLoading = false,
+  error = null,
+  onCreateWorkflow,
+  onUpdateWorkflow,
+  onDeleteWorkflow,
+  onSetDefaultWorkflow,
+  isProjectLevel = false,
+  organizationId,
+  onRefresh,
+}: WorkflowManagerProps) {
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'editor' | 'statuses'>('overview');
-  const [isLoading, setIsLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "editor" | "statuses">("overview");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  const { getCurrentUser } = useAuth();
+  const { currentOrganization } = useOrganization();
+  const currentUser = getCurrentUser();
 
-  // Mock data
-  const mockWorkflows: Workflow[] = [
-    {
-      id: 'workflow-1',
-      name: 'Default Workflow',
-      description: 'Standard workflow for all tasks',
-      projectId,
-      isDefault: true,
-      statuses: [
-        {
-          id: 'status-1',
-          name: 'To Do',
-          description: 'Tasks that need to be started',
-          color: '#64748b',
-          category: StatusCategory.TODO,
-          order: 1,
-          isDefault: true,
-          workflowId: 'workflow-1'
-        },
-        {
-          id: 'status-2',
-          name: 'In Progress',
-          description: 'Tasks currently being worked on',
-          color: '#f59e0b',
-          category: StatusCategory.IN_PROGRESS,
-          order: 2,
-          isDefault: false,
-          workflowId: 'workflow-1'
-        },
-        {
-          id: 'status-3',
-          name: 'Code Review',
-          description: 'Tasks awaiting code review',
-          color: '#3b82f6',
-          category: StatusCategory.IN_PROGRESS,
-          order: 3,
-          isDefault: false,
-          workflowId: 'workflow-1'
-        },
-        {
-          id: 'status-4',
-          name: 'Testing',
-          description: 'Tasks being tested',
-          color: '#8b5cf6',
-          category: StatusCategory.IN_PROGRESS,
-          order: 4,
-          isDefault: false,
-          workflowId: 'workflow-1'
-        },
-        {
-          id: 'status-5',
-          name: 'Done',
-          description: 'Completed tasks',
-          color: '#10b981',
-          category: StatusCategory.DONE,
-          order: 5,
-          isDefault: false,
-          workflowId: 'workflow-1'
-        }
-      ],
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: 'workflow-2',
-      name: 'Bug Workflow',
-      description: 'Specialized workflow for bug tracking',
-      projectId,
-      isDefault: false,
-      statuses: [
-        {
-          id: 'status-6',
-          name: 'Reported',
-          description: 'Bug has been reported',
-          color: '#ef4444',
-          category: StatusCategory.TODO,
-          order: 1,
-          isDefault: true,
-          workflowId: 'workflow-2'
-        },
-        {
-          id: 'status-7',
-          name: 'Confirmed',
-          description: 'Bug has been confirmed',
-          color: '#f59e0b',
-          category: StatusCategory.TODO,
-          order: 2,
-          isDefault: false,
-          workflowId: 'workflow-2'
-        },
-        {
-          id: 'status-8',
-          name: 'Fixing',
-          description: 'Bug is being fixed',
-          color: '#3b82f6',
-          category: StatusCategory.IN_PROGRESS,
-          order: 3,
-          isDefault: false,
-          workflowId: 'workflow-2'
-        },
-        {
-          id: 'status-9',
-          name: 'Verification',
-          description: 'Fix is being verified',
-          color: '#8b5cf6',
-          category: StatusCategory.IN_PROGRESS,
-          order: 4,
-          isDefault: false,
-          workflowId: 'workflow-2'
-        },
-        {
-          id: 'status-10',
-          name: 'Resolved',
-          description: 'Bug has been resolved',
-          color: '#10b981',
-          category: StatusCategory.DONE,
-          order: 5,
-          isDefault: false,
-          workflowId: 'workflow-2'
-        }
-      ],
-      createdAt: '2024-01-10T00:00:00Z',
-      updatedAt: '2024-01-20T15:30:00Z'
+  const workflows = React.useMemo(() => {
+    if (!Array.isArray(rawWorkflows)) {
+      setValidationErrors(["Invalid workflow data: expected array"]);
+      return [];
     }
-  ];
+
+    const errors: string[] = [];
+    const normalizedWorkflows = rawWorkflows
+      .map((workflow, index) => {
+        try {
+          if (!validateWorkflow(workflow)) {
+            errors.push(`Workflow ${index + 1}: Invalid structure`);
+          }
+
+          const normalized = normalizeWorkflow(workflow);
+          return normalized;
+        } catch (err) {
+          errors.push(`Workflow ${index + 1}: Processing error`);
+          return null;
+        }
+      })
+      .filter(Boolean) as Workflow[];
+
+    setValidationErrors(errors);
+    return normalizedWorkflows;
+  }, [rawWorkflows]);
 
   useEffect(() => {
-    const loadWorkflows = async () => {
-      try {
-        setIsLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        setWorkflows(mockWorkflows);
-        setSelectedWorkflow(mockWorkflows[0]);
-      } catch (error) {
-        console.error('Error loading workflows:', error);
-      } finally {
-        setIsLoading(false);
+    if (workflows.length > 0 && !selectedWorkflow) {
+      const defaultWorkflow = workflows.find((w) => w.isDefault);
+      const selected = defaultWorkflow || workflows[0];
+      setSelectedWorkflow(selected);
+    } else if (workflows.length === 0) {
+      setSelectedWorkflow(null);
+    }
+  }, [workflows, selectedWorkflow]);
+
+  const handleCreateWorkflow = useCallback(async (workflowData: CreateWorkflowData) => {
+    try {
+      setIsUpdating(true);
+      
+      const newWorkflow = await workflowsApi.createWorkflow(workflowData);
+      
+      if (onCreateWorkflow) {
+        onCreateWorkflow(newWorkflow);
       }
-    };
-
-    loadWorkflows();
-  }, [projectId]);
-
-  const handleCreateWorkflow = () => {
-    setShowCreateModal(true);
-  };
-
-  const handleDeleteWorkflow = (workflowId: string) => {
-    if (workflows.find(w => w.id === workflowId)?.isDefault) {
-      alert('Cannot delete default workflow');
-      return;
+      setShowCreateForm(false);
+      
+      if (onRefresh) {
+        onRefresh();
+      }
+      
+      return newWorkflow;
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsUpdating(false);
     }
+  }, [onCreateWorkflow, onRefresh]);
+
+  const handleUpdateWorkflow = useCallback(async (updatedWorkflow: Workflow) => {
+    try {
+      setIsUpdating(true);
+
+      const updateData: UpdateWorkflowData = {
+        name: updatedWorkflow.name,
+        description: updatedWorkflow.description,
+        isDefault: updatedWorkflow.isDefault,
+      };
+
+      const result = await workflowsApi.updateWorkflow(updatedWorkflow.id, updateData);
+
+      const normalizedResult = normalizeWorkflow(result);
+
+      if (onUpdateWorkflow) {
+        onUpdateWorkflow(normalizedResult);
+      }
+
+      setSelectedWorkflow(normalizedResult);
+      setHasUnsavedChanges(false);
+
+      if (onRefresh) {
+        onRefresh();
+      }
+
+      return normalizedResult;
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [onUpdateWorkflow, onRefresh]);
+
+  const handleDeleteWorkflow = useCallback(async (workflowId: string) => {
+    const workflow = workflows.find((w) => w.id === workflowId);
     
-    setWorkflows(prev => prev.filter(w => w.id !== workflowId));
-    if (selectedWorkflow?.id === workflowId) {
-      setSelectedWorkflow(workflows.find(w => w.isDefault) || workflows[0]);
+    if (workflow?.isDefault) {
+      return;
     }
-    console.log('Deleting workflow:', workflowId);
-  };
 
-  const handleSetDefault = (workflowId: string) => {
-    setWorkflows(prev => prev.map(w => ({
-      ...w,
-      isDefault: w.id === workflowId
-    })));
-    console.log('Setting default workflow:', workflowId);
-  };
+    if (!confirm("Are you sure you want to delete this workflow? This action cannot be undone.")) {
+      return;
+    }
 
-  const handleUpdateWorkflow = (updatedWorkflow: Workflow) => {
-    setWorkflows(prev => prev.map(w => 
-      w.id === updatedWorkflow.id ? updatedWorkflow : w
-    ));
-    setSelectedWorkflow(updatedWorkflow);
-    console.log('Updated workflow:', updatedWorkflow);
-  };
+    try {
+      setIsUpdating(true);
+      
+      await workflowsApi.deleteWorkflow(workflowId);
+      
+      if (onDeleteWorkflow) {
+        onDeleteWorkflow(workflowId);
+      }
+      
+      if (selectedWorkflow?.id === workflowId) {
+        const defaultWorkflow = workflows.find((w) => w.isDefault && w.id !== workflowId);
+        const fallbackWorkflow = workflows.find((w) => w.id !== workflowId);
+        const newSelected = defaultWorkflow || fallbackWorkflow || null;
+        setSelectedWorkflow(newSelected);
+      }
+      
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [workflows, selectedWorkflow, onDeleteWorkflow, onRefresh]);
 
-  const handleUpdateStatus = (statusId: string, updatedStatus: Partial<TaskStatus>) => {
-    if (!selectedWorkflow) return;
+  const handleSetDefault = useCallback(async (workflowId: string) => {
+    try {
+      setIsUpdating(true);
+      
+      await workflowsApi.setAsDefaultWorkflow(workflowId);
+      
+      if (onSetDefaultWorkflow) {
+        onSetDefaultWorkflow(workflowId);
+      }
+      
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [onSetDefaultWorkflow, onRefresh]);
 
-    const updatedWorkflow = {
-      ...selectedWorkflow,
-      statuses: selectedWorkflow.statuses.map(status => 
-        status.id === statusId ? { ...status, ...updatedStatus } : status
-      )
-    };
-
-    handleUpdateWorkflow(updatedWorkflow);
-  };
-
-  const handleCreateStatus = (newStatus: Omit<TaskStatus, 'id'>) => {
-    if (!selectedWorkflow) return;
-
-    const status: TaskStatus = {
-      ...newStatus,
-      id: `status-${Date.now()}`,
-      workflowId: selectedWorkflow.id
-    };
-
-    const updatedWorkflow = {
-      ...selectedWorkflow,
-      statuses: [...selectedWorkflow.statuses, status]
-    };
-
-    handleUpdateWorkflow(updatedWorkflow);
-  };
-
-  const handleDeleteStatus = (statusId: string) => {
-    if (!selectedWorkflow) return;
-
-    const status = selectedWorkflow.statuses.find(s => s.id === statusId);
-    if (status?.isDefault) {
-      alert('Cannot delete default status');
+  const handleUpdateStatus = useCallback((statusId: string, updatedStatus: Partial<TaskStatus>) => {
+    if (!selectedWorkflow) {
       return;
     }
 
     const updatedWorkflow = {
       ...selectedWorkflow,
-      statuses: selectedWorkflow.statuses.filter(s => s.id !== statusId)
+      statuses: selectedWorkflow.statuses?.map((status) =>
+        status.id === statusId ? { ...status, ...updatedStatus } : status
+      ),
+      _count: {
+        statuses: selectedWorkflow.statuses?.length || 0,
+        transitions: selectedWorkflow._count?.transitions ?? 0,
+      },
     };
 
-    handleUpdateWorkflow(updatedWorkflow);
-  };
+    setSelectedWorkflow(updatedWorkflow as Workflow);
+    setHasUnsavedChanges(true);
+  }, [selectedWorkflow]);
 
-  const getCategoryVariant = (category: StatusCategory) => {
+  const handleCreateStatus = useCallback((
+    newStatus: Omit<TaskStatus, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">
+  ) => {
+    if (!selectedWorkflow || !currentUser) {
+      return;
+    }
+
+    // const status: TaskStatus = {
+    //   ...newStatus,
+    //   id: `status-${Date.now()}`,
+    //   workflowId: selectedWorkflow.id,
+    //   createdAt: new Date().toISOString(),
+    //   updatedAt: new Date().toISOString(),
+    //   createdBy: currentUser.id,
+    //   updatedBy: currentUser.id,
+    // };
+
+    const updatedWorkflow = {
+      ...selectedWorkflow,
+      statuses: [...(selectedWorkflow.statuses || []), status],
+      _count: {
+        statuses: ((selectedWorkflow._count?.statuses) || 0) + 1,
+        transitions: selectedWorkflow._count?.transitions ?? 0,
+      },
+    };
+
+    setSelectedWorkflow(updatedWorkflow as Workflow);
+    setHasUnsavedChanges(true);
+  }, [selectedWorkflow, currentUser]);
+
+  const handleDeleteStatus = useCallback((statusId: string) => {
+    if (!selectedWorkflow) {
+      return;
+    }
+
+    const status = (selectedWorkflow.statuses || []).find((s) => s.id === statusId);
+    if (status) {
+      return;
+    }
+
+    const updatedWorkflow = {
+      ...selectedWorkflow,
+      statuses: (selectedWorkflow.statuses || []).filter((s) => s.id !== statusId),
+      _count: {
+        statuses: ((selectedWorkflow._count?.statuses) || 0) - 1,
+        transitions: selectedWorkflow._count?.transitions ?? 0,
+      },
+    };
+
+    setSelectedWorkflow(updatedWorkflow as Workflow);
+    setHasUnsavedChanges(true);
+  }, [selectedWorkflow]);
+
+  const getCategoryVariant = (category: string) => {
     switch (category) {
-      case StatusCategory.TODO:
-        return 'default';
-      case StatusCategory.IN_PROGRESS:
-        return 'secondary';
-      case StatusCategory.DONE:
-        return 'secondary';
+      case "TODO":
+        return "bg-[var(--muted)] text-[var(--muted-foreground)] border-none";
+      case "IN_PROGRESS":
+        return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800 border-none";
+      case "DONE":
+        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 border-none";
       default:
-        return 'default';
+        return "bg-[var(--muted)] text-[var(--muted-foreground)] border-none";
     }
   };
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: HiEye },
-    { id: 'editor', label: 'Workflow Editor', icon: HiPencilSquare },
-    { id: 'statuses', label: 'Status Configuration', icon: HiCog6Tooth }
+    { id: "overview", label: "Overview", icon: HiEye },
+    { id: "editor", label: "Editor", icon: HiPencil },
+    { id: "statuses", label: "Statuses", icon: HiCog },
   ];
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-amber-200 border-t-amber-600"></div>
-        <span className="ml-2 text-stone-600 dark:text-stone-400">Loading workflows...</span>
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin mr-3"></div>
+        <span className="text-sm text-[var(--muted-foreground)]">
+          Loading workflows...
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 rounded-lg">
+        <div className="flex items-center gap-3">
+          <HiExclamationTriangle className="w-5 h-5 text-[var(--destructive)] flex-shrink-0" />
+          <div className="flex-1">
+            <h4 className="text-sm font-medium text-[var(--destructive)] mb-1">
+              Error loading workflows
+            </h4>
+            <p className="text-sm text-[var(--destructive)]/80">{error}</p>
+          </div>
+          {onRefresh && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onRefresh}
+              className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
+            >
+              <HiArrowPath className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (validationErrors.length > 0 && workflows.length === 0) {
+    return (
+      <div className="p-4 bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 rounded-lg">
+        <div className="flex items-start gap-3">
+          <HiExclamationTriangle className="w-5 h-5 text-[var(--destructive)] flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-medium text-[var(--destructive)] mb-2">
+              Workflow Data Issues
+            </h4>
+            <ul className="text-sm text-[var(--destructive)]/80 space-y-1">
+              {validationErrors.map((error, index) => (
+                <li key={index}>• {error}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (workflows.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[var(--muted)] flex items-center justify-center">
+          <HiViewGrid className="w-6 h-6 text-[var(--muted-foreground)]" />
+        </div>
+        <h3 className="text-md font-semibold text-[var(--foreground)] mb-2">
+          No workflows found
+        </h3>
+        <p className="text-sm text-[var(--muted-foreground)] mb-6">
+          {isProjectLevel
+            ? "Create your first workflow for this project."
+            : "Create your first workflow template."}
+        </p>
+        <Button 
+          onClick={() => setShowCreateForm(true)} 
+          disabled={isUpdating}
+          className="h-9 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium"
+        >
+          {isUpdating ? (
+            <div className="w-4 h-4 border-2 border-[var(--primary-foreground)] border-t-transparent rounded-full animate-spin mr-2"></div>
+          ) : (
+            <HiPlus className="w-4 h-4 mr-2" />
+          )}
+          Create Workflow
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 flex items-center gap-2">
-            <HiArrowPath size={20} className="text-amber-600" />
-            Workflow Management
-          </h2>
-          <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
-            Manage workflows and task statuses for your project
+          <h3 className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
+            <HiViewGrid className="w-5 h-5 text-[var(--primary)]" />
+            {isProjectLevel ? "Project Workflows" : "Workflows"}
+          </h3>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            {isProjectLevel
+              ? "Manage workflows and task statuses for this project"
+              : "Manage workflow templates and task statuses"}
           </p>
         </div>
-        <Button onClick={handleCreateWorkflow} className="flex items-center gap-2">
-          <HiPlus size={16} />
-          Create Workflow
-        </Button>
+        <div className="flex items-center gap-3">
+          {hasUnsavedChanges && (
+            <Button
+              onClick={() => selectedWorkflow && handleUpdateWorkflow(selectedWorkflow)}
+              disabled={isUpdating}
+              variant="outline"
+              size="sm"
+              className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
+            >
+              {isUpdating ? (
+                <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin mr-2"></div>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          )}
+          <Button
+            onClick={() => setShowCreateForm(true)}
+            disabled={isUpdating}
+            className="h-8 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium"
+          >
+            {isUpdating ? (
+              <div className="w-4 h-4 border-2 border-[var(--primary-foreground)] border-t-transparent rounded-full animate-spin mr-2"></div>
+            ) : (
+              <HiPlus className="w-4 h-4 mr-2" />
+            )}
+            Create
+          </Button>
+        </div>
       </div>
 
-      {/* Workflow List & Tabs */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Workflow List */}
-        <div className="lg:col-span-1">
-          <Card className="p-4">
-            <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-4">
-              Workflows
-            </h3>
-            <div className="space-y-2">
-              {workflows.map(workflow => (
-                <div
-                  key={workflow.id}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedWorkflow?.id === workflow.id
-                      ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700'
-                      : 'border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800'
-                  }`}
-                  onClick={() => setSelectedWorkflow(workflow)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-stone-900 dark:text-stone-100">
-                        {workflow.name}
-                      </h4>
-                      <p className="text-xs text-stone-500 dark:text-stone-400">
-                        {workflow.statuses.length} statuses
-                      </p>
-                    </div>
-                    {workflow.isDefault && (
-                      <Badge variant="secondary" className="flex items-center gap-1">
-                        <HiCheck size={10} />
-                        Default
-                      </Badge>
-                    )}
-                  </div>
-                  {workflow.description && (
-                    <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                      {workflow.description}
-                    </p>
-                  )}
-                </div>
-              ))}
+      {validationErrors.length > 0 && workflows.length > 0 && (
+        <div className="p-3 bg-[var(--muted)]/50 border border-[var(--border)] rounded-lg">
+          <div className="flex items-start gap-2">
+            <HiExclamationTriangle className="w-4 h-4 text-[var(--muted-foreground)] flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-[var(--foreground)] mb-1">Some workflows have data issues:</p>
+              <ul className="text-xs text-[var(--muted-foreground)] space-y-0.5">
+                {validationErrors.slice(0, 3).map((error, index) => (
+                  <li key={index}>• {error}</li>
+                ))}
+                {validationErrors.length > 3 && (
+                  <li>• ... and {validationErrors.length - 3} more issues</li>
+                )}
+              </ul>
             </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="lg:col-span-1">
+          <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-[var(--foreground)]">
+                Workflows ({workflows.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2">
+                {workflows.map((workflow) => {
+                  const statusCount = workflow._count?.statuses || 0;
+                  const transitionCount = workflow._count?.transitions || 0;
+
+                  return (
+                    <div
+                      key={workflow.id}
+                      className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                        selectedWorkflow?.id === workflow.id
+                          ? "border-[var(--primary)] bg-[var(--primary)]/5"
+                          : "border-[var(--border)] hover:bg-[var(--accent)]"
+                      }`}
+                      onClick={() => {
+                        setSelectedWorkflow(workflow);
+                        setHasUnsavedChanges(false);
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-medium text-[var(--foreground)] truncate">
+                          {workflow.name || "Unnamed Workflow"}
+                        </h4>
+                        {workflow.isDefault && (
+                          <Badge className="bg-[var(--primary)]/10 text-[var(--primary)] border-none text-xs flex items-center gap-1">
+                            <HiCheck className="w-3 h-3" />
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        {statusCount} statuses • {transitionCount} transitions
+                      </p>
+                      {workflow.description && (
+                        <p className="text-xs text-[var(--muted-foreground)] mt-2 line-clamp-2">
+                          {workflow.description}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
           </Card>
         </div>
 
-        {/* Main Content */}
         <div className="lg:col-span-3">
           {selectedWorkflow && (
             <>
-              {/* Tab Navigation */}
-              <div className="mb-6">
+              <div className="border-b border-[var(--border)] mb-4">
                 <div className="flex gap-1">
-                  {tabs.map(tab => {
+                  {tabs.map((tab) => {
                     const IconComponent = tab.icon;
                     const isActive = activeTab === tab.id;
-                    
+
                     return (
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                        className={`flex items-center gap-2 px-3 py-2 border-b-2 border-transparent text-sm font-medium transition-colors ${
                           isActive
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                            : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800'
+                            ? "border-[var(--primary)] text-[var(--primary)]"
+                            : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                         }`}
                       >
-                        <IconComponent size={14} />
+                        <IconComponent className="w-4 h-4" />
                         {tab.label}
                       </button>
                     );
@@ -396,134 +580,137 @@ export default function WorkflowManager({ projectId }: WorkflowManagerProps) {
                 </div>
               </div>
 
-              {/* Tab Content */}
-              <div className="min-h-[500px]">
-                {activeTab === 'overview' && (
-                  <div className="space-y-6">
-                    {/* Workflow Info */}
-                    <Card className="p-6">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-2">
-                            {selectedWorkflow.name}
-                          </h3>
-                          <p className="text-sm text-stone-600 dark:text-stone-400">
-                            {selectedWorkflow.description}
-                          </p>
+              <div className="min-h-[400px]">
+                {activeTab === "overview" && (
+                  <div className="space-y-4">
+                    <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-md font-semibold text-[var(--foreground)] mb-2">
+                              {selectedWorkflow.name || "Unnamed Workflow"}
+                            </h3>
+                            <p className="text-sm text-[var(--muted-foreground)] mb-3">
+                              {selectedWorkflow.description || "No description provided"}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
+                              <span>
+                                Created: {selectedWorkflow.createdAt
+                                  ? new Date(selectedWorkflow.createdAt).toLocaleDateString()
+                                  : "Unknown"}
+                              </span>
+                              <span>
+                                Updated: {selectedWorkflow.updatedAt
+                                  ? new Date(selectedWorkflow.updatedAt).toLocaleDateString()
+                                  : "Unknown"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {!selectedWorkflow.isDefault && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSetDefault(selectedWorkflow.id)}
+                                disabled={isUpdating}
+                                className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
+                              >
+                                Set as Default
+                              </Button>
+                            )}
+                            {!selectedWorkflow.isDefault && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteWorkflow(selectedWorkflow.id)}
+                                disabled={isUpdating}
+                                className="h-8 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
+                              >
+                                <HiTrash className="w-3 h-3 mr-1" />
+                                Delete
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          {!selectedWorkflow.isDefault && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleSetDefault(selectedWorkflow.id)}
-                            >
-                              Set as Default
-                            </Button>
-                          )}
-                          {!selectedWorkflow.isDefault && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleDeleteWorkflow(selectedWorkflow.id)}
-                              className="flex items-center gap-1"
-                            >
-                              <HiTrash size={12} />
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </div>
+                      </CardContent>
                     </Card>
 
-                    {/* Status Flow */}
-                    <Card className="p-6">
-                      <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-4">
-                        Status Flow
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-4">
-                        {selectedWorkflow.statuses
-                          .sort((a, b) => a.order - b.order)
-                          .map((status, index) => (
-                            <React.Fragment key={status.id}>
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className="w-4 h-4 rounded-full border border-stone-200 dark:border-stone-700"
-                                  style={{ backgroundColor: status.color }}
-                                />
-                                <div>
-                                  <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
-                                    {status.name}
+                    <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md font-semibold text-[var(--foreground)]">
+                          Status Flow
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {selectedWorkflow.statuses && selectedWorkflow.statuses.length > 0 ? (
+                          <div className="flex flex-wrap items-center gap-3">
+                            {(selectedWorkflow.statuses as TaskStatus[])
+                              .sort((a, b) => (a.position || 0) - (b.position || 0))
+                              .map((status, index) => (
+                                <React.Fragment key={status.id}>
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className="w-3 h-3 rounded-full border border-[var(--border)]"
+                                      style={{
+                                        backgroundColor: status.color || "#gray",
+                                      }}
+                                    />
+                                    <div>
+                                      <div className="text-sm font-medium text-[var(--foreground)]">
+                                        {status.name || "Unnamed Status"}
+                                      </div>
+                                      <Badge className={`mt-1 text-xs ${getCategoryVariant(status.category)}`}>
+                                        {(status.category || "UNKNOWN").replace("_", " ")}
+                                      </Badge>
+                                    </div>
                                   </div>
-                                  <Badge variant={getCategoryVariant(status.category)} className="mt-1">
-                                    {status.category}
-                                  </Badge>
-                                </div>
-                              </div>
-                              {index < selectedWorkflow.statuses.length - 1 && (
-                                <HiChevronRight className="w-4 h-4 text-stone-400" />
-                              )}
-                            </React.Fragment>
-                          ))}
-                      </div>
-                    </Card>
-
-                    {/* Statistics */}
-                    <Card className="p-6">
-                      <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-4 flex items-center gap-2">
-                        <HiChartBarSquare size={16} className="text-amber-600" />
-                        Statistics
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="text-center p-4 bg-stone-50 dark:bg-stone-800 rounded-lg">
-                          <div className="text-xl font-bold text-amber-600 dark:text-amber-400">
-                            {selectedWorkflow.statuses.length}
+                                  {selectedWorkflow.statuses &&
+                                    index < selectedWorkflow.statuses.length - 1 && (
+                                      <HiChevronRight className="w-4 h-4 text-[var(--muted-foreground)]" />
+                                    )}
+                                </React.Fragment>
+                              ))}
                           </div>
-                          <div className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                            Total Statuses
-                          </div>
-                        </div>
-                        <div className="text-center p-4 bg-stone-50 dark:bg-stone-800 rounded-lg">
-                          <div className="text-xl font-bold text-stone-600 dark:text-stone-400">
-                            {selectedWorkflow.statuses.filter(s => s.category === StatusCategory.TODO).length}
-                          </div>
-                          <div className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                            To Do
-                          </div>
-                        </div>
-                        <div className="text-center p-4 bg-stone-50 dark:bg-stone-800 rounded-lg">
-                          <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                            {selectedWorkflow.statuses.filter(s => s.category === StatusCategory.IN_PROGRESS).length}
-                          </div>
-                          <div className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                            In Progress
-                          </div>
-                        </div>
-                        <div className="text-center p-4 bg-stone-50 dark:bg-stone-800 rounded-lg">
-                          <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                            {selectedWorkflow.statuses.filter(s => s.category === StatusCategory.DONE).length}
-                          </div>
-                          <div className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                            Done
-                          </div>
-                        </div>
-                      </div>
+                        ) : (
+                          <p className="text-sm text-[var(--muted-foreground)]">
+                            No statuses configured for this workflow.
+                          </p>
+                        )}
+                      </CardContent>
                     </Card>
                   </div>
                 )}
 
-                {activeTab === 'editor' && (
+                {activeTab === "editor" && (
                   <WorkflowEditor
                     workflow={selectedWorkflow}
-                    onUpdate={handleUpdateWorkflow}
+                    onUpdate={(updatedWorkflow) => {
+                      setSelectedWorkflow(updatedWorkflow);
+                      setHasUnsavedChanges(true);
+                    }}
+                    isUpdating={isUpdating}
                   />
                 )}
 
-                {activeTab === 'statuses' && (
+                {activeTab === "statuses" && (
                   <StatusConfiguration
-                    workflow={selectedWorkflow}
+                    workflow={{
+                      ...selectedWorkflow,
+                      statuses: (selectedWorkflow.statuses || []).map((s: any) => ({
+                        ...s,
+                        order: s.position ?? 0,
+                      })),
+                    }}
                     onUpdateStatus={handleUpdateStatus}
-                    onCreateStatus={handleCreateStatus}
+                    onCreateStatus={(newStatus) => {
+                      handleCreateStatus({
+                        ...newStatus,
+                        position: (newStatus as any).order ?? 0,
+                        color: (newStatus as any).color ?? "#64748b",
+                        isDefault: (newStatus as any).isDefault ?? false,
+                        workflowId: selectedWorkflow.id,
+                      });
+                    }}
                     onDeleteStatus={handleDeleteStatus}
                   />
                 )}
@@ -532,6 +719,18 @@ export default function WorkflowManager({ projectId }: WorkflowManagerProps) {
           )}
         </div>
       </div>
+
+      <CreateWorkflowForm
+        isOpen={showCreateForm}
+        onClose={() => setShowCreateForm(false)}
+        onSuccess={async (workflowData) => {
+          const result = await handleCreateWorkflow(workflowData);
+          return result;
+        }}
+        organizationId={organizationId || currentOrganization?.id || ""}
+        isProjectLevel={isProjectLevel}
+        isLoading={isUpdating}
+      />
     </div>
   );
 }

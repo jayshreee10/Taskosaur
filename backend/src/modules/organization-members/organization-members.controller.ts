@@ -47,6 +47,10 @@ export class OrganizationMembersController {
   findAll(@Query('organizationId') organizationId?: string) {
     return this.organizationMembersService.findAll(organizationId);
   }
+  @Get('slug')
+  findAllByOrgSlug(@Query('slug') slug?: string) {
+    return this.organizationMembersService.findAllByOrgSlug(slug);
+  }
 
   @Get('user/:userId/organizations')
   getUserOrganizations(@Param('userId', ParseUUIDPipe) userId: string) {

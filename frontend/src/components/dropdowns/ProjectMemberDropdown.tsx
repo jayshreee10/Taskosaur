@@ -154,13 +154,25 @@ export default function ProjectMemberDropdown({
         return;
       }
       
-      const membersList = data || [];
+      const membersList = (data || []).map((pm: any) => {
+        const user = pm.user || {};
+        return {
+          id: pm.id || '',
+          user: {
+            id: user.id || '',
+            email: user.email || '',
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            username: user.username || '',
+            avatar: user.avatar || '',
+          },
+          role: pm.role || '',
+        };
+      });
       setMembers(membersList);
-      
       // Cache the results
       membersCache.current.set(projectId, membersList);
       lastFetchedProjectRef.current = projectId;
-      
       console.log('✅ [ProjectMemberDropdown] Successfully fetched and cached members:', membersList.length);
     } catch (error) {
       if (!currentController.signal.aborted && isMountedRef.current) {

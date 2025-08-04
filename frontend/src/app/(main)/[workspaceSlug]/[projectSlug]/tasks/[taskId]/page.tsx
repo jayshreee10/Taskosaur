@@ -140,16 +140,16 @@ export default function TaskDetailPage({ params }: Props) {
   const [project, setProject] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const resolvedParams = use(params);
   const { workspaceSlug, projectSlug, taskId } = resolvedParams;
   const router = useRouter();
-  
+
   const { getTaskById } = useTask();
   const { getWorkspaceBySlug } = useWorkspaceContext();
   const { getProjectsByWorkspace } = useProjectContext();
   const { isAuthenticated } = useAuth();
-  
+
   // Global fetch prevention hook
   const {
     shouldPreventFetch,
@@ -180,15 +180,18 @@ export default function TaskDetailPage({ params }: Props) {
   };
 
   useEffect(() => {
-    // Check authentication
+    // Check authentication only
     if (!isAuthenticated()) {
-      setError('Authentication required');
+      setError('Authentication required. Please log in again.');
       setIsLoading(false);
       return;
     }
-    
+    // Debug: log token if needed
+    // import TokenManager from '@/lib/api' if you want to debug
+    // console.log('[TaskDetailPage] Auth token:', TokenManager.getAccessToken?.());
+
     const fetchKey = `task-detail-${workspaceSlug}/${projectSlug}/tasks/${taskId}`;
-    
+
     // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       // Try to get cached data
@@ -201,19 +204,19 @@ export default function TaskDetailPage({ params }: Props) {
         return;
       }
     }
-    
+
     // Reset state for new fetch
     setTask(null);
     setWorkspace(null);
     setProject(null);
     setError(null);
     setIsLoading(true);
-    
+
     // Fetch data
     const fetchData = async () => {
       // Mark fetch as started
       markFetchStart(fetchKey);
-      
+
       try {
         // Fetch workspace
         const workspaceData = await getWorkspaceBySlug(workspaceSlug);
@@ -221,7 +224,7 @@ export default function TaskDetailPage({ params }: Props) {
           throw new Error('Workspace not found');
         }
         setWorkspace(workspaceData);
-        
+
         // Fetch projects
         const projectsData = await getProjectsByWorkspace(workspaceData.id);
         const foundProject = findProjectBySlug(projectsData || [], projectSlug);
@@ -229,13 +232,13 @@ export default function TaskDetailPage({ params }: Props) {
           throw new Error('Project not found');
         }
         setProject(foundProject);
-        
+
         // Fetch task
         const taskData = await getTaskById(taskId);
         if (!taskData) {
           throw new Error('Task not found');
         }
-        
+
         // Enhance task data
         const enhancedTask = {
           ...taskData,
@@ -257,20 +260,17 @@ export default function TaskDetailPage({ params }: Props) {
           reporter: (taskData as any).reporter || null,
           updatedAt: (taskData as any).updatedAt || (taskData as any).createdAt || new Date().toISOString(),
         };
-        
+
         setTask(enhancedTask);
-        
+
         // Mark fetch as complete and cache the data
         markFetchComplete(fetchKey, {
           task: enhancedTask,
           workspace: workspaceData,
           project: foundProject
         });
-        
-
-        
       } catch (error) {
-        console.error('❌ [TASK_DETAIL] Error fetching data:', error);
+        console.error('❌ [TASK_DETAIL_WORKSPACE] Error fetching data:', error);
         setError(error instanceof Error ? error.message : 'Failed to load task data');
         markFetchError(fetchKey);
       } finally {
@@ -279,7 +279,7 @@ export default function TaskDetailPage({ params }: Props) {
     };
 
     fetchData();
-  }, [workspaceSlug, projectSlug, taskId]); // Only depend on route parameters
+  }, [workspaceSlug, projectSlug, taskId, isAuthenticated]); // Only depend on route parameters and auth
 
   // Manual retry function
   const retryFetch = () => {

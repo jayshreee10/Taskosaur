@@ -18,11 +18,11 @@ export const taskViewTypes = [
     key: 'kanban', 
     icon: <HiTemplate size={16} />,
   },
-  {
-    name: 'Calendar',
-    key: 'calendar',
-    icon: <HiCalendar size={16} />,
-  },
+  // {
+  //   name: 'Calendar',
+  //   key: 'calendar',
+  //   icon: <HiCalendar size={16} />,
+  // },
   {
     name: 'Gantt',
     key: 'gantt',

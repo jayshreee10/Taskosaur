@@ -33,12 +33,12 @@ interface Props {
 }
 
 const LoadingSpinner = () => (
-  <div className="min-h-screen bg-stone-100 dark:bg-stone-950">
+  <div className="min-h-screen bg-[var(--background)]">
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex justify-center items-center h-64">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-8 w-8 border-2 border-amber-200 border-t-amber-600"></div>
-          <div className="text-sm text-stone-600 dark:text-stone-400">Loading project kanban...</div>
+          <div className="text-sm text-[var(--muted-foreground)]">Loading project kanban...</div>
         </div>
       </div>
     </div>
@@ -52,17 +52,17 @@ const ErrorState = ({
   error: string;
   onRetry: () => void;
 }) => (
-  <div className="min-h-screen bg-stone-100 dark:bg-stone-950">
+  <div className="min-h-screen bg-[var(--background)]">
     <div className="max-w-7xl mx-auto p-6">
-      <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+      <Card className="border-[var(--destructive)]/20 bg-[var(--destructive)]/10">
         <CardHeader>
           <CardTitle className="flex items-start gap-3">
             <HiExclamationTriangle className="w-5 h-5 text-red-500 mt-0.5" />
-            <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+            <span className="text-sm font-semibold text-[var(--destructive)]">
               Error loading project kanban
             </span>
           </CardTitle>
-          <CardDescription className="text-sm text-red-600 dark:text-red-400">
+          <CardDescription className="text-sm text-[var(--destructive)]">
             {error}
           </CardDescription>
         </CardHeader>
@@ -70,7 +70,7 @@ const ErrorState = ({
           <Button 
             onClick={onRetry}
             variant="secondary"
-            className="flex items-center gap-2 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600"
+            className="flex items-center gap-2 text-[var(--destructive)] border-[var(--destructive)]/30"
           >
             <HiArrowPath size={16} />
             Try again
@@ -196,30 +196,29 @@ export default function ProjectTasksKanbanPage({ params }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 dark:bg-stone-950">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400 mb-1">
-                <Link href={`/${workspaceSlug}`} className="hover:text-stone-700 dark:hover:text-stone-300">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                <Link href={`/${workspaceSlug}`} className="hover:text-foreground">
                   {workspaceData?.name}
                 </Link>
                 <span>/</span>
-                <Link href={`/${workspaceSlug}/${projectSlug}`} className="hover:text-stone-700 dark:hover:text-stone-300">
+                <Link href={`/${workspaceSlug}/${projectSlug}`} className="hover:text-foreground">
                   {projectData?.name}
                 </Link>
               </div>
-              <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-1 flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-foreground mb-1 flex items-center gap-2">
                 <HiClipboardDocumentList size={20} />
                 Tasks
               </h1>
-              <p className="text-sm text-stone-600 dark:text-stone-400">
+              <p className="text-sm text-muted-foreground">
                 Manage and track all tasks for {projectData?.name}
               </p>
             </div>
-            
             {/* Controls */}
             <div className="flex flex-wrap gap-3 items-center">
               <Link href={`/${workspaceSlug}/${projectSlug}/tasks/new`}>
@@ -230,20 +229,17 @@ export default function ProjectTasksKanbanPage({ params }: Props) {
               </Link>
             </div>
           </div>
-
           {/* Task Count */}
-          <div className="mt-4 flex items-center gap-4 text-sm text-stone-500 dark:text-stone-400">
+          <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
             <span>
               {projectTasks.length} tasks
             </span>
           </div>
         </div>
-
         {/* View Tabs */}
         <div className="mb-6">
           <TaskViewTabs currentView="kanban" baseUrl={`/${workspaceSlug}/${projectSlug}/tasks`} />
         </div>
-
         {/* Kanban Board */}
         <div className="">
           <TaskKanbanView

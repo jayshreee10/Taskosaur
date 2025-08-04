@@ -65,7 +65,7 @@ export default function NewProjectPage({ params }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    key: '',
+    slug: '',
     description: '',
     color: '#6366F1',
     status: 'ACTIVE',
@@ -218,7 +218,7 @@ export default function NewProjectPage({ params }: Props) {
   const isFormValid = () => {
     return (
       formData.name.trim() !== '' &&
-      formData.key.trim() !== '' &&
+      formData.slug.trim() !== '' &&
       formData.description.trim() !== '' &&
       formData.startDate !== '' &&
       formData.endDate !== '' &&
@@ -242,7 +242,7 @@ export default function NewProjectPage({ params }: Props) {
     if (formData.name) {
       setFormData(prev => ({
         ...prev,
-        key: generateProjectKey(formData.name)
+        slug: generateProjectKey(formData.name)
       }));
     }
   }, [formData.name]);
@@ -274,9 +274,13 @@ export default function NewProjectPage({ params }: Props) {
         return;
       }
 
+      // Generate a project key (short identifier)
+      const key = generateProjectKey(formData.name);
+
       const projectData = {
+        key,
         name: formData.name.trim(),
-        key: formData.key || generateProjectKey(formData.name),
+        slug: formData.slug || key,
         description: formData.description.trim(),
         color: formData.color,
         status: formData.status,
@@ -288,16 +292,16 @@ export default function NewProjectPage({ params }: Props) {
         workspaceId: workspace.id,
         settings: formData.settings
       };
-      
+
       const newProject = await createProject(projectData);
-      
+
       const projectSlug = formData.name.toLowerCase()
         .trim()
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '')
         .replace(/-+/g, '-')
         .replace(/^-+|-+$/g, '');
-      
+
       router.push(`/${workspaceSlug}/${projectSlug}`);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to create project. Please try again.');
@@ -388,11 +392,11 @@ export default function NewProjectPage({ params }: Props) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="key">Project Key</Label>
+                  <Label htmlFor="slug">Project Slug</Label>
                   <Input
-                    id="key"
-                    name="key"
-                    value={formData.key}
+                    id="slug"
+                    name="slug"
+                    value={formData.slug}
                     onChange={handleChange}
                     required
                     maxLength={10}

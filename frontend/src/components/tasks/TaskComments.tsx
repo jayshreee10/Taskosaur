@@ -3,11 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { useTask } from '../../contexts/task-context';
 import { useGlobalFetchPrevention } from '@/hooks/useGlobalFetchPrevention';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import UserAvatar from '@/components/ui/avatars/UserAvatar';
 import {
   HiChatBubbleLeftRight,
   HiPencilSquare,
   HiTrash,
-  HiPlus
+  HiPlus,
+  HiExclamationTriangle
 } from 'react-icons/hi2';
 
 interface Comment {
@@ -40,60 +45,6 @@ interface TaskCommentsProps {
   onCommentUpdated?: (commentId: string, content: string) => void;
   onCommentDeleted?: (commentId: string) => void;
 }
-
-// UI Components matching your theme
-const Button = ({ 
-  children, 
-  variant = "primary", 
-  size = "sm",
-  className = "",
-  disabled = false,
-  ...props 
-}: { 
-  children: React.ReactNode;
-  variant?: "primary" | "secondary" | "danger";
-  size?: "sm" | "md";
-  className?: string;
-  disabled?: boolean;
-  [key: string]: any;
-}) => {
-  const variants = {
-    primary: "bg-amber-600 hover:bg-amber-700 disabled:bg-stone-300 dark:disabled:bg-stone-600 text-white",
-    secondary: "bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-600",
-    danger: "bg-red-600 hover:bg-red-700 disabled:bg-stone-300 dark:disabled:bg-stone-600 text-white"
-  };
-  
-  const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm"
-  };
-  
-  return (
-    <button 
-      className={`rounded-lg font-medium transition-colors disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
-      disabled={disabled}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-};
-
-const Textarea = ({ className = "", ...props }: { className?: string; [key: string]: any }) => (
-  <textarea
-    className={`w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 dark:bg-stone-700 dark:text-white transition-colors resize-none text-sm ${className}`}
-    {...props}
-  />
-);
-
-const UserAvatar = ({ name }: { name: string }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-  return (
-    <div className="h-9 w-9 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-      {initials}
-    </div>
-  );
-};
 
 export default function TaskComments({
   taskId,
@@ -149,7 +100,6 @@ export default function TaskComments({
 
     const fetchKey = `task-comments-${taskId}`;
     
-    // Check if we should prevent this fetch
     if (shouldPreventFetch(fetchKey)) {
       const cachedData = getCachedData(fetchKey);
       if (cachedData) {
@@ -162,7 +112,6 @@ export default function TaskComments({
       markFetchStart(fetchKey);
       
       try {
-
         const taskComments = await getTaskComments(taskId);
         // Transform the comments to include author display info
         const transformedComments = taskComments.map((comment: any) => ({
@@ -174,18 +123,15 @@ export default function TaskComments({
           }
         }));
         setComments(transformedComments);
-        
-        // Cache the successful result
         markFetchComplete(fetchKey, transformedComments);
-
       } catch (error) {
-        console.error('❌ [TASK_COMMENTS] Failed to fetch comments:', error);
+        console.error('Failed to fetch comments:', error);
         markFetchError(fetchKey);
       }
     };
 
     fetchComments();
-  }, [taskId]); // Only depend on task ID
+  }, [taskId]);
 
   // Refresh comments function for real-time updates
   const refreshComments = async () => {
@@ -219,11 +165,9 @@ export default function TaskComments({
 
       const createdComment = await createTaskComment(commentData);
       
-      // Refresh comments to get the latest data
       await refreshComments();
       setNewComment("");
       
-      // Call the callback if provided
       onCommentAdded?.(createdComment);
     } catch (error) {
       console.error("Failed to add comment:", error);
@@ -245,13 +189,11 @@ export default function TaskComments({
         content: editingContent.trim()
       });
 
-      // Refresh comments to get the latest data
       await refreshComments();
       
       setEditingCommentId(null);
       setEditingContent("");
       
-      // Call the callback if provided
       onCommentUpdated?.(commentId, editingContent.trim());
     } catch (error) {
       console.error("Failed to edit comment:", error);
@@ -267,11 +209,7 @@ export default function TaskComments({
 
     try {
       await deleteTaskComment(commentId, currentUser.id);
-
-      // Refresh comments to get the latest data
       await refreshComments();
-      
-      // Call the callback if provided
       onCommentDeleted?.(commentId);
     } catch (error) {
       console.error("Failed to delete comment:", error);
@@ -307,48 +245,61 @@ export default function TaskComments({
 
   if (!currentUser) {
     return (
-      <div className="text-center text-stone-500 dark:text-stone-400 p-4 bg-stone-50 dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700">
-        Please log in to view and add comments.
-      </div>
+      <Alert className="bg-[var(--muted)]/50 border-[var(--border)] text-[var(--muted-foreground)]">
+        <HiExclamationTriangle className="h-4 w-4" />
+        <AlertDescription>
+          Please log in to view and add comments.
+        </AlertDescription>
+      </Alert>
     );
   }
 
   return (
     <div>
-      <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-4 flex items-center gap-2">
-        <HiChatBubbleLeftRight size={16} className="text-amber-600" />
-        Comments ({comments.length})
-      </h2>
+      <div className="flex items-center gap-2 mb-4">
+        <HiChatBubbleLeftRight className="w-5 h-5 text-[var(--primary)]" />
+        <h3 className="text-md font-semibold text-[var(--foreground)]">
+          Comments ({comments.length})
+        </h3>
+      </div>
 
       {/* Loading State */}
       {loading && (
-        <div className="text-center text-stone-500 dark:text-stone-400 py-6 bg-stone-50 dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700">
+        <div className="text-center py-6 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
           <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-amber-200 border-t-amber-600"></div>
-            <span className="text-sm">Loading comments...</span>
+            <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm text-[var(--muted-foreground)]">Loading comments...</span>
           </div>
         </div>
       )}
 
       {/* Error State */}
       {error && (
-        <div className="text-center text-red-600 dark:text-red-400 py-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-          <span className="text-sm">Error: {error}</span>
-        </div>
+        <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
+          <HiExclamationTriangle className="h-4 w-4" />
+          <AlertDescription>Error: {error}</AlertDescription>
+        </Alert>
       )}
       
       {/* Comments List */}
       <div className="space-y-4">
         {comments.map((comment) => (
           <div key={comment.id} className="flex gap-3">
-            <UserAvatar name={comment.author?.name || `User ${comment.authorId.slice(0, 8)}`} />
+            <UserAvatar
+              user={{
+                firstName: comment.author?.name?.split(' ')[0] || 'User',
+                lastName: comment.author?.name?.split(' ')[1] || '',
+                avatar: comment.author?.avatar,
+              }}
+              size="sm"
+            />
             <div className="flex-1 min-w-0">
-              <div className="bg-stone-50 dark:bg-stone-800 p-3 rounded-lg border border-stone-200 dark:border-stone-700">
+              <div className="bg-[var(--muted)]/30 p-4 rounded-lg border border-[var(--border)]">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-stone-900 dark:text-stone-100">
+                  <h4 className="text-sm font-medium text-[var(--foreground)]">
                     {comment.author?.name || `User ${comment.authorId.slice(0, 8)}`}
-                  </h3>
-                  <p className="text-xs text-stone-500 dark:text-stone-400">
+                  </h4>
+                  <p className="text-xs text-[var(--muted-foreground)]">
                     {formatDate(comment.createdAt)}
                   </p>
                 </div>
@@ -358,14 +309,15 @@ export default function TaskComments({
                       value={editingContent}
                       onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditingContent(e.target.value)}
                       rows={3}
-                      className="mb-3"
+                      className="mb-3 border-input bg-background text-[var(--foreground)] resize-none"
                     />
                     <div className="flex justify-end gap-2">
                       <Button
                         onClick={handleCancelEdit}
-                        variant="secondary"
+                        variant="outline"
                         size="sm"
                         disabled={loading}
+                        className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
                       >
                         Cancel
                       </Button>
@@ -373,13 +325,14 @@ export default function TaskComments({
                         onClick={() => handleSaveEdit(comment.id)}
                         size="sm"
                         disabled={loading || !editingContent.trim()}
+                        className="h-8 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)]"
                       >
                         {loading ? 'Saving...' : 'Save'}
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                  <p className="text-sm text-[var(--foreground)] leading-relaxed">
                     {comment.content}
                   </p>
                 )}
@@ -388,18 +341,18 @@ export default function TaskComments({
                 <div className="mt-2 flex items-center gap-3">
                   <button
                     onClick={() => handleEditComment(comment.id, comment.content)}
-                    className="text-xs text-stone-500 dark:text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1 transition-colors"
+                    className="text-xs text-[var(--muted-foreground)] hover:text-[var(--primary)] flex items-center gap-1 transition-colors"
                     disabled={loading}
                   >
-                    <HiPencilSquare size={12} />
+                    <HiPencilSquare className="w-3 h-3" />
                     Edit
                   </button>
                   <button
                     onClick={() => handleDeleteComment(comment.id)}
-                    className="text-xs text-stone-500 dark:text-stone-400 hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1 transition-colors"
+                    className="text-xs text-[var(--muted-foreground)] hover:text-[var(--destructive)] flex items-center gap-1 transition-colors"
                     disabled={loading}
                   >
-                    <HiTrash size={12} />
+                    <HiTrash className="w-3 h-3" />
                     Delete
                   </button>
                 </div>
@@ -410,9 +363,9 @@ export default function TaskComments({
 
         {/* Empty State */}
         {!loading && comments.length === 0 && (
-          <div className="text-center text-stone-500 dark:text-stone-400 py-8 bg-stone-50 dark:bg-stone-800 rounded-lg border border-stone-200 dark:border-stone-700">
-            <HiChatBubbleLeftRight size={32} className="mx-auto mb-2 text-stone-400" />
-            <p className="text-sm">No comments yet. Be the first to comment!</p>
+          <div className="text-center py-8 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
+            <HiChatBubbleLeftRight className="w-8 h-8 mx-auto mb-3 text-[var(--muted-foreground)]" />
+            <p className="text-sm text-[var(--muted-foreground)]">No comments yet. Be the first to comment!</p>
           </div>
         )}
       </div>
@@ -420,7 +373,14 @@ export default function TaskComments({
       {/* Add Comment Form */}
       <div className="mt-6">
         <form onSubmit={handleAddComment} className="flex gap-3">
-          <UserAvatar name={`${currentUser.firstName} ${currentUser.lastName}`} />
+          <UserAvatar
+            user={{
+              firstName: currentUser.firstName || '',
+              lastName: currentUser.lastName || '',
+              avatar: currentUser.avatar,
+            }}
+            size="sm"
+          />
           <div className="flex-1 min-w-0">
             <Textarea
               value={newComment}
@@ -428,16 +388,16 @@ export default function TaskComments({
               rows={3}
               placeholder="Add a comment..."
               disabled={isSubmitting || loading}
-              className="mb-3"
+              className="mb-3 border-input bg-background text-[var(--foreground)] resize-none"
             />
             <div className="flex justify-end">
               <Button
                 type="submit"
                 disabled={!newComment.trim() || isSubmitting || loading}
-                size="md"
-                className="flex items-center gap-2"
+                size="sm"
+                className="h-9 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] flex items-center gap-2"
               >
-                <HiPlus size={14} />
+                <HiPlus className="w-4 h-4" />
                 {isSubmitting ? "Adding..." : "Comment"}
               </Button>
             </div>

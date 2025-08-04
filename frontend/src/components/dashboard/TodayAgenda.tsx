@@ -2,245 +2,256 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
-  HiX,
-  HiExclamation,
-  HiClock,
-  HiLightningBolt,
-  HiUsers,
-  HiVideoCamera,
-  HiLocationMarker,
-  HiUser,
-  HiDocumentText,
   HiCalendar,
-} from 'react-icons/hi';
-
-interface Task {
-  id: number;
-  title: string;
-  dueDate: string;
-  priority: 'high' | 'medium' | 'low';
-}
-
-interface Meeting {
-  id: number;
-  title: string;
-  time: string;
-  type: 'video' | 'in-person' | 'team';
-  location?: string;
-  attendees?: number;
-  icon: React.ComponentType<{ className?: string }>;
-  iconBg: string;
-}
+  HiClock,
+  HiFlag,
+  HiCheckCircle,
+  HiExclamationTriangle,
+  HiSparkles,
+} from 'react-icons/hi2';
+import { HiX } from "react-icons/hi";
+import { Task } from '@/utils/api';
 
 interface TodayAgendaProps {
   isOpen: boolean;
   onClose: () => void;
   currentDate: string;
   upcomingTasks?: Task[];
-  todayMeetings?: Meeting[];
 }
 
-const defaultTasks: Task[] = [
-  { id: 1, title: "Complete project proposal", dueDate: "Today", priority: "high" },
-  { id: 2, title: "Review team presentations", dueDate: "Tomorrow", priority: "medium" },
-  { id: 3, title: "Client meeting preparation", dueDate: "Friday", priority: "high" },
-];
-
-const defaultMeetings: Meeting[] = [
-  {
-    id: 1,
-    title: "Team Standup",
-    time: "9:00 AM - 9:30 AM",
-    type: "team",
-    icon: HiUsers,
-    iconBg: "bg-green-500/10",
-    location: "Video Call"
-  },
-  {
-    id: 2,
-    title: "Client Review Meeting",
-    time: "2:00 PM - 3:00 PM",
-    type: "in-person",
-    icon: HiUser,
-    iconBg: "bg-purple-500/10",
-    location: "Conference Room A"
-  },
-  {
-    id: 3,
-    title: "Project Planning Session",
-    time: "4:00 PM - 5:30 PM",
-    type: "team",
-    icon: HiDocumentText,
-    iconBg: "bg-amber-500/10",
-    attendees: 5
+const getPriorityConfig = (priority: string) => {
+  switch (priority?.toUpperCase()) {
+    case 'HIGH':
+    case 'URGENT':
+      return {
+        color: 'bg-red-500',
+        bgClass: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800',
+        iconClass: 'text-red-500',
+        label: 'High Priority'
+      };
+    case 'MEDIUM':
+      return {
+        color: 'bg-amber-500',
+        bgClass: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800',
+        iconClass: 'text-amber-500',
+        label: 'Medium Priority'
+      };
+    case 'LOW':
+      return {
+        color: 'bg-green-500',
+        bgClass: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800',
+        iconClass: 'text-green-500',
+        label: 'Low Priority'
+      };
+    default:
+      return {
+        color: 'bg-gray-400',
+        bgClass: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-700',
+        iconClass: 'text-gray-400',
+        label: 'Normal'
+      };
   }
-];
+};
+
+const formatDueDate = (dateString: string) => {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = date.getTime() - now.getTime();
+    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+    
+    if (diffHours < 0) return 'Overdue';
+    if (diffHours < 24) return `${diffHours}h left`;
+    
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return dateString;
+  }
+};
 
 export function TodayAgenda({ 
   isOpen, 
   onClose, 
   currentDate, 
-  upcomingTasks = defaultTasks, 
-  todayMeetings = defaultMeetings 
+  upcomingTasks = []
 }: TodayAgendaProps) {
   if (!isOpen) return null;
+
+  console.log('Rendering TodayAgenda with tasks:', upcomingTasks);
+
+  // Only treat 'HIGH' as urgent, since 'URGENT' is not a valid type
+  const urgentTasks = upcomingTasks.filter(task => task.priority === 'HIGH');
+  const regularTasks = upcomingTasks.filter(task => task.priority !== 'HIGH');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
       
       {/* Modal Content */}
-      <div className="relative bg-[var(--background)] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-[var(--border)] transform transition-all duration-200 scale-100">
+      <Card className="relative bg-[var(--card)] rounded-[var(--card-radius)] shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden border-none transform transition-all duration-200 scale-100 animate-in slide-in-from-bottom-4">
+        
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-[var(--primary)]/5 to-[var(--primary)]/10 px-6 py-6 border-b border-[var(--border)]/30">
+        <div className="relative bg-gradient-to-r from-[var(--primary)]/5 via-[var(--primary)]/8 to-[var(--primary)]/5 px-4 py-4 border-b border-[var(--border)]/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 flex items-center justify-center shadow-lg">
-                <HiCalendar className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 flex items-center justify-center shadow-lg">
+                  <HiCalendar className="w-5 h-5 text-[var(--primary-foreground)]" />
+                </div>
+                {upcomingTasks.length > 0 && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-white">{upcomingTasks.length}</span>
+                  </div>
+                )}
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-[var(--foreground)]">Today's Agenda</h3>
-                <p className="text-sm text-[var(--muted-foreground)] mt-1">{currentDate}</p>
+                <h3 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                  Today's Agenda
+                  <HiSparkles className="w-4 h-4 text-[var(--primary)]" />
+                </h3>
+                <p className="text-xs text-[var(--muted-foreground)]">{currentDate}</p>
               </div>
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onClose}
-              className="w-10 h-10 rounded-lg bg-[var(--accent)]/50 hover:bg-[var(--accent)] flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all duration-200"
+              className="w-8 h-8 p-0 rounded-lg hover:bg-[var(--accent)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all duration-200"
             >
-              <HiX className="w-5 h-5" />
-            </button>
+              <HiX className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
         {/* Modal Content */}
-        <div className="px-6 py-6 max-h-[70vh] overflow-y-auto">
-          <div className="space-y-6">
-            {/* Upcoming Deadlines */}
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <HiExclamation className="w-4 h-4 text-red-500" />
-                </div>
-                <h4 className="text-lg font-semibold text-[var(--foreground)]">Urgent Tasks</h4>
-              </div>
-              <div className="space-y-3">
-                {upcomingTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-4 p-4 rounded-xl border border-[var(--border)] hover:bg-[var(--accent)]/30 transition-colors duration-200"
-                  >
-                    <div className={`w-3 h-3 rounded-full ${
-                      task.priority === 'high' ? 'bg-red-500' : 
-                      task.priority === 'medium' ? 'bg-amber-500' : 'bg-green-500'
-                    }`} />
-                    <div className="flex-1">
-                      <p className="font-medium text-[var(--foreground)]">{task.title}</p>
-                      <p className="text-sm text-[var(--muted-foreground)]">Due: {task.dueDate}</p>
+        <CardContent className="p-0 max-h-[50vh] overflow-y-auto">
+          <div className="p-4 space-y-3">
+            
+            {upcomingTasks.length > 0 ? (
+              <div className="space-y-4">
+                {/* Single Task List */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                        <HiCheckCircle className="w-4 h-4 text-blue-500" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-[var(--foreground)]">Today's Tasks</h4>
+                        <p className="text-xs text-[var(--muted-foreground)]">Scheduled for completion</p>
+                      </div>
                     </div>
-                    <Button size="sm" variant="outline" className="border-[var(--border)] text-[var(--foreground)]">
-                      View
-                    </Button>
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-none">
+                      {upcomingTasks.length}
+                    </Badge>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Today's Schedule */}
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <HiClock className="w-4 h-4 text-blue-500" />
+                  
+                  <div className="space-y-2">
+                    {upcomingTasks.map((task) => {
+                      const priorityConfig = getPriorityConfig(task.priority);
+                      const isUrgent = task.priority === 'HIGH';
+                      return (
+                        <div
+                          key={task.id}
+                          className={`group p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
+                            isUrgent 
+                              ? 'border-red-200 bg-red-50/30 dark:border-red-800/30 dark:bg-red-900/5 hover:bg-red-50 dark:hover:bg-red-900/10' 
+                              : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--accent)]/30 hover:border-[var(--primary)]/20'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-1.5 h-1.5 rounded-full ${priorityConfig.color} flex-shrink-0`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${
+                                    isUrgent 
+                                      ? 'text-red-900 dark:text-red-100 group-hover:text-red-700 dark:group-hover:text-red-200' 
+                                      : 'text-[var(--foreground)] group-hover:text-[var(--primary)]'
+                                  }`}>
+                                    {task.title}
+                                  </p>
+                                  {task.description && (
+                                    <p className="text-xs text-[var(--muted-foreground)] mt-0.5 truncate">
+                                      {task.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Badge className={`text-[10px] px-1.5 py-0.5 ${priorityConfig.bgClass} border-none`}>
+                                    {task.priority}
+                                  </Badge>
+                                </div>
+                              </div>
+                              {task.dueDate && (
+                                <div className="flex items-center gap-1 mt-1.5 text-[10px] text-[var(--muted-foreground)]">
+                                  <HiClock className="w-2.5 h-2.5" />
+                                  Due: {formatDueDate(task.dueDate)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <h4 className="text-lg font-semibold text-[var(--foreground)]">Today's Schedule</h4>
               </div>
-              <div className="space-y-3">
-                {todayMeetings.map((meeting) => {
-                  const IconComponent = meeting.icon;
-                  return (
-                    <div
-                      key={meeting.id}
-                      className="flex items-center gap-4 p-4 rounded-xl border border-[var(--border)] hover:bg-[var(--accent)]/30 transition-colors duration-200"
-                    >
-                      <div className={`w-12 h-12 rounded-lg ${meeting.iconBg} flex items-center justify-center`}>
-                        <IconComponent className="w-5 h-5 text-current" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-[var(--foreground)]">{meeting.title}</p>
-                        <p className="text-sm text-[var(--muted-foreground)]">{meeting.time}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {meeting.type === 'video' && (
-                          <>
-                            <HiVideoCamera className="w-4 h-4 text-[var(--muted-foreground)]" />
-                            <span className="text-xs text-[var(--muted-foreground)]">Video Call</span>
-                          </>
-                        )}
-                        {meeting.type === 'in-person' && meeting.location && (
-                          <>
-                            <HiLocationMarker className="w-4 h-4 text-[var(--muted-foreground)]" />
-                            <span className="text-xs text-[var(--muted-foreground)]">{meeting.location}</span>
-                          </>
-                        )}
-                        {meeting.attendees && (
-                          <>
-                            <HiUsers className="w-4 h-4 text-[var(--muted-foreground)]" />
-                            <span className="text-xs text-[var(--muted-foreground)]">{meeting.attendees} attendees</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Calendar Integration Section */}
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
-                  <HiCalendar className="w-4 h-4 text-[var(--primary)]" />
+            ) : (
+              /* Empty State */
+              <div className="text-center py-8">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 flex items-center justify-center">
+                  <HiCheckCircle className="w-6 h-6 text-green-500" />
                 </div>
-                <h4 className="text-lg font-semibold text-[var(--foreground)]">Calendar Events</h4>
-              </div>
-              
-              {/* Calendar events will be populated here */}
-              <div className="p-6 border-2 border-dashed border-[var(--border)] rounded-xl text-center">
-                <HiCalendar className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-3" />
-                <p className="text-sm font-medium text-[var(--foreground)] mb-1">Calendar Integration</p>
-                <p className="text-xs text-[var(--muted-foreground)]">
-                  Connect your calendar to see events here
+                <h4 className="text-base font-semibold text-[var(--foreground)] mb-1">All clear for today!</h4>
+                <p className="text-sm text-[var(--muted-foreground)] mb-3 max-w-xs mx-auto">
+                  No tasks scheduled. You're all caught up!
                 </p>
-                <Button 
-                  size="sm" 
-                  className="mt-3 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)]"
-                >
-                  Connect Calendar
-                </Button>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <HiSparkles className="w-3 h-3 text-green-600 dark:text-green-400" />
+                  <span className="text-xs font-medium text-green-700 dark:text-green-400">
+                    Great job staying organized!
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        </div>
+        </CardContent>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 bg-[var(--accent)]/10 border-t border-[var(--border)]/30">
+        <div className="px-4 py-3 bg-[var(--muted)]/30 border-t border-[var(--border)]/50">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-[var(--muted-foreground)]">
-              Stay focused and make today productive! 🚀
-            </p>
+            <div className="flex items-center gap-2">
+              <HiSparkles className="w-3 h-3 text-[var(--primary)]" />
+              <p className="text-xs text-[var(--muted-foreground)]">
+                {upcomingTasks.length > 0 
+                  ? "Stay focused and productive!"
+                  : "Enjoy your free time!"
+                }
+              </p>
+            </div>
             <Button
               onClick={onClose}
-              className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)]"
+              size="sm"
+              className="bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 text-xs px-3 py-1.5"
             >
               Got it!
             </Button>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -8,10 +8,14 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { S3Service } from '../s3/s3.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private s3Service: S3Service,
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
     const existingUser = await this.prisma.user.findUnique({
@@ -69,7 +73,17 @@ export class UsersService {
         updatedAt: true,
       },
     });
-
+    const usersWithAvatarUrls = await Promise.all(
+      users.map(async (user) => {
+        if (user.avatar) {
+          const avatarUrl = await this.s3Service.getGetPresignedUrl(
+            user.avatar,
+          );
+          return { ...user, avatarUrl };
+        }
+        return usersWithAvatarUrls;
+      }),
+    );
     return users;
   }
 
@@ -102,8 +116,11 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
-    return user;
+    let avatarUrl: string | null = null;
+    if (user.avatar) {
+      avatarUrl = await this.s3Service.getGetPresignedUrl(user.avatar);
+    }
+    return { ...user, avatar: avatarUrl || null };
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -115,16 +132,6 @@ export class UsersService {
   async findByUsername(username: string): Promise<User | null> {
     return this.prisma.user.findUnique({
       where: { username },
-    });
-  }
-
-  async updateRefreshToken(
-    userId: string,
-    refreshToken: string | null,
-  ): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken },
     });
   }
 
@@ -172,9 +179,13 @@ export class UsersService {
       where: { id },
       data: updateData,
     });
+    let avatarUrl: string | null = null;
+    if (user.avatar) {
+      avatarUrl = await this.s3Service.getGetPresignedUrl(user.avatar);
+    }
 
     const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return {...userWithoutPassword, avatar: avatarUrl };
   }
 
   async remove(id: string): Promise<void> {
@@ -212,11 +223,48 @@ export class UsersService {
     });
   }
 
+  async findAllUsersWithResetTokens(): Promise<User[] | any[]> {
+    return this.prisma.user.findMany({
+      where: {
+        resetToken: { not: null },
+        resetTokenExpiry: { gte: new Date() },
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        resetToken: true,
+        resetTokenExpiry: true,
+      },
+    });
+  }
+  async clearResetToken(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+  }
   async updatePassword(userId: string, hashedPassword: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         password: hashedPassword,
+        updatedAt: new Date(),
+      },
+    });
+  }
+  async updateRefreshToken(
+    userId: string,
+    refreshToken: string | null,
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        refreshToken,
       },
     });
   }

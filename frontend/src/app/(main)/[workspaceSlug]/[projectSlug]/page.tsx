@@ -8,6 +8,7 @@ import { useTask } from '@/contexts/task-context';
 import { useAuth } from '@/contexts/auth-context';
 
 import { Button } from '@/components/ui';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import ProjectAvatar from '@/components/ui/avatars/ProjectAvatar';
 
@@ -40,21 +41,21 @@ interface Project {
   id: string;
   name: string;
   key: string;
-  description: string;
+  description?: string;
   color: string;
   status: string;
   priority: string;
   startDate: string;
   endDate: string;
   workspaceId: string;
-  workspace?: Workspace;
+  workspace?: Partial<Workspace>;
 }
 
 interface Task {
   id: string;
   title: string;
-  description: string;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'HIGHEST';
+  description?: string | null;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'HIGHEST' | 'LOWEST';
   startDate: string;
   dueDate: string;
   projectId: string;
@@ -213,64 +214,45 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="project-detail-container">
-        <div className="project-detail-content">
-          <div className="animate-pulse space-y-8">
+      <div className="min-h-screen bg-[var(--background)]">
+        <div className="max-w-7xl mx-auto p-4">
+          <div className="animate-pulse space-y-4">
+            {/* Breadcrumb skeleton */}
             <div className="h-4 bg-[var(--muted)] rounded w-1/3"></div>
             
-            <div className="project-detail-header">
-              <div className="project-detail-title-section">
+            {/* Header skeleton */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-[var(--muted)] rounded-lg"></div>
-                <div className="flex-1">
-                  <div className="h-6 bg-[var(--muted)] rounded w-64 mb-3"></div>
-                  <div className="h-4 bg-[var(--muted)] rounded w-96"></div>
+                <div>
+                  <div className="h-6 bg-[var(--muted)] rounded w-48 mb-2"></div>
+                  <div className="h-4 bg-[var(--muted)] rounded w-64"></div>
                 </div>
               </div>
-              <div className="project-detail-actions">
-                <div className="h-8 bg-[var(--muted)] rounded w-20"></div>
-                <div className="h-8 bg-[var(--muted)] rounded w-24"></div>
+              <div className="flex items-center gap-2">
+                <div className="h-9 bg-[var(--muted)] rounded w-20"></div>
+                <div className="h-9 bg-[var(--muted)] rounded w-24"></div>
               </div>
             </div>
-
-            <div className="project-detail-stats">
+            
+            {/* Stats skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-4">
-                  <div className="h-3 bg-[var(--muted)] rounded mb-2 w-16"></div>
-                  <div className="h-4 bg-[var(--muted)] rounded w-3/4"></div>
+                <div key={i} className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4">
+                  <div className="h-3 bg-[var(--muted)] rounded mb-3 w-16"></div>
+                  <div className="h-5 bg-[var(--muted)] rounded w-3/4"></div>
                 </div>
               ))}
             </div>
-
-            <div className="project-detail-members">
-              <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-4">
-                <div className="h-4 bg-[var(--muted)] rounded w-32 mb-4"></div>
-                <div className="flex gap-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="w-8 h-8 bg-[var(--muted)] rounded-full"></div>
-                  ))}
-                </div>
+            
+            {/* Members skeleton */}
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4">
+              <div className="h-5 bg-[var(--muted)] rounded w-32 mb-4"></div>
+              <div className="flex gap-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="w-8 h-8 bg-[var(--muted)] rounded-full"></div>
+                ))}
               </div>
-            </div>
-
-            <div className="project-detail-tasks-header">
-              <div className="h-5 bg-[var(--muted)] rounded w-24"></div>
-              <div className="h-4 bg-[var(--muted)] rounded w-20"></div>
-            </div>
-
-            <div className="project-detail-kanban">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="h-4 bg-[var(--muted)] rounded w-20"></div>
-                    <div className="h-4 bg-[var(--muted)] rounded-full w-6"></div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="h-16 bg-[var(--muted)] rounded"></div>
-                    <div className="h-16 bg-[var(--muted)] rounded"></div>
-                    <div className="h-12 bg-[var(--muted)] rounded border-2 border-dashed border-[var(--border)]"></div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -289,89 +271,142 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="project-detail-container">
-      <div className="project-detail-content">
-        <div className="project-detail-breadcrumb">
-          <Link href={`/${workspaceSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors">
-            {workspace.name}
+    <div className="min-h-screen bg-[var(--background)]">
+      <div className="max-w-7xl mx-auto p-4">
+        
+        {/* Breadcrumb - Compact */}
+        <div className="flex items-center gap-2 text-sm mb-4">
+          <Link href={`/${workspaceSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
+            {workspace?.name ?? ''}
           </Link>
           <span className="text-[var(--muted-foreground)]">/</span>
-          <span className="text-[var(--foreground)]">{project.name}</span>
+          <span className="text-[var(--foreground)] font-medium">{project?.name ?? ''}</span>
         </div>
 
-        <div className="project-detail-header">
-          <div className="project-detail-title-section">
-            <ProjectAvatar project={project} size="md" />
+        {/* Header - Reduced spacing */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            {project && <ProjectAvatar project={project} size="md" />}
             <div>
-              <h1 className="project-detail-title text-[var(--foreground)]">{project.name}</h1>
-              <p className="project-detail-description text-[var(--muted-foreground)]">
-                {project.description}
-              </p>
+              <h1 className="text-xl font-bold text-[var(--foreground)]">{project?.name ?? ''}</h1>
+              <p className="text-sm text-[var(--muted-foreground)] mt-1">{project?.description ?? ''}</p>
             </div>
           </div>
-          <div className="project-detail-actions">
+          <div className="flex items-center gap-2">
             <Link href={`/${workspaceSlug}/${projectSlug}/settings`}>
-              <Button variant="secondary" size="sm" className="bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--secondary)]/80 border-[var(--border)]">
-                <HiCog size={14} className="mr-2" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center gap-2 whitespace-nowrap transition-all duration-200"
+              >
+                <HiCog size={14} />
                 Settings
               </Button>
             </Link>
             <Link href={`/${workspaceSlug}/${projectSlug}/tasks/new`}>
-              <Button variant='secondary' size="sm" className="bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--secondary)]/80 border-[var(--border)]">
-                <HiPlus size={14} className="mr-2" />
+              <Button
+                variant="default"
+                className="h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
+              >
+                <HiPlus className="w-4 h-4" />
                 Add Task
               </Button>
             </Link>
           </div>
         </div>
 
-        <div className="project-detail-stats">
-          <StatCard
-            title="Status"
-            value={<StatusBadge status={project.status} type="project" />}
-          />
-          <StatCard
-            title="Start Date"
-            value={formatDate(project.startDate)}
-          />
-          <StatCard
-            title="End Date"
-            value={formatDate(project.endDate)}
-          />
-          <StatCard
-            title="Tasks"
-            value={tasks.length}
-          />
+        {/* Stats Row - Compact cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+          {/* Status Card */}
+          <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4">
+            <div className="flex items-center gap-1 mb-2">
+              <div className="w-1 h-4 bg-[var(--primary)] rounded-full" />
+              <h3 className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wide">Status</h3>
+            </div>
+            <div className="flex items-center">
+              {project && <StatusBadge status={project.status} type="project" />}
+            </div>
+          </Card>
+
+          {/* Start Date Card */}
+          <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4">
+            <div className="flex items-center gap-1 mb-2">
+              <div className="w-1 h-4 bg-[var(--primary)] rounded-full" />
+              <h3 className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wide">Start Date</h3>
+            </div>
+            <div className="flex items-center">
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                {project ? formatDate(project.startDate) : ''}
+              </span>
+            </div>
+          </Card>
+
+          {/* End Date Card */}
+          <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4">
+            <div className="flex items-center gap-1 mb-2">
+              <div className="w-1 h-4 bg-[var(--primary)] rounded-full" />
+              <h3 className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wide">End Date</h3>
+            </div>
+            <div className="flex items-center">
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                {project ? formatDate(project.endDate) : ''}
+              </span>
+            </div>
+          </Card>
+
+          {/* Tasks Card */}
+          <Card className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none p-4">
+            <div className="flex items-center gap-1 mb-2">
+              <div className="w-1 h-4 bg-[var(--primary)] rounded-full" />
+              <h3 className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wide">Tasks</h3>
+            </div>
+            <div className="flex items-center">
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+              </span>
+            </div>
+          </Card>
         </div>
 
-        <div className="project-detail-members">
-          <ProjectMembers 
-            projectId={project.id} 
-            organizationId={workspace.organizationId}
-            workspaceId={workspace.id}
-          />
+        {/* Members Card - Compact */}
+        <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm border-none">
+          {project && workspace && (
+            <ProjectMembers 
+              projectId={project.id} 
+              organizationId={workspace.organizationId}
+              workspaceId={workspace.id}
+            />
+          )}
         </div>
 
-        <div className="project-detail-tasks-header">
-          <h2 className="project-detail-tasks-title text-[var(--foreground)] flex items-center gap-2">
+        {/* Uncomment when needed */}
+        {/* Tasks Header */}
+        {/* <div className="flex items-center justify-between mt-6">
+          <h2 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
             <HiClipboardList size={18} />
             Tasks
           </h2>
           <Link 
             href={`/${workspaceSlug}/${projectSlug}/tasks`} 
-            className="project-detail-tasks-link text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors flex items-center gap-1 text-sm"
+            className="text-sm font-medium text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors flex items-center gap-1"
           >
             View all tasks <HiExternalLink size={12} />
           </Link>
-        </div>
+        </div> */}
 
-        <ProjectKanbanView
-          tasks={tasks}
-          taskStatuses={taskStatuses}
-          workspaceSlug={workspaceSlug}
-          projectSlug={projectSlug}
-          className="project-detail-kanban"
-        />
+        {/* Kanban View */}
+        {/* <div className="mt-4">
+          <ProjectKanbanView
+            tasks={tasks.map(task => ({
+              ...task,
+              description: typeof task.description === 'string' ? task.description : ''
+            }))}
+            taskStatuses={taskStatuses}
+            workspaceSlug={workspaceSlug}
+            projectSlug={projectSlug}
+            className="grid grid-cols-1 lg:grid-cols-4 gap-4"
+          />
+        </div> */}
       </div>
     </div>
   );

@@ -2,44 +2,44 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 /**
- * Run npm install in a directory
+ * Run npm install using taskosaur commands
  */
-async function runNpmInstall(directory) {
+async function runTaskosaurNpmInstall(service) {
     return new Promise((resolve, reject) => {
-        console.log(`📦 Installing dependencies in ${directory}...`);
-        const npm = spawn('npm', ['install'], { 
-            cwd: path.join(process.cwd(), directory),
+        console.log(`📦 Installing dependencies for ${service}...`);
+        const taskosaur = spawn('node', ['taskosaur.js', `${service}:npm`, 'install'], { 
+            cwd: process.cwd(),
             stdio: 'inherit'
         });
         
-        npm.on('close', (code) => {
+        taskosaur.on('close', (code) => {
             if (code === 0) {
-                console.log(`✅ Dependencies installed in ${directory}`);
+                console.log(`✅ Dependencies installed for ${service}`);
                 resolve();
             } else {
-                reject(new Error(`npm install failed in ${directory} with code ${code}`));
+                reject(new Error(`taskosaur ${service}:npm install failed with code ${code}`));
             }
         });
     });
 }
 
 /**
- * Run npm build in a directory
+ * Run npm build using taskosaur commands
  */
-async function runNpmBuild(directory) {
+async function runTaskosaurNpmBuild(service) {
     return new Promise((resolve, reject) => {
-        console.log(`🔨 Building ${directory}...`);
-        const npm = spawn('npm', ['run', 'build'], { 
-            cwd: path.join(process.cwd(), directory),
+        console.log(`🔨 Building ${service}...`);
+        const taskosaur = spawn('node', ['taskosaur.js', `${service}:npm`, 'run', 'build'], { 
+            cwd: process.cwd(),
             stdio: 'inherit'
         });
         
-        npm.on('close', (code) => {
+        taskosaur.on('close', (code) => {
             if (code === 0) {
-                console.log(`✅ Build completed in ${directory}`);
+                console.log(`✅ Build completed for ${service}`);
                 resolve();
             } else {
-                reject(new Error(`npm run build failed in ${directory} with code ${code}`));
+                reject(new Error(`taskosaur ${service}:npm run build failed with code ${code}`));
             }
         });
     });
@@ -50,8 +50,8 @@ async function runNpmBuild(directory) {
  */
 async function installDependencies() {
     try {
-        await runNpmInstall('backend');
-        await runNpmInstall('frontend');
+        await runTaskosaurNpmInstall('be');
+        await runTaskosaurNpmInstall('fe');
         console.log('✅ All dependencies installed successfully!');
     } catch (error) {
         console.error('❌ Failed to install dependencies:', error.message);
@@ -64,8 +64,8 @@ async function installDependencies() {
  */
 async function buildProjects() {
     try {
-        await runNpmBuild('backend');
-        await runNpmBuild('frontend');
+        await runTaskosaurNpmBuild('be');
+        await runTaskosaurNpmBuild('fe');
         console.log('✅ All projects built successfully!');
     } catch (error) {
         console.error('❌ Failed to build projects:', error.message);
@@ -79,12 +79,12 @@ async function buildProjects() {
 async function runMigrations() {
     return new Promise((resolve, reject) => {
         console.log('🗃️  Running database migrations...');
-        const npm = spawn('npm', ['run', 'prisma:migrate:dev'], { 
-            cwd: path.join(process.cwd(), 'backend'),
+        const taskosaur = spawn('node', ['taskosaur.js', 'be:npm', 'run', 'prisma:migrate:dev'], { 
+            cwd: process.cwd(),
             stdio: 'inherit'
         });
         
-        npm.on('close', (code) => {
+        taskosaur.on('close', (code) => {
             if (code === 0) {
                 console.log('✅ Database migrations completed');
                 resolve();
@@ -101,12 +101,12 @@ async function runMigrations() {
 async function runSeed() {
     return new Promise((resolve, reject) => {
         console.log('🌱 Seeding database...');
-        const npm = spawn('npm', ['run', 'seed:core', 'seed'], { 
-            cwd: path.join(process.cwd(), 'backend'),
+        const taskosaur = spawn('node', ['taskosaur.js', 'be:npm', 'run', 'seed:core', 'seed'], { 
+            cwd: process.cwd(),
             stdio: 'inherit'
         });
         
-        npm.on('close', (code) => {
+        taskosaur.on('close', (code) => {
             if (code === 0) {
                 console.log('✅ Database seeding completed');
                 resolve();
@@ -132,8 +132,8 @@ async function setupDatabase() {
 }
 
 module.exports = {
-    runNpmInstall,
-    runNpmBuild,
+    runTaskosaurNpmInstall,
+    runTaskosaurNpmBuild,
     installDependencies,
     buildProjects,
     runMigrations,
