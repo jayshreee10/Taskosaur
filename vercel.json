@@ -11,5 +11,7 @@
       "src": "/(.*)",
       "dest": "dist/main.js"
     }
-  ]
+  ],
+  "installCommand": "npm i && npm run be:install && npm run fe:install",
+  "buildCommand": "npm run build:dist && cd dist && npm install --production"
 }
