@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "dist/main.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "dist/**"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/dist/main.js"
+    }
+  ],
+  "functions": {
+    "dist/main.js": {
+      "maxDuration": 30
+    }
+  },
+  "installCommand": "npm i && npm run be:install && npm run fe:install",
+  "buildCommand": "npm run build:dist && cd dist && npm install --production"
+}
