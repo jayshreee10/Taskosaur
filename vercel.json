@@ -3,7 +3,7 @@
   "functions": {
     "dist/main.js": {
       "runtime": "@vercel/node",
-      "includeFiles": ["dist/**"]
+      "includeFiles": "dist/**"
     }
   },
   "routes": [
