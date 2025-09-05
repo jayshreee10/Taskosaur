@@ -70,8 +70,8 @@ export class SeederService {
       console.log('✅ Tasks seeded');
 
       // 6. Seed Sprints (depends on projects and users)
-      const sprints = await this.sprintsSeeder.seed(projects, users);
-      console.log('✅ Sprints seeded');
+      // const sprints = await this.sprintsSeeder.seed(projects, users);
+      // console.log('✅ Sprints seeded');
 
       // 7. Seed Labels (depends on projects and users)
       const labels = await this.labelsSeeder.seed(projects, users);
@@ -82,7 +82,10 @@ export class SeederService {
       console.log('✅ Task comments seeded');
 
       // 9. Seed Task Dependencies (depends on tasks and users)
-      const taskDependencies = await this.taskDependenciesSeeder.seed(tasks, users);
+      const taskDependencies = await this.taskDependenciesSeeder.seed(
+        tasks,
+        users,
+      );
       console.log('✅ Task dependencies seeded');
 
       // 10. Seed Task Watchers (depends on tasks and users)
@@ -102,12 +105,12 @@ export class SeederService {
         workspaces,
         projects,
         tasks,
-        sprints,
+        // sprints,
         labels,
         taskComments,
         taskDependencies,
         taskWatchers,
-        timeEntries
+        timeEntries,
       };
     } catch (error) {
       console.error('❌ Error seeding core modules:', error);

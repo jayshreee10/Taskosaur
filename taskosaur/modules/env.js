@@ -205,11 +205,11 @@ async function createSimpleEnvFile() {
         
         // Email Configuration
         console.log('\n📧 Email Configuration:');
-        config.BE_SMTP_HOST = await askQuestion(rl, 'SMTP Host', 'smtp.gmail.com');
+        config.BE_SMTP_HOST = await askQuestion(rl, 'SMTP Host', 'smtp.example.com');
         config.BE_SMTP_PORT = await askQuestion(rl, 'SMTP Port', '587');
-        config.BE_SMTP_USER = await askQuestion(rl, 'SMTP User (email address)', 'your-email@gmail.com');
+        config.BE_SMTP_USER = await askQuestion(rl, 'SMTP User (email address)', 'your-email@example.com');
         config.BE_SMTP_PASS = await askQuestion(rl, 'SMTP Password (app password)', 'your-app-password');
-        config.BE_SMTP_FROM = await askQuestion(rl, 'From Email Address', 'noreply@taskosaur.com');
+        config.BE_SMTP_FROM = await askQuestion(rl, 'From Email Address', 'noreply@example.com');
         // Bucket Configuration
         console.log('\n📧 Bucket Configuration:');
         config.BE_AWS_ACCESS_KEY_ID = await askQuestion(rl, 'AWS Access Key', 'your-access-key');

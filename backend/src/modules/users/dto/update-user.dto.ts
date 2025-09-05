@@ -17,4 +17,8 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @ApiProperty({ required: false })
   @IsOptional()
   preferences?: any;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  onboardInfo?: { [key: string]: string };
 }

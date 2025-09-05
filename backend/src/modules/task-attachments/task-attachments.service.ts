@@ -29,7 +29,7 @@ export class TaskAttachmentsService {
   }
 
   async create(
-    createTaskAttachmentDto: CreateTaskAttachmentDto,
+    createTaskAttachmentDto: CreateTaskAttachmentDto, userId: string
   ): Promise<TaskAttachment> {
     const { taskId } = createTaskAttachmentDto;
 
@@ -102,7 +102,7 @@ export class TaskAttachmentsService {
     }
 
     return this.prisma.taskAttachment.create({
-      data: createTaskAttachmentDto,
+      data: { ...createTaskAttachmentDto, createdBy: userId },
       include: {
         task: {
           select: {

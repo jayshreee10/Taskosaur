@@ -1,173 +1,8 @@
+
 import api from "@/lib/api";
+import { CreateTaskStatusDto, CreateTaskStatusFromProjectDto, TaskStatus, UpdateTaskStatusDto } from "@/types";
 
-export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  key: string;
-  priority: TaskPriority;
-  statusId: string;
-  assigneeId?: string;
-  reporterId: string;
-  projectId?: string;
-  sprintId?: string;
-  workspaceId?: string;
-  parentTaskId?: string;
-  dueDate?: string;
-  createdAt: string;
-  updatedAt: string;
-  _count?: {
-    comments: number;
-    attachments: number;
-    subTasks: number;
-  };
-  status?: TaskStatus;
-  assignee?: User;
-  reporter?: User;
-  project?: Project;
-  sprint?: Sprint;
-  workspace?: Workspace;
-  parentTask?: Task;
-  subTasks?: Task[];
-  comments?: TaskComment[];
-}
-
-export interface TaskStatus {
-  id: string;
-  name: string;
-  color?: string;
-  category: "TODO" | "IN_PROGRESS" | "DONE";
-  position: number;
-  isDefault: boolean;
-  workflowId: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy?: string;
-  updatedBy?: string;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  username: string;
-  avatar?: string;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  key: string;
-  description?: string;
-}
-
-export interface Sprint {
-  id: string;
-  name: string;
-  description?: string;
-  startDate: string;
-  endDate: string;
-}
-
-export interface Workspace {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-}
-
-export interface TaskComment {
-  id: string;
-  content: string;
-  taskId: string;
-  authorId: string;
-  createdAt: string;
-  updatedAt: string;
-  author?: User;
-}
-
-export interface CreateTaskData {
-  title: string;
-  description?: string;
-  priority?: TaskPriority;
-  statusId?: string;
-  assigneeId?: string;
-  projectId?: string;
-  sprintId?: string;
-  workspaceId?: string;
-  parentTaskId?: string;
-  dueDate?: string;
-}
-
-export interface UpdateTaskData {
-  title?: string;
-  description?: string;
-  priority?: TaskPriority;
-  statusId?: string;
-  assigneeId?: string;
-  projectId?: string;
-  sprintId?: string;
-  workspaceId?: string;
-  parentTaskId?: string;
-  dueDate?: string;
-}
-
-export interface CreateTaskStatusDto {
-  name: string;
-  color: string;
-  category: "TODO" | "IN_PROGRESS" | "DONE";
-  position?: number;
-  workflowId: string;
-}
-
-export interface UpdateTaskStatusDto {
-  name?: string;
-  color?: string;
-  category?: "TODO" | "IN_PROGRESS" | "DONE";
-  position?: number;
-  isDefault?: boolean;
-  workflowId?: string;
-}
-
-export interface TaskFilters {
-  projectId?: string;
-  sprintId?: string;
-  workspaceId?: string;
-  parentTaskId?: string;
-  priority?: TaskPriority;
-  search?: string;
-  page?: number;
-  limit?: number;
-}
-
-export interface TaskPaginatedResponse {
-  tasks: Task[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-    limit: number;
-  };
-}
-
-export interface TodaysTasksParams {
-  organizationId: string;
-  page?: number;
-  limit?: number;
-}
-
-export interface OrganizationTasksParams {
-  organizationId: string;
-  priority?: TaskPriority;
-  search?: string;
-  page?: number;
-  limit?: number;
-}
 
 // Task Status API - aligned with your NestJS controller
 export const taskStatusApi = {
@@ -186,6 +21,20 @@ export const taskStatusApi = {
       throw error;
     }
   },
+  createTaskStatusFromProject: async (
+    taskStatusData: CreateTaskStatusFromProjectDto
+  ): Promise<TaskStatus> => {
+    try {
+      const response = await api.post<TaskStatus>(
+        "/task-statuses/from-project", // updated endpoint
+        taskStatusData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Create task status from project error:", error);
+      throw error;
+    }
+  },
 
   // Get all task statuses with optional workflow filter
   getTaskStatuses: async (workflowId?: string): Promise<TaskStatus[]> => {
@@ -198,7 +47,16 @@ export const taskStatusApi = {
       throw error;
     }
   },
-
+  getTaskStatusByProject: async (projectId: string): Promise<TaskStatus[]> => {
+    try {
+      const params = `?projectId=${projectId}`;
+      const response = await api.get<TaskStatus[]>(`/task-statuses/project${params}`);
+      return response.data;
+    } catch (error) {
+      console.error("Get task statuses error:", error);
+      throw error;
+    }
+  },
   // Get task status by ID
   getTaskStatusById: async (statusId: string): Promise<TaskStatus> => {
     try {
@@ -227,12 +85,12 @@ export const taskStatusApi = {
     }
   },
   updateTaskStatusPositions: async (
-    statusUpdates: { id: string; position: number; }[]
+    statusUpdates: { id: string; position: number }[]
   ): Promise<TaskStatus[]> => {
     try {
       const response = await api.patch<TaskStatus[]>(
         "/task-statuses/positions",
-        {statusUpdates}
+        { statusUpdates }
       );
       return response.data;
     } catch (error) {

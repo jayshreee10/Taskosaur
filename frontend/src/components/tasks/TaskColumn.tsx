@@ -1,7 +1,7 @@
-'use client';
+;
 
 import { useState } from 'react';
-import { Task, TaskStatus } from '@/types/tasks';
+import { Task, TaskStatus } from '@/types';
 import TaskCard from './TaskCard';
 
 interface TaskColumnProps {

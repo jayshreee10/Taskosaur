@@ -1,4 +1,4 @@
-'use client';
+;
 
 import React from 'react';
 
@@ -16,19 +16,19 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`flex items-center justify-between mb-4 ${className}`}>
-      <div>
-        <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+    <div className={`layout-section-header-container ${className}`}>
+      <div className="layout-section-header-content">
+        <h2 className="layout-section-header-title">
           {title}
         </h2>
         {subtitle && (
-          <p className="text-xs text-stone-600 dark:text-stone-400 mt-1">
+          <p className="layout-section-header-subtitle">
             {subtitle}
           </p>
         )}
       </div>
       {action && (
-        <div className="flex-shrink-0">
+        <div className="layout-section-header-action">
           {action}
         </div>
       )}

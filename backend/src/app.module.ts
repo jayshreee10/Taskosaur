@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { RouterModule } from '@nestjs/core';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -34,6 +35,10 @@ import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { ActivityNotificationInterceptor } from './common/interceptor/activity-notification.interceptor';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { S3Module } from './modules/s3/s3.module';
+import { InvitationsModule } from './modules/invitations/invitations.module';
+import { TaskLabelsModule } from './modules/task-label/task-labels.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { AiChatModule } from './modules/ai-chat/ai-chat.module';
 // import { EmailModule } from './modules/email/email.module';
 // import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
@@ -44,6 +49,41 @@ import { S3Module } from './modules/s3/s3.module';
       load: [appConfig],
       cache: true,
     }),
+    RouterModule.register([
+      {
+        path: 'api',
+        children: [
+          AuthModule,
+          UsersModule,
+          OrganizationsModule,
+          WorkspacesModule,
+          ProjectsModule,
+          TasksModule,
+          WorkflowsModule,
+          TaskStatusesModule,
+          SprintsModule,
+          LabelsModule,
+          TaskCommentsModule,
+          TimeEntriesModule,
+          OrganizationMembersModule,
+          WorkspaceMembersModule,
+          ProjectMembersModule,
+          TaskWatchersModule,
+          TaskAttachmentsModule,
+          TaskDependenciesModule,
+          SearchModule,
+          AutomationModule,
+          GanttModule,
+          ActivityLogModule,
+          NotificationsModule,
+          S3Module,
+          InvitationsModule,
+          TaskLabelsModule,
+          SettingsModule,
+          AiChatModule,
+        ],
+      },
+    ]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -71,7 +111,11 @@ import { S3Module } from './modules/s3/s3.module';
     SeederModule,
     ActivityLogModule,
     NotificationsModule,
-    S3Module
+    S3Module,
+    InvitationsModule,
+    TaskLabelsModule,
+    SettingsModule,
+    AiChatModule
     // EmailModule,
     // SchedulerModule,
   ],

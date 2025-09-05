@@ -1,4 +1,4 @@
-'use client';
+;
 
 import React from 'react';
 
@@ -18,7 +18,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`flex items-start gap-3 p-2 rounded-lg hover:bg-[var(--accent)]/50 transition-colors duration-200 ${className}`}>
+    <div className={`layout-activity-item ${className}`}>
       <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center flex-shrink-0`}>
         {icon}
       </div>

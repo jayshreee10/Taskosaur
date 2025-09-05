@@ -1,17 +1,18 @@
-"use client";
-
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/workspace-context";
-import { setCurrentWorkspaceId, clearCurrentProjectId } from "@/utils/hierarchyContext";
+import {
+  getCurrentWorkspaceId,
+  setCurrentWorkspaceId,
+  clearCurrentProjectId,
+} from "@/utils/hierarchyContext";
 import { HiChevronDown, HiCheck } from "react-icons/hi2";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+} from "@/components/ui/DropdownMenu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface Workspace {
@@ -26,14 +27,18 @@ interface WorkspaceSelectorProps {
   currentWorkspaceSlug: string | null;
 }
 
-export default function WorkspaceSelector({ currentWorkspaceSlug }: WorkspaceSelectorProps) {
+export default function WorkspaceSelector({
+  currentWorkspaceSlug,
+}: WorkspaceSelectorProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const { getWorkspacesByOrganization, getWorkspaceBySlug } = useWorkspace();
+  
+  const { getWorkspacesByOrganization } = useWorkspace();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState(true); // Start with loading true
 
   // Fetch workspaces for current organization
   useEffect(() => {
@@ -52,47 +57,50 @@ export default function WorkspaceSelector({ currentWorkspaceSlug }: WorkspaceSel
 
     fetchWorkspaces();
 
-    // Listen for organization changes to refetch workspaces
     const handleOrganizationChange = () => {
-      setCurrentWorkspace(null); // Clear current workspace when organization changes
+      setCurrentWorkspace(null); 
       fetchWorkspaces();
     };
 
-    window.addEventListener('organizationChanged', handleOrganizationChange);
+    window.addEventListener("organizationChanged", handleOrganizationChange);
     return () => {
-      window.removeEventListener('organizationChanged', handleOrganizationChange);
+      window.removeEventListener(
+        "organizationChanged",
+        handleOrganizationChange
+      );
     };
-  }, []); // Remove getWorkspacesByOrganization dependency to prevent infinite loop
+  }, []);
 
-  // Fetch current workspace details
+  // Resolve current workspace from URL slug or localStorage fallback
   useEffect(() => {
-    const fetchCurrentWorkspace = async () => {
-      if (!currentWorkspaceSlug) {
-        setCurrentWorkspace(null);
-        return;
-      }
+    if (workspaces.length === 0) {
+      setCurrentWorkspace(null);
+      return;
+    }
 
-      try {
-        const workspaceData = await getWorkspaceBySlug(currentWorkspaceSlug);
-        setCurrentWorkspace(workspaceData);
-      } catch (error) {
-        console.error("Error fetching current workspace:", error);
-        setCurrentWorkspace(null);
-      }
-    };
+    // 1. Try URL slug first
+    let workspace =
+      currentWorkspaceSlug &&
+      workspaces.find((w) => w.slug === currentWorkspaceSlug);
 
-    fetchCurrentWorkspace();
-  }, [currentWorkspaceSlug]); // Remove getWorkspaceBySlug dependency to prevent infinite loop
+    // 2. Fallback to localStorage id
+    if (!workspace) {
+      const storedId = getCurrentWorkspaceId(); // util that reads localStorage
+      workspace = workspaces.find((w) => w.id === storedId);
+    }
+
+    setCurrentWorkspace(workspace || null);
+  }, [workspaces, currentWorkspaceSlug]);
 
   const handleWorkspaceSelect = (workspace: Workspace) => {
     // Store the workspace ID in localStorage for hierarchy context
     setCurrentWorkspaceId(workspace.id);
     // Clear project context since we're switching workspaces
     clearCurrentProjectId();
-    
+
     // Dispatch workspace change event
-    window.dispatchEvent(new CustomEvent('workspaceChanged'));
-    
+    window.dispatchEvent(new CustomEvent("workspaceChanged"));
+
     // Navigate to the workspace homepage
     // This replaces the current route to prevent going back to old workspace contexts
     router.replace(`/${workspace.slug}`);
@@ -102,44 +110,31 @@ export default function WorkspaceSelector({ currentWorkspaceSlug }: WorkspaceSel
     return name?.charAt(0)?.toUpperCase() || "W";
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-3 px-3 py-2 h-9 rounded-lg bg-[var(--sidebar-accent)] animate-pulse">
-        <div className="w-6 h-6 bg-[var(--sidebar-muted)] rounded-md"></div>
-        <div className="space-y-1 flex-1">
-          <div className="w-20 h-3 bg-[var(--sidebar-muted)] rounded"></div>
-          <div className="w-12 h-2 bg-[var(--sidebar-muted)] rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Don't show selector if no workspaces or if we're in a global route  
-  if (workspaces.length === 0 || !currentWorkspaceSlug) {
-    return null;
-  }
-
+  // Always render the selector (show loading state instead of hiding)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 px-0 py-0 h-8 bg-transparent hover:bg-[var(--sidebar-accent)] text-[var(--sidebar-foreground)] border-none rounded-lg"
-        >
-          <div className="flex-shrink-0 w-8 h-8 bg-[var(--sidebar-primary)] rounded-lg flex items-center justify-center text-[var(--sidebar-primary-foreground)] text-xs font-medium">
+        <div className="layout-workspace-selector-trigger">
+          <div className="layout-workspace-selector-icon">
             {currentWorkspace ? getInitials(currentWorkspace.name) : "W"}
           </div>
-          <div className="flex-1 text-left min-w-0 ml-0">
-            <div className="text-sm font-medium text-[var(--sidebar-foreground)] leading-none truncate">
-              {currentWorkspace ? currentWorkspace.name : "Select Workspace"}
-            </div>
+
+          <div className="layout-workspace-selector-content">
+            {isLoading ? (
+              <div className="layout-workspace-selector-loading" />
+            ) : (
+              <div className="layout-workspace-selector-title">
+                {currentWorkspace ? currentWorkspace.name : "Select Workspace"}
+              </div>
+            )}
           </div>
-          <HiChevronDown className="w-4 h-4 text-[var(--sidebar-muted-foreground)] flex-shrink-0" />
-        </Button>
+
+          <HiChevronDown className="layout-workspace-selector-chevron" />
+        </div>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className="w-64 p-2 bg-[var(--popover)] border-[var(--border)] shadow-lg"
+        className="layout-workspace-selector-dropdown"
         align="start"
         sideOffset={8}
       >
@@ -147,27 +142,27 @@ export default function WorkspaceSelector({ currentWorkspaceSlug }: WorkspaceSel
           <DropdownMenuItem
             key={workspace.id}
             onClick={() => handleWorkspaceSelect(workspace)}
-            className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer hover:bg-[var(--accent)] transition-all duration-200 ${
+            className={`layout-workspace-selector-item ${
               currentWorkspace?.id === workspace.id
-                ? "bg-[var(--primary)]/10 border border-[var(--primary)]/20"
+                ? "layout-workspace-selector-item-selected"
                 : ""
             }`}
           >
-            <Avatar className="h-6 w-6 flex-shrink-0">
-              <AvatarFallback className="bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold">
+            <Avatar className="layout-workspace-selector-item-avatar">
+              <AvatarFallback className="layout-workspace-selector-item-avatar-fallback">
                 {getInitials(workspace.name)}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 text-left min-w-0">
-              <div className="text-sm font-medium text-[var(--foreground)] truncate">
+            <div className="layout-workspace-selector-item-content">
+              <div className="layout-workspace-selector-item-name">
                 {workspace.name}
               </div>
-              <div className="text-xs text-[var(--muted-foreground)] truncate">
+              <div className="layout-workspace-selector-item-description">
                 {workspace.description || "No description"}
               </div>
             </div>
             {currentWorkspace?.id === workspace.id && (
-              <HiCheck className="w-4 h-4 text-[var(--primary)] flex-shrink-0" />
+              <HiCheck className="layout-workspace-selector-item-check" />
             )}
           </DropdownMenuItem>
         ))}

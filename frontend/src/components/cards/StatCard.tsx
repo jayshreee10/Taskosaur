@@ -1,4 +1,4 @@
-'use client';
+;
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -36,7 +36,7 @@ export const StatCard: React.FC<StatCardProps> = ({
             </CardDescription>
           </div>
           {icon && (
-            <div className="p-1.5 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+            <div className="p-1.5 rounded-md bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
               {icon}
             </div>
           )}

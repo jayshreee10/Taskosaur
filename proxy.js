@@ -22,20 +22,27 @@ const fastify = Fastify({ logger: true, trustProxy: true });
 const BE_UPSTREAM = BE_UNIX_SOCKET === '1' ? `unix+http://${encodeURIComponent(BE_UNIX_SOCKET_PATH)}` : `http://${BE_HOST}:${BE_PORT}`;
 const FE_UPSTREAM = FE_UNIX_SOCKET === '1' ? `unix+http://${encodeURIComponent(FE_UNIX_SOCKET_PATH)}` : `http://${FE_HOST}:${FE_PORT}`;
 
+const BE_WS_UPSTREAM = BE_UNIX_SOCKET === '1' ? `unix+ws://${encodeURIComponent(BE_UNIX_SOCKET_PATH)}` : `ws://${BE_HOST}:${BE_PORT}`;
+const FE_WS_UPSTREAM = FE_UNIX_SOCKET === '1' ? `unix+ws://${encodeURIComponent(FE_UNIX_SOCKET_PATH)}` : `ws://${FE_HOST}:${FE_PORT}`;
+
 // Proxy /api requests to backend
 fastify.register(proxy, {
     upstream: BE_UPSTREAM,
+    wsUpstream: BE_WS_UPSTREAM,
     prefix: '/api',
     rewritePrefix: '/api',
     http2: false,
+    websocket: true,
 });
 
 // Proxy all other requests to frontend
 fastify.register(proxy, {
     upstream: FE_UPSTREAM,
+    wsUpstream: FE_WS_UPSTREAM,
     prefix: '/',
     rewritePrefix: '/',
     http2: false,
+    websocket: true,
     preHandler: (request, reply, done) => {
 
         if (request.raw.url.startsWith('/api')) {

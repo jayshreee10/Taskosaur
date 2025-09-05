@@ -30,10 +30,7 @@ export class LabelsController {
   constructor(private readonly labelsService: LabelsService) {}
 
   @Post()
-  create(
-    @Body() createLabelDto: CreateLabelDto,
-    @CurrentUser() user: any,
-  ) {
+  create(@Body() createLabelDto: CreateLabelDto, @CurrentUser() user: any) {
     return this.labelsService.create(createLabelDto, user.id);
   }
 

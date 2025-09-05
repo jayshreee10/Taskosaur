@@ -415,62 +415,108 @@ export class EmailService {
     };
   }
   async sendPasswordResetEmail(
-  email: string,
-  data: {
-    userName: string;
-    resetToken: string;
-    resetUrl: string;
-  },
-): Promise<void> {
-  try {
-    await this.sendEmail({
-      to: email,
-      subject: 'Reset Your Password',
-      template: EmailTemplate.PASSWORD_RESET, // Add this to your EmailTemplate enum if not exists
-      data: {
-        userName: data.userName,
-        resetToken: data.resetToken,
-        resetUrl: data.resetUrl,
-        // Add any other data your email template needs
-      },
-      priority: EmailPriority.HIGH, // Password reset is high priority
-    });
+    email: string,
+    data: {
+      userName: string;
+      resetToken: string;
+      resetUrl: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.sendEmail({
+        to: email,
+        subject: 'Reset Your Password',
+        template: EmailTemplate.PASSWORD_RESET, // Add this to your EmailTemplate enum if not exists
+        data: {
+          userName: data.userName,
+          resetToken: data.resetToken,
+          resetUrl: data.resetUrl,
+          // Add any other data your email template needs
+        },
+        priority: EmailPriority.HIGH, // Password reset is high priority
+      });
 
-    this.logger.log(`Password reset email queued for ${email}`);
-  } catch (error) {
-    this.logger.error(`Failed to send password reset email: ${error.message}`);
-    throw error; // Re-throw to handle at caller level
+      this.logger.log(`Password reset email queued for ${email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email: ${error.message}`,
+      );
+      throw error; // Re-throw to handle at caller level
+    }
   }
-}
-// src/modules/email/email.service.ts
-async sendPasswordResetConfirmationEmail(
-  email: string,
-  data: {
-    userName: string;
-    resetTime: string;
-  },
-): Promise<void> {
-  try {
-    const emailData = {
-      ...data,
-      supportEmail: this.configService.get('SUPPORT_EMAIL', 'support@taskosaur.com'),
-      companyName: 'Taskosaur',
-    };
+  // src/modules/email/email.service.ts
+  async sendPasswordResetConfirmationEmail(
+    email: string,
+    data: {
+      userName: string;
+      resetTime: string;
+    },
+  ): Promise<void> {
+    try {
+      const emailData = {
+        ...data,
+        supportEmail: this.configService.get(
+          'SUPPORT_EMAIL',
+          'support@taskosaur.com',
+        ),
+        companyName: 'Taskosaur',
+      };
 
-    await this.sendEmail({
-      to: email,
-      subject: 'Password Successfully Reset - Taskosaur',
-      template: EmailTemplate.PASSWORD_RESET_CONFIRMATION,
-      data: emailData,
-      priority: EmailPriority.HIGH,
-    });
+      await this.sendEmail({
+        to: email,
+        subject: 'Password Successfully Reset - Taskosaur',
+        template: EmailTemplate.PASSWORD_RESET_CONFIRMATION,
+        data: emailData,
+        priority: EmailPriority.HIGH,
+      });
 
-    console.log(`Password reset confirmation email sent to: ${email}`);
-  } catch (error) {
-    console.error(`Failed to send password reset confirmation email to ${email}:`, error);
-    // Don't throw error here as password was already reset successfully
+      console.log(`Password reset confirmation email sent to: ${email}`);
+    } catch (error) {
+      console.error(
+        `Failed to send password reset confirmation email to ${email}:`,
+        error,
+      );
+      // Don't throw error here as password was already reset successfully
+    }
   }
-}
+  async sendInvitationEmail(
+    email: string,
+    data: {
+      inviterName: string;
+      entityName: string;
+      entityType: string;
+      role: string;
+      invitationUrl: string;
+      expiresAt: string;
+    },
+  ): Promise<void> {
+    try {
+      const emailData = {
+        ...data,
+        supportEmail: this.configService.get(
+          'SUPPORT_EMAIL',
+          'support@taskosaur.com',
+        ),
+        companyName: 'Taskosaur',
+      };
 
+      await this.sendEmail({
+        to: email,
+        subject: `You're invited to join ${data.entityName} - Taskosaur`,
+        template: EmailTemplate.SEND_INVITATION,
+        data: emailData,
+        priority: EmailPriority.NORMAL,
+      });
 
+      console.log(
+        `Invitation email sent to: ${email} for ${data.entityType}: ${data.entityName}`,
+      );
+    } catch (error) {
+      console.error(
+        `Failed to send invitation email to ${email} for ${data.entityType} ${data.entityName}:`,
+        error,
+      );
+      throw error; // Throw error here as invitation sending failure should be handled
+    }
+  }
 }

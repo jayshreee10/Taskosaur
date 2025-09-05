@@ -45,7 +45,6 @@ export class AuthService {
       user.status === 'ACTIVE' && // Only active users can login
       (await bcrypt.compare(password, user.password))
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password: _, ...result } = user;
       return result;
     }

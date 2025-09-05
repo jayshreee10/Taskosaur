@@ -1,43 +1,157 @@
-/**
- * Organization-related types
- */
+import { Workspace } from "./workspaces";
 
+export enum OrganizationRole {
+  SUPER_ADMIN = "SUPER_ADMIN",
+  OWNER = "OWNER",
+  MANAGER = "MANAGER",
+  MEMBER = "MEMBER",
+  VIEWER = "VIEWER",
+}
 export interface Organization {
   id: string;
   name: string;
   slug: string;
   description?: string;
-  avatar?: string;
   website?: string;
-  settings?: Record<string, any>;
   ownerId: string;
-  memberCount: number;
-  workspaceCount: number;
+  settings: OrganizationSettings;
+  createdAt: string;
+  updatedAt: string;
+  avatar?: string;
+  _count?: {
+    members: number;
+    workspaces: number;
+  };
+  userRole?: OrganizationRole;
+  joinedAt?: string;
+  isOwner?: boolean;
+  memberCount?: number;
+  workspaceCount?: number;
+  workspaces?: Workspace[];
+}
+
+export interface OrganizationResponse {
+  organizations?: Organization[];
+  data?: Organization[];
+  organization?: Organization | Organization[];
+}
+
+export interface OrganizationStats {
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  statistics: {
+    totalTasks: number;
+    openTasks: number;
+    completedTasks: number;
+    activeProjects: number;
+    totalActiveWorkspaces: number;
+  };
+  recentActivities: RecentActivity[];
+}
+
+export interface RecentActivity {
+  id: string;
+  type:
+    | "TASK_CREATED"
+    | "TASK_COMPLETED"
+    | "TASK_UPDATED"
+    | "PROJECT_CREATED"
+    | "MEMBER_ADDED"
+    | "WORKSPACE_CREATED";
+  description: string;
+  entityType: "Task" | "Project" | "Workspace" | "Member";
+  entityId: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+}
+export interface CreateOrganizationData {
+  name: string;
+  slug?: string;
+  description?: string;
+  website?: string;
+  settings?: OrganizationSettings;
+}
+
+export interface ActivityFilters {
+  limit?: number;
+  page?: number;
+  entityType?: "Task" | "Project" | "Workspace" | "Organization" | "User";
+  userId?: string;
+}
+
+export interface ActivityItem {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  description: string;
+  userId: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  metadata?: any;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface OrganizationMember {
-  id: string;
-  userId: string;
-  organizationId: string;
-  role: OrganizationRole;
-  joinedAt: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    avatar?: string;
-    status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING';
+export interface ActivityResponse {
+  activities: ActivityItem[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   };
 }
 
-export enum OrganizationRole {
-  ADMIN = 'ADMIN',
-  MANAGER = 'MANAGER',
-  MEMBER = 'MEMBER',
-  VIEWER = 'VIEWER'
+export interface OrganizationMember {
+  id: string;
+  role: OrganizationRole;
+  joinedAt: Date;
+  userId: string;
+  organizationId: string;
+  status?: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  user?: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    avatar?: string;
+  };
+  organization?: {
+    id: string;
+    name: string;
+    slug?: string;
+  };
+  creator?: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+  };
+  updater?: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+  };
 }
 
 export interface CreateOrganizationDto {
@@ -46,7 +160,7 @@ export interface CreateOrganizationDto {
   description?: string;
   avatar?: string;
   website?: string;
-  settings?: Record<string, any>;
+  settings?: OrganizationSettings;
 }
 
 export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> {}
@@ -63,35 +177,47 @@ export interface OrganizationStats {
 }
 
 export interface OrganizationSettings {
-  general: {
+  general?: {
     name: string;
     slug: string;
     description?: string;
     avatar?: string;
     website?: string;
   };
-  preferences: {
+  preferences?: {
     timezone: string;
     language: string;
     dateFormat: string;
     timeFormat: string;
   };
-  features: {
-    enableTimeTracking: boolean;
-    enableAutomation: boolean;
-    enableCustomFields: boolean;
-    enableIntegrations: boolean;
+  features?: {
+    timeTracking: boolean;
+    customFields: boolean;
+    automation: boolean;
+    integrations: boolean;
   };
-  notifications: {
+  allowInvites?: boolean;
+  requireEmailVerification?: boolean;
+  defaultRole?: OrganizationRole;
+  notifications?: {
     emailNotifications: boolean;
     slackNotifications: boolean;
     webhookUrl?: string;
   };
-  security: {
+  security?: {
     requireTwoFactor: boolean;
     allowGuestAccess: boolean;
     sessionTimeout: number;
   };
+  requireTwoFactor?: boolean;
+  allowGuestAccess?: boolean;
+  sessionTimeout?: number;
+  emailNotifications?: boolean;
+  slackNotifications?: boolean;
+  webhookUrl?: string;
+  timeTracking?: boolean;
+  customFields?: boolean;
+  timeFormat?: string;
 }
 
 export interface InviteMemberDto {
@@ -102,7 +228,12 @@ export interface InviteMemberDto {
 
 export interface OrganizationActivity {
   id: string;
-  type: 'MEMBER_JOINED' | 'MEMBER_LEFT' | 'WORKSPACE_CREATED' | 'PROJECT_CREATED' | 'SETTINGS_UPDATED';
+  type:
+    | "MEMBER_JOINED"
+    | "MEMBER_LEFT"
+    | "WORKSPACE_CREATED"
+    | "PROJECT_CREATED"
+    | "SETTINGS_UPDATED";
   description: string;
   user: {
     id: string;

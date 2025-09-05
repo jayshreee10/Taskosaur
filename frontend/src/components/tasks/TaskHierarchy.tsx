@@ -1,4 +1,4 @@
-'use client';
+;
 
 import { useState } from 'react';
 import { Task } from '@/types/tasks';
@@ -106,7 +106,7 @@ export default function TaskHierarchy({
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {parentTask.key}
+                      {parentTask.slug}
                     </span>
                     <span className="text-gray-600 dark:text-gray-400">
                       {parentTask.title}
@@ -175,7 +175,7 @@ export default function TaskHierarchy({
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {task.key}
+                    {task.slug}
                   </span>
                   <span className="text-gray-600 dark:text-gray-400">
                     {task.title}
@@ -225,7 +225,7 @@ export default function TaskHierarchy({
                   <div>
                     <div className="flex items-center space-x-2">
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {subtask.key}
+                        {subtask.slug}
                       </span>
                       <span className="text-gray-600 dark:text-gray-400">
                         {subtask.title}
@@ -388,7 +388,7 @@ export default function TaskHierarchy({
                   <option value="">Select a parent task...</option>
                   {potentialParents.map(t => (
                     <option key={t.id} value={t.id}>
-                      {t.key} - {t.title}
+                      {t.slug} - {t.title}
                     </option>
                   ))}
                 </select>

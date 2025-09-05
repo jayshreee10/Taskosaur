@@ -1,0 +1,71 @@
+import Link from "next/link";
+import { ReactNode } from "react";
+import { Card } from "@/components/ui/card";
+
+interface EntityCardProps {
+  href?: string;
+  leading: ReactNode;
+  heading: string;
+  subheading?: string;
+  description?: string;
+  footer?: ReactNode;
+  className?: string;
+  role?: string;
+}
+
+export function EntityCard({
+  href,
+  leading,
+  heading,
+  subheading,
+  description,
+  role,
+  footer,
+  className = "",
+}: EntityCardProps) {
+  const Inner = () => (
+    <Card
+      className={`bg-[var(--card)] rounded-md shadow-sm group hover:shadow-lg transition-all duration-200 border-none cursor-pointer p-4 h-44 ${className}`}
+    >
+      {/* Top Row */}
+      <div className="flex items-start gap-3">
+        {leading}
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors line-clamp-1">
+            {heading}
+          </h3>
+          {subheading && (
+            <p className="text-xs text-[var(--muted-foreground)] line-clamp-1">
+              {subheading}
+            </p>
+          )}
+        </div>
+        <div className="inline-flex items-center px-2 py-1 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] text-xs font-medium">
+          {role?.replace("_", " ")
+            .toLowerCase()
+            .replace(/\b\w/g, (l) => l.toUpperCase())}
+        </div>
+      </div>
+
+      {/* Description */}
+      <p className="text-sm text-[var(--muted-foreground)] line-clamp-2">
+        {description || "No description provided"}
+      </p>
+
+      {/* Footer */}
+      {footer && (
+        <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
+          {footer}
+        </div>
+      )}
+    </Card>
+  );
+
+  return href ? (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      <Inner />
+    </Link>
+  ) : (
+    <Inner />
+  );
+}

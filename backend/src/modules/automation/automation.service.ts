@@ -299,8 +299,8 @@ export class AutomationService {
     });
 
     const taskLabel = await this.prisma.taskLabel.create({
-      data: { 
-        taskId, 
+      data: {
+        taskId,
         labelId,
         createdBy: task?.createdBy || '',
       },
@@ -333,9 +333,9 @@ export class AutomationService {
     authorId: string,
   ): Promise<any> {
     const comment = await this.prisma.taskComment.create({
-      data: { 
-        taskId, 
-        content, 
+      data: {
+        taskId,
+        content,
         authorId,
         createdBy: authorId,
       },

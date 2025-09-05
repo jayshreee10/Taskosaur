@@ -1,4 +1,4 @@
-'use client';
+;
 
 import React from 'react';
 import Link from 'next/link';
@@ -32,11 +32,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   return (
     <Link href={`/${workspaceSlug}/${projectSlug}/tasks/${task.id}`}>
       <Card className={`group ${className}`}>
-        <CardHeader className="pb-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
+        <CardHeader className="taskcard-header">
+          <div className="taskcard-header-content">
+            <div className="taskcard-main-content">
               <CardTitle>
-                <span className="text-xs font-medium text-stone-900 dark:text-stone-100 group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors mb-2 line-clamp-2">
+                <span className="taskcard-title">
                   {task.title}
                 </span>
               </CardTitle>
@@ -46,8 +46,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mt-2 flex items-center text-xs text-stone-600 dark:text-stone-400">
-            <HiClock size={12} className="mr-1" />
+          <div className="taskcard-due-date">
+            <HiClock size={12} className="taskcard-due-icon" />
             Due {new Date(task.dueDate).toLocaleDateString()}
           </div>
         </CardContent>

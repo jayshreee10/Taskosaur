@@ -1,14 +1,17 @@
-"use client";
-
 import React, {
   createContext,
   useContext,
   useState,
-  useMemo,
   useCallback,
+  useMemo,
 } from "react";
+import { taskApi } from "@/utils/api/taskApi";
 import {
-  taskApi,
+  getCurrentOrganizationId,
+  getCurrentWorkspaceId,
+  getCurrentProjectId,
+} from "@/utils/hierarchyContext";
+import {
   Task,
   CreateTaskRequest,
   CreateSubtaskRequest,
@@ -27,13 +30,9 @@ import {
   AssignMultipleLabelsRequest,
   GetTasksParams,
   TasksResponse,
-} from "@/utils/api/taskApi";
-import { 
-  getCurrentOrganizationId, 
-  getCurrentWorkspaceId, 
-  getCurrentProjectId 
-} from "@/utils/hierarchyContext";
-
+  TaskActivityType,
+  ActivityApiResponse,
+} from "@/types";
 interface TaskState {
   tasks: Task[];
   currentTask: Task | null;
@@ -46,10 +45,38 @@ interface TaskState {
 }
 
 interface TaskContextType extends TaskState {
+  getTaskStatusByProject: (params: { projectId: string }) => Promise<{ data: TaskStatus[] }>;
+  getFilteredTasks: (params: {
+    projectId?: string;
+    sprintId?: string;
+    workspaceId?: string;
+    parentTaskId?: string;
+    statuses?: string[];
+    priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
+  }) => Promise<Task[]>;
+
+  updateTaskStatus: (taskId: string, statusId: string) => Promise<Task>;
+  getTaskKanbanStatus: (params: {
+    type: "project" | "workspace";
+    slug: string;
+    userId?: string;
+    includeSubtasks?: boolean;
+  }) => Promise<any>;
   // Task operations
   createTask: (taskData: CreateTaskRequest) => Promise<Task>;
   createSubtask: (subtaskData: CreateSubtaskRequest) => Promise<Task>;
-  getAllTasks: () => Promise<Task[]>;
+  getAllTasks: (
+    organizationId: string,
+    params?: {
+      workspaceId?: string;
+      projectId?: string;
+      priorities?: string;
+      statuses?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) => Promise<Task[]>;
   getTasksByOrganization: (
     organizationId?: string,
     params?: GetTasksParams
@@ -58,19 +85,26 @@ interface TaskContextType extends TaskState {
     organizationId?: string,
     params?: GetTasksParams
   ) => Promise<TasksResponse>;
-  getTasksByProject: (projectId: string) => Promise<Task[]>;
+  getTasksByProject: (projectId: string, organizationId: string) => Promise<Task[]>;
+  getTasksBySprint: (
+    organizationId: string,
+    sprintId: string
+  ) => Promise<Task[]>;
   getSubtasksByParent: (parentTaskId: string) => Promise<Task[]>;
   getTasksOnly: (projectId?: string) => Promise<Task[]>;
   getSubtasksOnly: (projectId?: string) => Promise<Task[]>;
   getTaskById: (taskId: string) => Promise<Task>;
   updateTask: (taskId: string, taskData: UpdateTaskRequest) => Promise<Task>;
   deleteTask: (taskId: string) => Promise<void>;
-  getAllTaskStatuses: () => Promise<TaskStatus[]>;
+  getTaskActivity: (taskId: string, pageNum: number) => Promise<ActivityApiResponse>;
+  getAllTaskStatuses: (params?: { workflowId?: string; organizationId?: string }) => Promise<TaskStatus[]>;
   getTasksByWorkspace: (workspaceId: string) => Promise<Task[]>;
 
   // Enhanced methods with automatic hierarchy context
   getCurrentTasks: () => Promise<Task[]>; // Uses current project context
-  getCurrentOrganizationTasks: (params?: GetTasksParams) => Promise<TasksResponse>; // Uses current organization
+  getCurrentOrganizationTasks: (
+    params?: GetTasksParams
+  ) => Promise<TasksResponse>; // Uses current organization
   getCurrentWorkspaceTasks: () => Promise<Task[]>; // Uses current workspace
   getCurrentProjectLabels: () => Promise<TaskLabel[]>; // Uses current project
 
@@ -192,8 +226,67 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const contextValue = useMemo(
     () => ({
       ...taskState,
+      getTaskStatusByProject: async (params: { projectId: string }): Promise<{ data: TaskStatus[] }> => {
+        if (!params.projectId) {
+          throw new Error("No projectId provided for getTaskStatusByProject");
+        }
+        return await handleApiOperation(() => taskApi.getTaskStatusByProject(params), false);
+      },
 
-      // Task operations with state management
+      getFilteredTasks: async (params: {
+        projectId?: string;
+        sprintId?: string;
+        workspaceId?: string;
+        parentTaskId?: string;
+        statuses?: string[];
+        priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
+      }): Promise<Task[]> => {
+        const organizationId =
+          localStorage.getItem("currentOrganizationId") ||
+          taskApi.getCurrentOrganization();
+        if (!organizationId) {
+          throw new Error(
+            "No organization selected. Please select an organization first."
+          );
+        }
+
+        const result = await handleApiOperation(
+          () =>
+            taskApi.getFilteredTasks({
+              organizationId,
+              projectId: params.projectId,
+              sprintId: params.sprintId,
+              workspaceId: params.workspaceId,
+              parentTaskId: params.parentTaskId,
+              statuses: params.statuses,
+              priorities: params.priorities,
+            }),
+          false
+        );
+
+        // Only update the task state if we're not filtering by parent task
+        // This prevents overwriting the main task list with subtasks
+        if (!params.parentTaskId) {
+          setTaskState((prev) => ({
+            ...prev,
+            tasks: result,
+          }));
+        }
+
+        return result;
+      },
+      getTaskKanbanStatus: async (params: {
+        type: "project" | "workspace";
+        slug: string;
+        userId?: string;
+        includeSubtasks?: boolean;
+      }): Promise<any> => {
+        const result = await handleApiOperation(
+          () => taskApi.getTaskKanbanStatus(params),
+          false
+        );
+        return result;
+      },
       createTask: async (taskData: CreateTaskRequest): Promise<Task> => {
         const result = await handleApiOperation(() =>
           taskApi.createTask(taskData)
@@ -219,8 +312,18 @@ export function TaskProvider({ children }: TaskProviderProps) {
         return result;
       },
 
-      getAllTasks: async (): Promise<Task[]> => {
-        const result = await handleApiOperation(() => taskApi.getAllTasks());
+      getAllTasks: async (
+        organizationId: string,
+        params?: {
+          workspaceId?: string;
+          projectId?: string;
+          priorities?: string;
+          statuses?: string;
+        }
+      ): Promise<Task[]> => {
+        const result = await handleApiOperation(() =>
+          taskApi.getAllTasks(organizationId, params)
+        );
 
         setTaskState((prev) => ({
           ...prev,
@@ -230,16 +333,29 @@ export function TaskProvider({ children }: TaskProviderProps) {
         return result;
       },
 
-      getTasksByProject: async (projectId: string): Promise<Task[]> => {
-        const result = await handleApiOperation(() =>
-          taskApi.getTasksByProject(projectId)
-        );
+      getTasksByProject: async (projectId: string , organizationId: string): Promise<Task[]> => {
 
+        const result = await handleApiOperation(() =>
+          taskApi.getTasksByProject(projectId , organizationId)
+        );
         setTaskState((prev) => ({
           ...prev,
           tasks: result,
         }));
+        return result;
+      },
 
+      getTasksBySprint: async (
+        organizationId: string,
+        sprintId: string
+      ): Promise<Task[]> => {
+        const result = await handleApiOperation(() =>
+          taskApi.getTasksBySprint(sprintId, organizationId)
+        );
+        setTaskState((prev) => ({
+          ...prev,
+          tasks: result,
+        }));
         return result;
       },
 
@@ -295,6 +411,28 @@ export function TaskProvider({ children }: TaskProviderProps) {
         return result;
       },
 
+      updateTaskStatus: async (
+        taskId: string,
+        statusId: string
+      ): Promise<Task> => {
+        const result = await handleApiOperation(
+          () => taskApi.updateTaskStatus(taskId, statusId),
+          false
+        );
+        // Update task in state
+        setTaskState((prev) => ({
+          ...prev,
+          tasks: prev.tasks.map((task) =>
+            task.id === taskId ? { ...task, statusId } : task
+          ),
+          currentTask:
+            prev.currentTask?.id === taskId
+              ? { ...prev.currentTask, statusId }
+              : prev.currentTask,
+        }));
+        return result;
+      },
+
       deleteTask: async (taskId: string): Promise<void> => {
         await handleApiOperation(() => taskApi.deleteTask(taskId), false);
 
@@ -307,9 +445,20 @@ export function TaskProvider({ children }: TaskProviderProps) {
         }));
       },
 
-      getAllTaskStatuses: async (): Promise<TaskStatus[]> => {
+      getTaskActivity: async (taskId: string, pageNum: number): Promise<ActivityApiResponse> => {
+        const result = await handleApiOperation(() => taskApi.getTaskActivity(taskId), false);
+
+        setTaskState((prev) => ({
+          ...prev,
+          taskActivities: result,
+        }));
+
+        return result;
+      },
+
+      getAllTaskStatuses: async (params?: { workflowId?: string; organizationId?: string }): Promise<TaskStatus[]> => {
         const result = await handleApiOperation(
-          () => taskApi.getAllTaskStatuses(),
+          () => taskApi.getAllTaskStatuses(params),
           false
         );
 
@@ -555,9 +704,21 @@ export function TaskProvider({ children }: TaskProviderProps) {
 
       refreshTasks: async (projectId?: string): Promise<void> => {
         if (projectId) {
-          await contextValue.getTasksByProject(projectId);
+          const organizationId = getCurrentOrganizationId();
+          if (!organizationId) {
+            throw new Error(
+              "No organization selected. Please select an organization first."
+            );
+          }
+          await contextValue.getTasksByProject(projectId, organizationId);
         } else {
-          await contextValue.getAllTasks();
+          const organizationId = getCurrentOrganizationId();
+          if (!organizationId) {
+            throw new Error(
+              "No organization selected. Please select an organization first."
+            );
+          }
+          await contextValue.getAllTasks(organizationId);
         }
       },
 
@@ -652,23 +813,40 @@ export function TaskProvider({ children }: TaskProviderProps) {
       getCurrentTasks: async (): Promise<Task[]> => {
         const projectId = getCurrentProjectId();
         if (!projectId) {
-          throw new Error("No project selected. Please select a project first.");
+          throw new Error(
+            "No project selected. Please select a project first."
+          );
         }
-        return await contextValue.getTasksByProject(projectId);
-      },
-
-      getCurrentOrganizationTasks: async (params?: GetTasksParams): Promise<TasksResponse> => {
         const organizationId = getCurrentOrganizationId();
         if (!organizationId) {
-          throw new Error("No organization selected. Please select an organization first.");
+          throw new Error(
+            "No organization selected. Please select an organization first."
+          );
         }
-        return await contextValue.getTasksByOrganization(organizationId, params);
+        return await contextValue.getTasksByProject(projectId, organizationId);
+      },
+
+      getCurrentOrganizationTasks: async (
+        params?: GetTasksParams
+      ): Promise<TasksResponse> => {
+        const organizationId = getCurrentOrganizationId();
+        if (!organizationId) {
+          throw new Error(
+            "No organization selected. Please select an organization first."
+          );
+        }
+        return await contextValue.getTasksByOrganization(
+          organizationId,
+          params
+        );
       },
 
       getCurrentWorkspaceTasks: async (): Promise<Task[]> => {
         const workspaceId = getCurrentWorkspaceId();
         if (!workspaceId) {
-          throw new Error("No workspace selected. Please select a workspace first.");
+          throw new Error(
+            "No workspace selected. Please select a workspace first."
+          );
         }
         return await contextValue.getTasksByWorkspace(workspaceId);
       },
@@ -676,7 +854,9 @@ export function TaskProvider({ children }: TaskProviderProps) {
       getCurrentProjectLabels: async (): Promise<TaskLabel[]> => {
         const projectId = getCurrentProjectId();
         if (!projectId) {
-          throw new Error("No project selected. Please select a project first.");
+          throw new Error(
+            "No project selected. Please select a project first."
+          );
         }
         return await contextValue.getProjectLabels(projectId);
       },
@@ -709,4 +889,5 @@ export type {
   UpdateLabelRequest,
   AssignLabelRequest,
   AssignMultipleLabelsRequest,
+  TaskActivityType,
 };

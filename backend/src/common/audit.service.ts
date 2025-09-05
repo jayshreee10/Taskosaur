@@ -11,12 +11,16 @@ export class AuditService {
    * @param overrides Optional overrides for createdBy/updatedBy
    * @returns Object with createdBy and optionally updatedBy
    */
-  getCreateAuditData(overrides: { createdBy?: string; updatedBy?: string } = {}) {
+  getCreateAuditData(
+    overrides: { createdBy?: string; updatedBy?: string } = {},
+  ) {
     const currentUserId = RequestContextService.getCurrentUserId();
-    
+
     return {
       createdBy: overrides.createdBy || currentUserId || SYSTEM_USER_ID,
-      ...(overrides.updatedBy !== undefined && { updatedBy: overrides.updatedBy }),
+      ...(overrides.updatedBy !== undefined && {
+        updatedBy: overrides.updatedBy,
+      }),
     };
   }
 
@@ -27,7 +31,7 @@ export class AuditService {
    */
   getUpdateAuditData(overrides: { updatedBy?: string } = {}) {
     const currentUserId = RequestContextService.getCurrentUserId();
-    
+
     return {
       updatedBy: overrides.updatedBy || currentUserId || SYSTEM_USER_ID,
     };
@@ -74,7 +78,13 @@ export class AuditService {
    * @returns Result of the callback
    */
   runWithFullUserContext<T>(
-    user: { id: string; email: string; firstName: string; lastName: string; role: string },
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+    },
     callback: () => T,
   ): T {
     return RequestContextService.run({ user }, callback);

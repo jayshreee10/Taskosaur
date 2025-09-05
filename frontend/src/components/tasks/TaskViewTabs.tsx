@@ -1,4 +1,4 @@
-'use client';
+;
 import ViewTabs from '@/components/ui/tabs/ViewTabs';
 import { taskViewTypes } from '@/components/ui/icons/TaskViewIcons';
 
@@ -8,7 +8,7 @@ interface TaskViewTabsProps {
   variant?: 'cards' | 'bordered';
 }
 
-export default function TaskViewTabs({
+export function TaskViewTabs({
   currentView,
   baseUrl,
   variant = 'cards'

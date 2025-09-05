@@ -1,5 +1,3 @@
-"use client";
-
 import React, {
   createContext,
   useContext,
@@ -8,8 +6,11 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { organizationApi } from "@/utils/api/organizationApi";
+import { workflowsApi } from "@/utils/api/workflowsApi";
+import { taskStatusApi } from "@/utils/api/taskStatusApi";
+import { orgChartsApi } from "@/utils/api"; // Add this import
 import {
-  organizationApi,
   Organization,
   CreateOrganizationData,
   OrganizationStats,
@@ -17,24 +18,40 @@ import {
   ActivityResponse,
   OrganizationMember,
   Workflow,
-} from "@/utils/api/organizationApi";
-import {
+  TaskStatus,
   CreateWorkflowData,
   UpdateWorkflowData,
-  workflowsApi,
-} from "@/utils/api/workflowsApi";
-import { TaskStatus, taskStatusApi } from "@/utils/api/taskStatusApi";
+} from "@/types";
+
+// Add the AnalyticsData interface
+interface AnalyticsData {
+  kpiMetrics: any;
+  projectPortfolio: any[];
+  teamUtilization: any[];
+  taskDistribution: any[];
+  taskType: any[];
+  sprintMetrics: any[];
+  qualityMetrics: any;
+  workspaceProjectCount: any[];
+  memberWorkload: any[];
+  resourceAllocation: any[];
+}
 
 interface OrganizationState {
   organizations: Organization[];
   currentOrganization: Organization | null;
   isLoading: boolean;
   error: string | null;
+  // Add analytics state
+  analyticsData: AnalyticsData | null;
+  analyticsLoading: boolean;
+  analyticsError: string | null;
+  refreshingAnalytics: boolean;
 }
 
 interface OrganizationContextType extends OrganizationState {
   // Organization methods
-  getOrganizationsByUser: (userId: string) => Promise<Organization[]>;
+  getUserOrganizations: (userId: string) => Promise<Organization[]>;
   createOrganization: (
     organizationData: CreateOrganizationData
   ) => Promise<Organization>;
@@ -67,8 +84,12 @@ interface OrganizationContextType extends OrganizationState {
   ) => Promise<Workflow>;
   createWorkflow: (workflowData: CreateWorkflowData) => Promise<Workflow>;
   updateTaskStatusPositions: (
-    statusUpdates: { id: string; position: number; }[]
+    statusUpdates: { id: string; position: number }[]
   ) => Promise<TaskStatus[]>;
+  
+  // Add analytics methods
+  fetchAnalyticsData: (organizationId: string) => Promise<void>;
+  clearAnalyticsError: () => void;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(
@@ -96,6 +117,11 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       currentOrganization: null,
       isLoading: false,
       error: null,
+      // Initialize analytics state
+      analyticsData: null,
+      analyticsLoading: false,
+      analyticsError: null,
+      refreshingAnalytics: false,
     }
   );
 
@@ -107,7 +133,6 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
 
         const currentOrgId = localStorage.getItem("currentOrganizationId");
         if (currentOrgId) {
-          // Find organization in state or fetch it
           const existingOrg = organizationState.organizations.find(
             (org) => org.id === currentOrgId
           );
@@ -124,9 +149,9 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     };
 
     initializeCurrentOrganization();
-  }, [organizationState.organizations]);
+  }, []);
 
-  // Fixed: Helper to handle API operations with error handling
+  // Helper to handle API operations with error handling
   const handleApiOperation = useCallback(async function <T>(
     operation: () => Promise<T>,
     loadingState: boolean = true
@@ -157,8 +182,88 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       }));
       throw error;
     }
-  },
-  []);
+  }, []);
+
+  // Add fetchAnalyticsData function
+  const fetchAnalyticsData = useCallback(async (organizationId: string): Promise<void> => {
+    try {
+      setOrganizationState(prev => ({
+        ...prev,
+        analyticsLoading: true,
+        analyticsError: null,
+        refreshingAnalytics: true,
+      }));
+
+      const requests = [
+        orgChartsApi.getKPIMetrics(organizationId),
+        orgChartsApi.getProjectPortfolio(organizationId),
+        orgChartsApi.getTeamUtilization(organizationId),
+        orgChartsApi.getTaskDistribution(organizationId),
+        orgChartsApi.getTaskTypeDistribution(organizationId),
+        orgChartsApi.getSprintMetrics(organizationId),
+        orgChartsApi.getQualityMetrics(organizationId),
+        orgChartsApi.getWorkspaceProjectCount(organizationId),
+        orgChartsApi.getMemberWorkload(organizationId),
+        orgChartsApi.getResourceAllocation(organizationId),
+      ];
+
+      const results = await Promise.allSettled(requests);
+
+      // Check if any requests failed
+      const failedRequests = results.filter(
+        (result) => result.status === "rejected"
+      );
+
+      if (failedRequests.length > 0) {
+        console.error("Some requests failed:", failedRequests);
+      }
+
+      const [
+        kpiMetrics,
+        projectPortfolio,
+        teamUtilization,
+        taskDistribution,
+        taskType,
+        sprintMetrics,
+        qualityMetrics,
+        workspaceProjectCount,
+        memberWorkload,
+        resourceAllocation,
+      ] = results.map((result) =>
+        result.status === "fulfilled" ? result.value : null
+      );
+
+      setOrganizationState(prev => ({
+        ...prev,
+        analyticsData: {
+          kpiMetrics,
+          projectPortfolio,
+          teamUtilization,
+          taskDistribution,
+          taskType,
+          sprintMetrics,
+          qualityMetrics,
+          workspaceProjectCount,
+          memberWorkload,
+          resourceAllocation,
+        },
+        analyticsLoading: false,
+        refreshingAnalytics: false,
+      }));
+    } catch (err) {
+      console.error("Error fetching analytics data:", err);
+      const errorMessage = err instanceof Error
+        ? err.message
+        : "Failed to load organization analytics data";
+      
+      setOrganizationState(prev => ({
+        ...prev,
+        analyticsLoading: false,
+        refreshingAnalytics: false,
+        analyticsError: errorMessage,
+      }));
+    }
+  }, []);
 
   // Helper function for organization redirect logic
   const checkOrganizationAndRedirect = useCallback((): string => {
@@ -169,15 +274,10 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
         "currentOrganizationId"
       );
 
-      console.log("Organization redirect check:", {
-        hasOrganizationId: !!currentOrganizationId,
-        organizationId: currentOrganizationId,
-      });
-
       if (currentOrganizationId) {
-        return "/dashboard"; // User has organization, go to main app
+        return "/dashboard";
       } else {
-        return "/organizations"; // User needs to select/create organization
+        return "/organizations";
       }
     } catch (error) {
       console.error("Error determining redirect path:", error);
@@ -185,21 +285,17 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     }
   }, []);
 
-  // Memoized context value
-  const contextValue = useMemo(
+  // Memoized API methods (stable references)
+  const apiMethods = useMemo(
     () => ({
-      ...organizationState,
-      getOrganizationsByUser: async (
-        userId: string
-      ): Promise<Organization[]> => {
+      getUserOrganizations: async (userId: string): Promise<Organization[]> => {
         const result = await handleApiOperation(() =>
-          organizationApi.getOrganizationsByUser(userId)
+          organizationApi.getUserOrganizations(userId)
         );
         setOrganizationState((prev) => ({
           ...prev,
           organizations: result,
         }));
-
         return result;
       },
 
@@ -213,7 +309,6 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
           ...prev,
           organizations: [...prev.organizations, result],
         }));
-
         return result;
       },
 
@@ -241,7 +336,6 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
               ? { ...prev.currentOrganization, ...result }
               : prev.currentOrganization,
         }));
-
         return result;
       },
 
@@ -251,7 +345,6 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
           false
         );
 
-        // Remove organization from state
         setOrganizationState((prev) => ({
           ...prev,
           organizations: prev.organizations.filter(
@@ -263,7 +356,6 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
               : prev.currentOrganization,
         }));
 
-        // Clear from localStorage if it was the current organization
         if (typeof window !== "undefined") {
           const currentOrgId = localStorage.getItem("currentOrganizationId");
           if (currentOrgId === organizationId) {
@@ -273,7 +365,91 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
         }
       },
 
-      // State management methods
+      refreshOrganizations: async (userId: string): Promise<void> => {
+        const result = await handleApiOperation(() =>
+          organizationApi.getUserOrganizations(userId)
+        );
+        setOrganizationState((prev) => ({
+          ...prev,
+          organizations: result,
+        }));
+      },
+
+      getOrganizationStats: async (
+        organizationId: string
+      ): Promise<OrganizationStats> => {
+        const result = await handleApiOperation(
+          () => organizationApi.getOrganizationStats(organizationId),
+          false
+        );
+        return result;
+      },
+
+      getOrganizationRecentActivity: async (
+        organizationId: string,
+        filters: ActivityFilters
+      ): Promise<ActivityResponse> => {
+        return handleApiOperation(
+          () =>
+            organizationApi.getOrganizationRecentActivity(
+              organizationId,
+              filters
+            ),
+          false
+        );
+      },
+
+      getOrganizationBySlug: async (slug: string): Promise<Organization> => {
+        return handleApiOperation(
+          () => organizationApi.getOrganizationBySlug(slug),
+          false
+        );
+      },
+
+      getOrganizationMembers: async (
+        slug: string
+      ): Promise<OrganizationMember[]> => {
+        return handleApiOperation(
+          () => organizationApi.getOrganizationMembers(slug),
+          false
+        );
+      },
+
+      getOrganizationWorkFlows: async (slug: string): Promise<Workflow[]> => {
+        return handleApiOperation(
+          () => organizationApi.getOrganizationWorkFlows(slug),
+          false
+        );
+      },
+
+      createWorkflow: async (
+        workflowData: CreateWorkflowData
+      ): Promise<Workflow> => {
+        return workflowsApi.createWorkflow(workflowData);
+      },
+
+      updateWorkflow: async (
+        workflowId: string,
+        workflowData: UpdateWorkflowData
+      ): Promise<Workflow> => {
+        return workflowsApi.updateWorkflow(workflowId, workflowData);
+      },
+
+      updateTaskStatusPositions: async (
+        statusUpdates: { id: string; position: number }[]
+      ): Promise<TaskStatus[]> => {
+        return taskStatusApi.updateTaskStatusPositions(statusUpdates);
+      },
+
+      // Add analytics methods
+      fetchAnalyticsData,
+    }),
+    [handleApiOperation, fetchAnalyticsData]
+  );
+
+  // Memoized state management methods
+  const stateMethods = useMemo(
+    () => ({
       setCurrentOrganization: (organization: Organization | null): void => {
         setOrganizationState((prev) => ({
           ...prev,
@@ -290,19 +466,14 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
         }
       },
 
-      refreshOrganizations: async (userId: string): Promise<void> => {
-        const result = await handleApiOperation(() =>
-          organizationApi.getOrganizationsByUser(userId)
-        );
-        setOrganizationState((prev) => ({
-          ...prev,
-          organizations: result,
-        }));
-      },
-
       clearError: (): void => {
         setOrganizationState((prev) => ({ ...prev, error: null }));
       },
+
+      clearAnalyticsError: (): void => {
+        setOrganizationState((prev) => ({ ...prev, analyticsError: null }));
+      },
+
       checkOrganizationAndRedirect,
 
       isUserInOrganization: (organizationId: string): boolean => {
@@ -310,85 +481,18 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
           (org) => org.id === organizationId
         );
       },
-      getOrganizationStats: async (
-        organizationId: string
-      ): Promise<OrganizationStats> => {
-        const result = await handleApiOperation(
-          () => organizationApi.getOrganizationStats(organizationId),
-          false
-        );
-
-        // Update organization stats in state
-        setOrganizationState((prev) => ({
-          ...prev,
-          organizationStats: result,
-        }));
-
-        return result;
-      },
-      getOrganizationRecentActivity: async (
-        organizationId: string,
-        filters: ActivityFilters
-      ): Promise<ActivityResponse> => {
-        const result = await handleApiOperation(
-          () =>
-            organizationApi.getOrganizationRecentActivity(
-              organizationId,
-              filters
-            ),
-          false
-        );
-        return result;
-      },
-      getOrganizationBySlug: async (slug: string): Promise<Organization> => {
-        const result = await handleApiOperation(
-          () => organizationApi.getOrganizationBySlug(slug),
-          false
-        );
-        return result;
-      },
-      getOrganizationMembers: async (
-        slug: string
-      ): Promise<OrganizationMember[]> => {
-        const result = await handleApiOperation(
-          () => organizationApi.getOrganizationMembers(slug),
-          false
-        );
-        return result;
-      },
-      getOrganizationWorkFlows: async (slug: string): Promise<Workflow[]> => {
-        const result = await handleApiOperation(
-          () => organizationApi.getOrganizationWorkFlows(slug),
-          false
-        );
-        return result;
-      },
-      createWorkflow: async (
-        workflowData: CreateWorkflowData
-      ): Promise<Workflow> => {
-        const result = await workflowsApi.createWorkflow(workflowData);
-        return result;
-      },
-      updateWorkflow: async (
-        workflowId: string,
-        workflowData: UpdateWorkflowData
-      ): Promise<Workflow> => {
-        const result = await workflowsApi.updateWorkflow(
-          workflowId,
-          workflowData
-        );
-        return result;
-      },
-      updateTaskStatusPositions: async (
-        statusUpdates: { id: string; position: number; }[]
-      ): Promise<TaskStatus[]> => {
-        const result = await taskStatusApi.updateTaskStatusPositions(
-          statusUpdates
-        );
-        return result;
-      },
     }),
-    [organizationState, handleApiOperation, checkOrganizationAndRedirect]
+    [checkOrganizationAndRedirect, organizationState]
+  );
+
+  // Combined context value
+  const contextValue = useMemo(
+    () => ({
+      ...organizationState,
+      ...apiMethods,
+      ...stateMethods,
+    }),
+    [organizationState, apiMethods, stateMethods]
   );
 
   return (

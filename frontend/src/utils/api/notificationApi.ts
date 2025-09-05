@@ -1,73 +1,6 @@
 import api from "@/lib/api";
+import { Notification, NotificationFilters, NotificationPriority, NotificationResponse, NotificationStats, NotificationType, RecentNotificationsResponse } from "@/types";
 
-export interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: NotificationType;
-  priority: NotificationPriority;
-  isRead: boolean;
-  entityType?: string;
-  entityId?: string;
-  actionUrl?: string;
-  userId: string;
-  organizationId?: string;
-  createdBy?: string;
-  createdAt: string;
-  updatedAt: string;
-  readAt?: string;
-  createdByUser?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    avatar?: string;
-  };
-}
-
-export interface NotificationFilters {
-  page?: number;
-  limit?: number;
-  isRead?: boolean;
-  type?: NotificationType;
-  organizationId?: string;
-}
-
-export interface NotificationResponse {
-  notifications: Notification[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
-
-export interface NotificationStats {
-  total: number;
-  unread: number;
-  read: number;
-  recent: number;
-  byType: Record<string, number>;
-}
-
-export interface RecentNotificationsResponse {
-  notifications: Notification[];
-  count: number;
-}
-
-export type NotificationType =
-  | "TASK_ASSIGNED"
-  | "TASK_STATUS_CHANGED"
-  | "TASK_COMMENTED"
-  | "TASK_DUE_SOON"
-  | "PROJECT_CREATED"
-  | "PROJECT_UPDATED"
-  | "WORKSPACE_INVITED"
-  | "MENTION"
-  | "SYSTEM";
-
-export type NotificationPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export const notificationApi = {
   // Get user notifications with filters and pagination
@@ -101,13 +34,11 @@ export const notificationApi = {
         params.append("organizationId", filters.organizationId);
       }
 
-      console.log("Fetching user notifications with filters:", filters);
 
       const response = await api.get<NotificationResponse>(
         `/notifications?${params.toString()}`
       );
 
-      console.log("User notifications fetched successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch user notifications:", error);
@@ -125,13 +56,11 @@ export const notificationApi = {
         params.append("organizationId", organizationId);
       }
 
-      console.log("Fetching unread notification count");
 
       const response = await api.get<{ count: number }>(
         `/notifications/unread-count?${params.toString()}`
       );
 
-      console.log("Unread count fetched successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch unread count:", error);
@@ -160,13 +89,11 @@ export const notificationApi = {
         params.append("organizationId", filters.organizationId);
       }
 
-      console.log("Fetching recent notifications with filters:", filters);
 
       const response = await api.get<RecentNotificationsResponse>(
         `/notifications/recent?${params.toString()}`
       );
 
-      console.log("Recent notifications fetched successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch recent notifications:", error);
@@ -201,13 +128,11 @@ export const notificationApi = {
         params.append("organizationId", filters.organizationId);
       }
 
-      console.log(`Fetching notifications by type: ${type}`, filters);
 
       const response = await api.get<NotificationResponse>(
         `/notifications/by-type/${type}?${params.toString()}`
       );
 
-      console.log("Notifications by type fetched successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch notifications by type:", error);
@@ -229,13 +154,11 @@ export const notificationApi = {
         );
       }
 
-      console.log("Fetching notification by ID:", notificationId);
 
       const response = await api.get<Notification>(
         `/notifications/${notificationId}`
       );
 
-      console.log("Notification fetched successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch notification by ID:", error);
@@ -257,13 +180,11 @@ export const notificationApi = {
         );
       }
 
-      console.log("Marking notification as read:", notificationId);
 
       const response = await api.patch<{ message: string }>(
         `/notifications/${notificationId}/read`
       );
 
-      console.log("Notification marked as read successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
@@ -281,16 +202,11 @@ export const notificationApi = {
         params.append("organizationId", organizationId);
       }
 
-      console.log("Marking all notifications as read");
 
       const response = await api.patch<{ message: string }>(
         `/notifications/mark-all-read?${params.toString()}`
       );
 
-      console.log(
-        "All notifications marked as read successfully:",
-        response.data
-      );
       return response.data;
     } catch (error) {
       console.error("Failed to mark all notifications as read:", error);
@@ -308,16 +224,11 @@ export const notificationApi = {
         params.append("organizationId", organizationId);
       }
 
-      console.log("Marking all unread notifications as read");
 
       const response = await api.patch<{ message: string }>(
         `/notifications/mark-all-unread-read?${params.toString()}`
       );
 
-      console.log(
-        "All unread notifications marked as read successfully:",
-        response.data
-      );
       return response.data;
     } catch (error) {
       console.error("Failed to mark all unread notifications as read:", error);
@@ -337,11 +248,9 @@ export const notificationApi = {
         );
       }
 
-      console.log("Deleting notification:", notificationId);
 
       await api.delete(`/notifications/${notificationId}`);
 
-      console.log("Notification deleted successfully");
     } catch (error) {
       console.error("Failed to delete notification:", error);
       throw error;
@@ -369,13 +278,11 @@ export const notificationApi = {
         }
       }
 
-      console.log("Deleting multiple notifications:", notificationIds);
 
       await api.delete("/notifications/bulk", {
         data: { notificationIds },
       });
 
-      console.log("Multiple notifications deleted successfully");
     } catch (error) {
       console.error("Failed to delete multiple notifications:", error);
       throw error;
@@ -392,13 +299,11 @@ export const notificationApi = {
         params.append("organizationId", organizationId);
       }
 
-      console.log("Fetching notification statistics");
 
       const response = await api.get<NotificationStats>(
         `/notifications/stats/summary?${params.toString()}`
       );
 
-      console.log("Notification stats fetched successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch notification stats:", error);
@@ -411,7 +316,6 @@ export const notificationApi = {
     filters: Omit<NotificationFilters, "isRead"> = {}
   ): Promise<NotificationResponse> => {
     try {
-      console.log("Fetching unread notifications");
       return await notificationApi.getUserNotifications({
         ...filters,
         isRead: false,
@@ -427,7 +331,6 @@ export const notificationApi = {
     filters: Omit<NotificationFilters, "isRead"> = {}
   ): Promise<NotificationResponse> => {
     try {
-      console.log("Fetching read notifications");
       return await notificationApi.getUserNotifications({
         ...filters,
         isRead: true,
@@ -443,7 +346,6 @@ export const notificationApi = {
     filters: Omit<NotificationFilters, "type"> = {}
   ): Promise<NotificationResponse[]> => {
     try {
-      console.log("Fetching task-related notifications");
 
       const taskNotificationTypes: NotificationType[] = [
         "TASK_ASSIGNED",
@@ -457,7 +359,6 @@ export const notificationApi = {
       );
 
       const results = await Promise.all(promises);
-      console.log("Task notifications fetched successfully");
       return results;
     } catch (error) {
       console.error("Failed to fetch task notifications:", error);
@@ -471,7 +372,6 @@ export const notificationApi = {
     deleteAfterRead: boolean = false
   ): Promise<{ message: string }> => {
     try {
-      console.log("Clearing all notifications");
 
       // First mark all as read
       await notificationApi.markAllNotificationsAsRead(organizationId);
@@ -489,7 +389,6 @@ export const notificationApi = {
         }
       }
 
-      console.log("All notifications cleared successfully");
       return { message: "All notifications cleared successfully" };
     } catch (error) {
       console.error("Failed to clear all notifications:", error);
@@ -500,7 +399,6 @@ export const notificationApi = {
   // Helper function to refresh notification count (useful for real-time updates)
   refreshNotificationData: async (organizationId?: string) => {
     try {
-      console.log("Refreshing notification data");
 
       const [unreadCount, recentNotifications, stats] = await Promise.all([
         notificationApi.getUnreadNotificationCount(organizationId),
@@ -514,7 +412,6 @@ export const notificationApi = {
         stats,
       };
 
-      console.log("Notification data refreshed successfully:", refreshedData);
       return refreshedData;
     } catch (error) {
       console.error("Failed to refresh notification data:", error);
@@ -551,7 +448,6 @@ export const notificationApi = {
     };
   }> => {
     try {
-        console.log("Fetching notifications for user", userId, "in organization", organizationId);
       // Validate UUIDs
       const uuidRegex =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { 
-  Task, 
-  TaskType, 
-  TaskPriority, 
-  Project, 
+import {
+  Task,
+  TaskType,
+  TaskPriority,
+  Project,
   User,
   TaskStatus,
-  StatusCategory 
+  StatusCategory,
 } from '@prisma/client';
 import slugify from 'slugify';
 
@@ -31,13 +31,26 @@ export class TasksSeederService {
     // Create tasks for each project
     for (const project of projects) {
       console.log(`\n📋 Creating tasks for project: ${project.name}`);
-      
+
       // Get all available statuses for this project
       const availableStatuses = await this.getStatusesForProject(project.id);
-      
+
       if (!availableStatuses || availableStatuses.length === 0) {
-        console.log(`⚠ No statuses found for project ${project.name}, skipping tasks...`);
+        console.log(
+          `⚠ No statuses found for project ${project.name}, skipping tasks...`,
+        );
         continue;
+      }
+      const defaultSprint = await this.prisma.sprint.findFirst({
+        where: {
+          projectId: project.id,
+          isDefault: true,
+        },
+      });
+      if (!defaultSprint) {
+        console.log(`⚠ No default sprint found for project ${project.name}`);
+      } else {
+        console.log(`   📅 Found default sprint: ${defaultSprint.name}`);
       }
 
       // Get project members for assignment
@@ -46,15 +59,20 @@ export class TasksSeederService {
         include: { user: true },
       });
 
-      const availableUsers = projectMembers.length > 0 
-        ? projectMembers.map(pm => pm.user)
-        : users.slice(0, 4); // fallback to first 4 users
+      const availableUsers =
+        projectMembers.length > 0
+          ? projectMembers.map((pm) => pm.user)
+          : users.slice(0, 4); // fallback to first 4 users
 
       // Generate base tasks for the project type
       const baseTasksData = this.getBaseTasksForProject(project);
-      
+
       // Create tasks distributed across all available statuses
-      const tasksWithStatuses = this.distributeTasksAcrossStatuses(baseTasksData, availableStatuses, project);
+      const tasksWithStatuses = this.distributeTasksAcrossStatuses(
+        baseTasksData,
+        availableStatuses,
+        project,
+      );
 
       let taskNumber = 1;
       for (const taskWithStatus of tasksWithStatuses) {
@@ -63,34 +81,53 @@ export class TasksSeederService {
             data: {
               ...taskWithStatus.taskData,
               projectId: project.id,
+              sprintId: defaultSprint?.id,
               taskNumber: taskNumber,
-              slug: slugify(`${project.slug}-${taskNumber}`, { lower: true, strict: true }),
+              slug: slugify(`${project.slug}-${taskNumber}`, {
+                lower: true,
+                strict: true,
+              }),
               statusId: taskWithStatus.status.id,
               reporterId: availableUsers[0]?.id || users[0].id,
-              assigneeId: this.getAssigneeForTask(taskWithStatus.taskData, availableUsers),
+              assigneeId: this.getAssigneeForTask(
+                taskWithStatus.taskData,
+                availableUsers,
+              ),
               createdBy: availableUsers[0]?.id || users[0].id,
               updatedBy: availableUsers[0]?.id || users[0].id,
               // Set completedAt for DONE tasks
-              completedAt: taskWithStatus.status.category === StatusCategory.DONE 
-                ? this.getCompletedDate(taskWithStatus.taskData.startDate!, taskWithStatus.taskData.dueDate!)
-                : null,
+              completedAt:
+                taskWithStatus.status.category === StatusCategory.DONE
+                  ? this.getCompletedDate(
+                      taskWithStatus.taskData.startDate,
+                      taskWithStatus.taskData.dueDate,
+                    )
+                  : null,
             },
           });
 
           createdTasks.push(task);
-          console.log(`   ✓ Created task #${taskNumber}: ${task.title} [${taskWithStatus.status.name}]`);
+          console.log(
+            `   ✓ Created task #${taskNumber}: ${task.title} [${taskWithStatus.status.name}]`,
+          );
           taskNumber++;
         } catch (error) {
-          console.log(`   ⚠ Error creating task ${taskWithStatus.taskData.title}: ${error.message}`);
+          console.log(
+            `   ⚠ Error creating task ${taskWithStatus.taskData.title}: ${error.message}`,
+          );
         }
       }
     }
 
-    console.log(`\n✅ Tasks seeding completed. Created ${createdTasks.length} tasks across all projects.`);
+    console.log(
+      `\n✅ Tasks seeding completed. Created ${createdTasks.length} tasks across all projects.`,
+    );
     return createdTasks;
   }
 
-  private async getStatusesForProject(projectId: string): Promise<TaskStatus[]> {
+  private async getStatusesForProject(
+    projectId: string,
+  ): Promise<TaskStatus[]> {
     // Get project with workspace and organization workflows
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -127,7 +164,8 @@ export class TasksSeederService {
       return [
         {
           title: 'Set up development environment',
-          description: 'Configure local development environment with Node.js, React, and necessary dependencies. Include documentation for other developers.',
+          description:
+            'Configure local development environment with Node.js, React, and necessary dependencies. Include documentation for other developers.',
           type: TaskType.TASK,
           priority: TaskPriority.HIGH,
           storyPoints: 3,
@@ -138,7 +176,8 @@ export class TasksSeederService {
         },
         {
           title: 'Design user authentication flow',
-          description: 'Create wireframes and user flow diagrams for login, signup, and password reset functionality.',
+          description:
+            'Create wireframes and user flow diagrams for login, signup, and password reset functionality.',
           type: TaskType.STORY,
           priority: TaskPriority.HIGH,
           storyPoints: 5,
@@ -149,7 +188,8 @@ export class TasksSeederService {
         },
         {
           title: 'Implement JWT authentication',
-          description: 'Build secure JWT-based authentication system with refresh tokens and proper error handling.',
+          description:
+            'Build secure JWT-based authentication system with refresh tokens and proper error handling.',
           type: TaskType.TASK,
           priority: TaskPriority.HIGH,
           storyPoints: 8,
@@ -160,7 +200,8 @@ export class TasksSeederService {
         },
         {
           title: 'Create responsive dashboard layout',
-          description: 'Build main dashboard with responsive grid layout, navigation sidebar, and header components.',
+          description:
+            'Build main dashboard with responsive grid layout, navigation sidebar, and header components.',
           type: TaskType.STORY,
           priority: TaskPriority.MEDIUM,
           storyPoints: 5,
@@ -171,7 +212,8 @@ export class TasksSeederService {
         },
         {
           title: 'Fix authentication redirect bug',
-          description: 'Users are not being redirected to the correct page after login. Investigate and fix routing issue.',
+          description:
+            'Users are not being redirected to the correct page after login. Investigate and fix routing issue.',
           type: TaskType.BUG,
           priority: TaskPriority.HIGH,
           storyPoints: 2,
@@ -182,7 +224,8 @@ export class TasksSeederService {
         },
         {
           title: 'Add dark mode toggle',
-          description: 'Implement theme switching functionality with user preference persistence.',
+          description:
+            'Implement theme switching functionality with user preference persistence.',
           type: TaskType.TASK,
           priority: TaskPriority.LOW,
           storyPoints: 3,
@@ -193,7 +236,8 @@ export class TasksSeederService {
         },
         {
           title: 'User management epic',
-          description: 'Epic for all user-related features including profiles, permissions, and account settings.',
+          description:
+            'Epic for all user-related features including profiles, permissions, and account settings.',
           type: TaskType.EPIC,
           priority: TaskPriority.MEDIUM,
           storyPoints: 21,
@@ -204,7 +248,8 @@ export class TasksSeederService {
         },
         {
           title: 'Implement user profile editing',
-          description: 'Allow users to edit their profile information, avatar, and preferences.',
+          description:
+            'Allow users to edit their profile information, avatar, and preferences.',
           type: TaskType.STORY,
           priority: TaskPriority.MEDIUM,
           storyPoints: 5,
@@ -215,7 +260,8 @@ export class TasksSeederService {
         },
         {
           title: 'Add email notification system',
-          description: 'Send email notifications for important events like password changes, account updates.',
+          description:
+            'Send email notifications for important events like password changes, account updates.',
           type: TaskType.TASK,
           priority: TaskPriority.MEDIUM,
           storyPoints: 8,
@@ -226,7 +272,8 @@ export class TasksSeederService {
         },
         {
           title: 'Performance optimization',
-          description: 'Optimize bundle size, implement lazy loading, and improve page load times.',
+          description:
+            'Optimize bundle size, implement lazy loading, and improve page load times.',
           type: TaskType.TASK,
           priority: TaskPriority.LOW,
           storyPoints: 13,
@@ -240,7 +287,8 @@ export class TasksSeederService {
       return [
         {
           title: 'Set up NestJS project structure',
-          description: 'Initialize NestJS application with proper folder structure, modules, and configuration.',
+          description:
+            'Initialize NestJS application with proper folder structure, modules, and configuration.',
           type: TaskType.TASK,
           priority: TaskPriority.HIGH,
           storyPoints: 3,
@@ -251,7 +299,8 @@ export class TasksSeederService {
         },
         {
           title: 'Design database schema',
-          description: 'Create comprehensive database schema with proper relationships and constraints.',
+          description:
+            'Create comprehensive database schema with proper relationships and constraints.',
           type: TaskType.TASK,
           priority: TaskPriority.HIGH,
           storyPoints: 8,
@@ -262,7 +311,8 @@ export class TasksSeederService {
         },
         {
           title: 'Implement user CRUD operations',
-          description: 'Build complete user management API with create, read, update, delete operations.',
+          description:
+            'Build complete user management API with create, read, update, delete operations.',
           type: TaskType.STORY,
           priority: TaskPriority.HIGH,
           storyPoints: 5,
@@ -273,7 +323,8 @@ export class TasksSeederService {
         },
         {
           title: 'Add input validation middleware',
-          description: 'Implement comprehensive input validation using class-validator and transform pipes.',
+          description:
+            'Implement comprehensive input validation using class-validator and transform pipes.',
           type: TaskType.TASK,
           priority: TaskPriority.MEDIUM,
           storyPoints: 3,
@@ -284,7 +335,8 @@ export class TasksSeederService {
         },
         {
           title: 'Fix database connection pool issue',
-          description: 'Database connections are not being properly released, causing pool exhaustion.',
+          description:
+            'Database connections are not being properly released, causing pool exhaustion.',
           type: TaskType.BUG,
           priority: TaskPriority.HIGH,
           storyPoints: 5,
@@ -295,7 +347,8 @@ export class TasksSeederService {
         },
         {
           title: 'Implement rate limiting',
-          description: 'Add rate limiting middleware to prevent API abuse and ensure service stability.',
+          description:
+            'Add rate limiting middleware to prevent API abuse and ensure service stability.',
           type: TaskType.TASK,
           priority: TaskPriority.MEDIUM,
           storyPoints: 3,
@@ -306,7 +359,8 @@ export class TasksSeederService {
         },
         {
           title: 'API documentation with Swagger',
-          description: 'Generate comprehensive API documentation using Swagger/OpenAPI specifications.',
+          description:
+            'Generate comprehensive API documentation using Swagger/OpenAPI specifications.',
           type: TaskType.TASK,
           priority: TaskPriority.LOW,
           storyPoints: 5,
@@ -317,7 +371,8 @@ export class TasksSeederService {
         },
         {
           title: 'Implement caching layer',
-          description: 'Add Redis caching for frequently accessed data to improve API performance.',
+          description:
+            'Add Redis caching for frequently accessed data to improve API performance.',
           type: TaskType.STORY,
           priority: TaskPriority.MEDIUM,
           storyPoints: 8,
@@ -331,7 +386,8 @@ export class TasksSeederService {
       return [
         {
           title: 'Define color palette and typography',
-          description: 'Establish primary and secondary colors, typography scale, and spacing system.',
+          description:
+            'Establish primary and secondary colors, typography scale, and spacing system.',
           type: TaskType.TASK,
           priority: TaskPriority.HIGH,
           storyPoints: 5,
@@ -342,7 +398,8 @@ export class TasksSeederService {
         },
         {
           title: 'Create button component variants',
-          description: 'Design and document all button states: primary, secondary, outline, ghost, with sizes.',
+          description:
+            'Design and document all button states: primary, secondary, outline, ghost, with sizes.',
           type: TaskType.STORY,
           priority: TaskPriority.HIGH,
           storyPoints: 3,
@@ -353,7 +410,8 @@ export class TasksSeederService {
         },
         {
           title: 'Build form input components',
-          description: 'Create text inputs, selects, checkboxes, and radio buttons with validation states.',
+          description:
+            'Create text inputs, selects, checkboxes, and radio buttons with validation states.',
           type: TaskType.STORY,
           priority: TaskPriority.MEDIUM,
           storyPoints: 8,
@@ -364,7 +422,8 @@ export class TasksSeederService {
         },
         {
           title: 'Document component usage guidelines',
-          description: 'Write comprehensive documentation for when and how to use each component.',
+          description:
+            'Write comprehensive documentation for when and how to use each component.',
           type: TaskType.TASK,
           priority: TaskPriority.MEDIUM,
           storyPoints: 5,
@@ -375,7 +434,8 @@ export class TasksSeederService {
         },
         {
           title: 'Create navigation components',
-          description: 'Design and implement navigation bar, sidebar, breadcrumbs, and pagination components.',
+          description:
+            'Design and implement navigation bar, sidebar, breadcrumbs, and pagination components.',
           type: TaskType.STORY,
           priority: TaskPriority.MEDIUM,
           storyPoints: 8,
@@ -386,7 +446,8 @@ export class TasksSeederService {
         },
         {
           title: 'Build modal and overlay components',
-          description: 'Create reusable modal, tooltip, popover, and drawer components with accessibility.',
+          description:
+            'Create reusable modal, tooltip, popover, and drawer components with accessibility.',
           type: TaskType.TASK,
           priority: TaskPriority.LOW,
           storyPoints: 13,
@@ -400,7 +461,8 @@ export class TasksSeederService {
       return [
         {
           title: 'Research target audience',
-          description: 'Conduct market research to identify key demographics and user personas.',
+          description:
+            'Conduct market research to identify key demographics and user personas.',
           type: TaskType.TASK,
           priority: TaskPriority.HIGH,
           storyPoints: 5,
@@ -411,7 +473,8 @@ export class TasksSeederService {
         },
         {
           title: 'Create campaign messaging strategy',
-          description: 'Develop key messages, value propositions, and communication guidelines.',
+          description:
+            'Develop key messages, value propositions, and communication guidelines.',
           type: TaskType.STORY,
           priority: TaskPriority.HIGH,
           storyPoints: 8,
@@ -422,7 +485,8 @@ export class TasksSeederService {
         },
         {
           title: 'Design social media assets',
-          description: 'Create graphics, banners, and templates for various social media platforms.',
+          description:
+            'Create graphics, banners, and templates for various social media platforms.',
           type: TaskType.TASK,
           priority: TaskPriority.MEDIUM,
           storyPoints: 5,
@@ -433,7 +497,8 @@ export class TasksSeederService {
         },
         {
           title: 'Launch email campaign',
-          description: 'Set up automated email sequences and launch initial campaign to subscriber list.',
+          description:
+            'Set up automated email sequences and launch initial campaign to subscriber list.',
           type: TaskType.TASK,
           priority: TaskPriority.HIGH,
           storyPoints: 3,
@@ -444,7 +509,8 @@ export class TasksSeederService {
         },
         {
           title: 'Create landing page content',
-          description: 'Write compelling copy and create visuals for campaign landing pages.',
+          description:
+            'Write compelling copy and create visuals for campaign landing pages.',
           type: TaskType.STORY,
           priority: TaskPriority.MEDIUM,
           storyPoints: 8,
@@ -457,11 +523,13 @@ export class TasksSeederService {
     }
 
     // Default tasks for other projects
-    const projectStartDate = project.startDate || new Date(now.getTime() - 30 * oneDay);
+    const projectStartDate =
+      project.startDate || new Date(now.getTime() - 30 * oneDay);
     return [
       {
         title: 'Project planning and requirements gathering',
-        description: 'Define project scope, gather requirements, and create initial project plan.',
+        description:
+          'Define project scope, gather requirements, and create initial project plan.',
         type: TaskType.TASK,
         priority: TaskPriority.HIGH,
         storyPoints: 5,
@@ -472,7 +540,8 @@ export class TasksSeederService {
       },
       {
         title: 'Set up project infrastructure',
-        description: 'Initialize project repository, CI/CD pipeline, and development environment.',
+        description:
+          'Initialize project repository, CI/CD pipeline, and development environment.',
         type: TaskType.TASK,
         priority: TaskPriority.HIGH,
         storyPoints: 3,
@@ -483,7 +552,8 @@ export class TasksSeederService {
       },
       {
         title: 'Implement core functionality',
-        description: 'Build the main features and functionality as defined in requirements.',
+        description:
+          'Build the main features and functionality as defined in requirements.',
         type: TaskType.STORY,
         priority: TaskPriority.MEDIUM,
         storyPoints: 13,
@@ -494,7 +564,8 @@ export class TasksSeederService {
       },
       {
         title: 'Testing and quality assurance',
-        description: 'Write tests, perform manual testing, and ensure quality standards are met.',
+        description:
+          'Write tests, perform manual testing, and ensure quality standards are met.',
         type: TaskType.TASK,
         priority: TaskPriority.MEDIUM,
         storyPoints: 8,
@@ -505,7 +576,8 @@ export class TasksSeederService {
       },
       {
         title: 'Documentation and deployment',
-        description: 'Create user documentation and deploy the application to production.',
+        description:
+          'Create user documentation and deploy the application to production.',
         type: TaskType.TASK,
         priority: TaskPriority.LOW,
         storyPoints: 5,
@@ -518,20 +590,28 @@ export class TasksSeederService {
   }
 
   private distributeTasksAcrossStatuses(
-    baseTasks: any[], 
-    availableStatuses: TaskStatus[], 
-    project: Project
+    baseTasks: any[],
+    availableStatuses: TaskStatus[],
+    project: Project,
   ) {
     const tasksWithStatuses: Array<{ taskData: any; status: TaskStatus }> = [];
-    
+
     // Sort statuses by position to maintain workflow order
-    const sortedStatuses = [...availableStatuses].sort((a, b) => a.position - b.position);
-    
+    const sortedStatuses = [...availableStatuses].sort(
+      (a, b) => a.position - b.position,
+    );
+
     // Calculate how many tasks should be in each status category
-    const todoStatuses = sortedStatuses.filter(s => s.category === StatusCategory.TODO);
-    const inProgressStatuses = sortedStatuses.filter(s => s.category === StatusCategory.IN_PROGRESS);
-    const doneStatuses = sortedStatuses.filter(s => s.category === StatusCategory.DONE);
-    
+    const todoStatuses = sortedStatuses.filter(
+      (s) => s.category === StatusCategory.TODO,
+    );
+    const inProgressStatuses = sortedStatuses.filter(
+      (s) => s.category === StatusCategory.IN_PROGRESS,
+    );
+    const doneStatuses = sortedStatuses.filter(
+      (s) => s.category === StatusCategory.DONE,
+    );
+
     // Distribution: ~40% TODO, ~35% IN_PROGRESS, ~25% DONE
     const totalTasks = baseTasks.length;
     const todoCount = Math.ceil(totalTasks * 0.4);
@@ -542,7 +622,9 @@ export class TasksSeederService {
 
     // Assign DONE tasks first (oldest/completed tasks)
     for (let i = 0; i < doneCount && taskIndex < baseTasks.length; i++) {
-      const status = doneStatuses[i % doneStatuses.length] || sortedStatuses.find(s => s.category === StatusCategory.DONE);
+      const status =
+        doneStatuses[i % doneStatuses.length] ||
+        sortedStatuses.find((s) => s.category === StatusCategory.DONE);
       if (status) {
         // Adjust remaining estimate for completed tasks
         const taskData = {
@@ -556,12 +638,17 @@ export class TasksSeederService {
 
     // Assign IN_PROGRESS tasks (current work)
     for (let i = 0; i < inProgressCount && taskIndex < baseTasks.length; i++) {
-      const status = inProgressStatuses[i % inProgressStatuses.length] || sortedStatuses.find(s => s.category === StatusCategory.IN_PROGRESS);
+      const status =
+        inProgressStatuses[i % inProgressStatuses.length] ||
+        sortedStatuses.find((s) => s.category === StatusCategory.IN_PROGRESS);
       if (status) {
         // Keep partial remaining estimates for in-progress tasks
         const taskData = {
           ...baseTasks[taskIndex],
-          remainingEstimate: Math.floor(baseTasks[taskIndex].remainingEstimate * (0.3 + Math.random() * 0.6)),
+          remainingEstimate: Math.floor(
+            baseTasks[taskIndex].remainingEstimate *
+              (0.3 + Math.random() * 0.6),
+          ),
         };
         tasksWithStatuses.push({ taskData, status });
         taskIndex++;
@@ -570,10 +657,13 @@ export class TasksSeederService {
 
     // Assign remaining tasks to TODO statuses
     while (taskIndex < baseTasks.length) {
-      const status = todoStatuses[(taskIndex - doneCount - inProgressCount) % todoStatuses.length] || 
-                    sortedStatuses.find(s => s.category === StatusCategory.TODO) ||
-                    sortedStatuses[0]; // fallback to first status
-      
+      const status =
+        todoStatuses[
+          (taskIndex - doneCount - inProgressCount) % todoStatuses.length
+        ] ||
+        sortedStatuses.find((s) => s.category === StatusCategory.TODO) ||
+        sortedStatuses[0]; // fallback to first status
+
       if (status) {
         tasksWithStatuses.push({ taskData: baseTasks[taskIndex], status });
         taskIndex++;
@@ -585,18 +675,26 @@ export class TasksSeederService {
     return tasksWithStatuses;
   }
 
-  private getAssigneeForTask(taskData: any, availableUsers: User[]): string | null {
+  private getAssigneeForTask(
+    taskData: any,
+    availableUsers: User[],
+  ): string | null {
     if (availableUsers.length === 0) return null;
 
     // Assign based on task priority and type
-    if (taskData.priority === TaskPriority.HIGH || taskData.type === TaskType.BUG) {
+    if (
+      taskData.priority === TaskPriority.HIGH ||
+      taskData.type === TaskType.BUG
+    ) {
       // High priority tasks go to first user (usually admin/manager)
       return availableUsers[0].id;
     }
 
     if (taskData.type === TaskType.EPIC) {
       // Epics typically assigned to managers
-      const manager = availableUsers.find(u => u.role === 'MANAGER' || u.role === 'ADMIN');
+      const manager = availableUsers.find(
+        (u) => u.role === 'MANAGER' || u.role === 'SUPER_ADMIN',
+      );
       return manager?.id || availableUsers[0].id;
     }
 
@@ -607,7 +705,8 @@ export class TasksSeederService {
   private getCompletedDate(startDate: Date, dueDate: Date): Date {
     // Completed tasks should be completed between start and due date, or slightly after
     const timeDiff = dueDate.getTime() - startDate.getTime();
-    const completionTime = startDate.getTime() + (timeDiff * (0.8 + Math.random() * 0.4)); // 80-120% of planned time
+    const completionTime =
+      startDate.getTime() + timeDiff * (0.8 + Math.random() * 0.4); // 80-120% of planned time
     return new Date(completionTime);
   }
 
@@ -625,11 +724,17 @@ export class TasksSeederService {
       const deletedTaskLabels = await this.prisma.taskLabel.deleteMany();
       console.log(`   ✓ Deleted ${deletedTaskLabels.count} task labels`);
 
-      const deletedTaskDependencies = await this.prisma.taskDependency.deleteMany();
-      console.log(`   ✓ Deleted ${deletedTaskDependencies.count} task dependencies`);
+      const deletedTaskDependencies =
+        await this.prisma.taskDependency.deleteMany();
+      console.log(
+        `   ✓ Deleted ${deletedTaskDependencies.count} task dependencies`,
+      );
 
-      const deletedTaskAttachments = await this.prisma.taskAttachment.deleteMany();
-      console.log(`   ✓ Deleted ${deletedTaskAttachments.count} task attachments`);
+      const deletedTaskAttachments =
+        await this.prisma.taskAttachment.deleteMany();
+      console.log(
+        `   ✓ Deleted ${deletedTaskAttachments.count} task attachments`,
+      );
 
       const deletedTaskComments = await this.prisma.taskComment.deleteMany();
       console.log(`   ✓ Deleted ${deletedTaskComments.count} task comments`);
@@ -707,10 +812,7 @@ export class TasksSeederService {
         },
         createdAt: true,
       },
-      orderBy: [
-        { project: { name: 'asc' } },
-        { taskNumber: 'asc' },
-      ],
+      orderBy: [{ project: { name: 'asc' } }, { taskNumber: 'asc' }],
     });
   }
 }

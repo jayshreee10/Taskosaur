@@ -1,6 +1,4 @@
-'use client';
-
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/components/ui/DropdownMenu';
 import { 
   HiFolder, 
   HiDotsVertical,
@@ -50,27 +48,18 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onDelete,
   onShowMembers,
 }) => {
-  const [showMenu, setShowMenu] = useState(false);
 
-  const cardColors = [
-    "bg-amber-50 dark:bg-amber-950/20",
-    "bg-orange-50 dark:bg-orange-950/20", 
-    "bg-yellow-50 dark:bg-yellow-950/20",
-    "bg-stone-50 dark:bg-stone-950/20",
-    "bg-neutral-50 dark:bg-neutral-950/20",
-  ];
 
-  const colorIndex = workspace.id.length % cardColors.length;
-  const cardColor = workspace.color || cardColors[colorIndex];
+  
 
   // Simple variant (original design for dashboard/sidebar)
   if (variant === 'simple') {
     return (
       <Link href={`/${workspace.slug}`}>
-        <Card className={`group hover:shadow-md transition-all duration-200 border-[var(--border)] bg-[var(--card)] ${className}`}>
+        <Card className={`content-card-hover ${className}`}>
           <div className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 flex items-center justify-center text-white">
+            <div className="flex-start gap-3">
+              <div className="icon-container-md bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80">
                 <HiFolder size={16} />
               </div>
               <div className="flex-1 min-w-0">
@@ -92,12 +81,12 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 
   // Detailed variant using shadcn components
   return (
-    <Card className={`relative group border-[var(--border)] bg-[var(--card)] hover:shadow-lg transition-all duration-200 hover:scale-105 ${className}`}>
+    <Card className={`relative group content-card hover:shadow-lg transition-all duration-200 hover:scale-105 ${className}`}>
       <CardContent className="p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <Link href={`/${workspace.slug}`} className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/25 flex-shrink-0">
+        <div className="flex-between mb-3">
+          <Link href={`/${workspace.slug}`} className="flex-start gap-3 flex-1 min-w-0">
+            <div className="icon-container-lg bg-gradient-to-br from-blue-500 to-purple-500 shadow-lg shadow-blue-500/25">
               {workspace.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -183,17 +172,17 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
         )}
 
         {/* Stats */}
-        <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
-          <div className="flex items-center gap-1">
+        <div className="flex-start gap-4 text-xs text-muted">
+          <div className="flex-start gap-1">
             <HiUsers className="w-3 h-3" />
             <span className="font-medium">{workspace.memberCount || 0}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex-start gap-1">
             <HiFolder className="w-3 h-3" />
             <span className="font-medium">{workspace.projectCount || 0}</span>  
           </div>
           {workspace.lastActivity && (
-            <div className="flex items-center gap-1">
+            <div className="flex-start gap-1">
               <HiClock className="w-3 h-3" />
               <span className="font-medium">{workspace.lastActivity}</span>
             </div>

@@ -1,16 +1,13 @@
-"use client";
-
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useOrganization } from "@/contexts/organization-context";
-import { CreateWorkflowData, UpdateWorkflowData, workflowsApi } from "@/utils/api/workflowsApi";
+import { workflowsApi } from "@/utils/api/workflowsApi";
 import WorkflowEditor from "./WorkflowEditor";
 import StatusConfiguration from "./StatusConfiguration";
 import CreateWorkflowForm from "./CreateWorkflowForm";
 import {
   HiPlus,
   HiCog,
-  HiChartBar,
   HiEye,
   HiPencil,
   HiTrash,
@@ -18,21 +15,19 @@ import {
   HiChevronRight,
   HiExclamationTriangle,
   HiArrowPath,
-  
 } from "react-icons/hi2";
 import { HiViewGrid } from "react-icons/hi";
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TaskStatus } from "@/utils/api/taskStatusApi";
-import { Workflow } from "@/utils/api/organizationApi";
+import {
+  CreateWorkflowData,
+  TaskStatus,
+  Workflow,
+} from "@/types";
+import Tooltip from "../common/ToolTip";
+import { Check } from "lucide-react";
 
 interface WorkflowManagerProps {
   organizationId?: string;
@@ -49,9 +44,9 @@ interface WorkflowManagerProps {
 
 const validateWorkflow = (workflow: any): workflow is Workflow => {
   if (!workflow || typeof workflow !== "object") return false;
-  
+
   const hasRequiredFields =
-    typeof workflow.id === "string" && 
+    typeof workflow.id === "string" &&
     typeof workflow.name === "string" &&
     typeof workflow.organizationId === "string";
 
@@ -60,8 +55,10 @@ const validateWorkflow = (workflow: any): workflow is Workflow => {
 
 const normalizeWorkflow = (workflow: any): Workflow => {
   const statuses = Array.isArray(workflow?.statuses) ? workflow.statuses : [];
-  const transitions = Array.isArray(workflow?.transitions) ? workflow.transitions : [];
-  
+  const transitions = Array.isArray(workflow?.transitions)
+    ? workflow.transitions
+    : [];
+
   const _count = {
     statuses: statuses.length,
     transitions: transitions.length,
@@ -96,13 +93,16 @@ export default function WorkflowManager({
   organizationId,
   onRefresh,
 }: WorkflowManagerProps) {
-  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "editor" | "statuses">("overview");
+  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(
+    null
+  );
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "editor" | "statuses"
+  >("overview");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+
   const { getCurrentUser } = useAuth();
   const { currentOrganization } = useOrganization();
   const currentUser = getCurrentUser();
@@ -144,202 +144,192 @@ export default function WorkflowManager({
     }
   }, [workflows, selectedWorkflow]);
 
-  const handleCreateWorkflow = useCallback(async (workflowData: CreateWorkflowData) => {
-    try {
-      setIsUpdating(true);
-      
-      const newWorkflow = await workflowsApi.createWorkflow(workflowData);
-      
-      if (onCreateWorkflow) {
-        onCreateWorkflow(newWorkflow);
-      }
-      setShowCreateForm(false);
-      
-      if (onRefresh) {
-        onRefresh();
-      }
-      
-      return newWorkflow;
-    } catch (error) {
-      throw error;
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [onCreateWorkflow, onRefresh]);
+  const handleCreateWorkflow = useCallback(
+    async (workflowData: CreateWorkflowData) => {
+      try {
+        setIsUpdating(true);
 
-  const handleUpdateWorkflow = useCallback(async (updatedWorkflow: Workflow) => {
-    try {
-      setIsUpdating(true);
+        const newWorkflow = await workflowsApi.createWorkflow(workflowData);
 
-      const updateData: UpdateWorkflowData = {
-        name: updatedWorkflow.name,
-        description: updatedWorkflow.description,
-        isDefault: updatedWorkflow.isDefault,
+        if (onCreateWorkflow) {
+          onCreateWorkflow(newWorkflow);
+        }
+        setShowCreateForm(false);
+
+        if (onRefresh) {
+          onRefresh();
+        }
+
+        return newWorkflow;
+      } catch (error) {
+        throw error;
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [onCreateWorkflow, onRefresh]
+  );
+
+  const handleDeleteWorkflow = useCallback(
+    async (workflowId: string) => {
+      const workflow = workflows.find((w) => w.id === workflowId);
+
+      if (workflow?.isDefault) {
+        return;
+      }
+
+      if (
+        !confirm(
+          "Are you sure you want to delete this workflow? This action cannot be undone."
+        )
+      ) {
+        return;
+      }
+
+      try {
+        setIsUpdating(true);
+
+        await workflowsApi.deleteWorkflow(workflowId);
+
+        if (onDeleteWorkflow) {
+          onDeleteWorkflow(workflowId);
+        }
+
+        if (selectedWorkflow?.id === workflowId) {
+          const defaultWorkflow = workflows.find(
+            (w) => w.isDefault && w.id !== workflowId
+          );
+          const fallbackWorkflow = workflows.find((w) => w.id !== workflowId);
+          const newSelected = defaultWorkflow || fallbackWorkflow || null;
+          setSelectedWorkflow(newSelected);
+        }
+
+        if (onRefresh) {
+          onRefresh();
+        }
+      } catch (error) {
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [workflows, selectedWorkflow, onDeleteWorkflow, onRefresh]
+  );
+
+  const handleSetDefault = useCallback(
+    async (workflowId: string) => {
+      try {
+        setIsUpdating(true);
+
+        await workflowsApi.setAsDefaultWorkflow(
+          workflowId,
+          organizationId,
+          currentUser?.id
+        );
+
+        if (onSetDefaultWorkflow) {
+          onSetDefaultWorkflow(workflowId);
+        }
+
+        if (onRefresh) {
+          onRefresh();
+        }
+      } catch (error) {
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [onSetDefaultWorkflow, onRefresh]
+  );
+
+  const handleUpdateStatus = useCallback(
+    (statusId: string, updatedStatus: Partial<TaskStatus>) => {
+      if (!selectedWorkflow) {
+        return;
+      }
+
+      const updatedWorkflow = {
+        ...selectedWorkflow,
+        statuses: selectedWorkflow.statuses?.map((status) =>
+          status.id === statusId ? { ...status, ...updatedStatus } : status
+        ),
+        _count: {
+          statuses: selectedWorkflow.statuses?.length || 0,
+          transitions: selectedWorkflow._count?.transitions ?? 0,
+        },
       };
 
-      const result = await workflowsApi.updateWorkflow(updatedWorkflow.id, updateData);
+      setSelectedWorkflow(updatedWorkflow as Workflow);
+    },
+    [selectedWorkflow]
+  );
 
-      const normalizedResult = normalizeWorkflow(result);
-
-      if (onUpdateWorkflow) {
-        onUpdateWorkflow(normalizedResult);
+  const handleCreateStatus = useCallback(
+    (createdStatus: TaskStatus | any) => {
+      if (!selectedWorkflow || !currentUser) {
+        return;
       }
 
-      setSelectedWorkflow(normalizedResult);
-      setHasUnsavedChanges(false);
+      const updatedWorkflow = {
+        ...selectedWorkflow,
+        statuses: [...(selectedWorkflow.statuses || []), createdStatus],
+        _count: {
+          statuses: (selectedWorkflow._count?.statuses || 0) + 1,
+          transitions: selectedWorkflow._count?.transitions ?? 0,
+        },
+      };
 
-      if (onRefresh) {
-        onRefresh();
+      setSelectedWorkflow(updatedWorkflow as Workflow);
+    },
+    [selectedWorkflow, currentUser]
+  );
+
+  const handleDeleteStatus = useCallback(
+    (statusId: string) => {
+      if (!selectedWorkflow) {
+        return;
       }
 
-      return normalizedResult;
-    } catch (error) {
-      throw error;
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [onUpdateWorkflow, onRefresh]);
-
-  const handleDeleteWorkflow = useCallback(async (workflowId: string) => {
-    const workflow = workflows.find((w) => w.id === workflowId);
-    
-    if (workflow?.isDefault) {
-      return;
-    }
-
-    if (!confirm("Are you sure you want to delete this workflow? This action cannot be undone.")) {
-      return;
-    }
-
-    try {
-      setIsUpdating(true);
-      
-      await workflowsApi.deleteWorkflow(workflowId);
-      
-      if (onDeleteWorkflow) {
-        onDeleteWorkflow(workflowId);
+      const status = (selectedWorkflow.statuses || []).find(
+        (s) => s.id === statusId
+      );
+      if (!status) {
+        return;
       }
-      
-      if (selectedWorkflow?.id === workflowId) {
-        const defaultWorkflow = workflows.find((w) => w.isDefault && w.id !== workflowId);
-        const fallbackWorkflow = workflows.find((w) => w.id !== workflowId);
-        const newSelected = defaultWorkflow || fallbackWorkflow || null;
-        setSelectedWorkflow(newSelected);
+
+      if (status?.isDefault) {
+        return;
       }
-      
-      if (onRefresh) {
-        onRefresh();
+      const updatedWorkflow = {
+        ...selectedWorkflow,
+        statuses: (selectedWorkflow.statuses || []).filter(
+          (s) => s.id !== statusId
+        ),
+        _count: {
+          statuses: (selectedWorkflow._count?.statuses || 0) - 1,
+          transitions: selectedWorkflow._count?.transitions ?? 0,
+        },
+      };
+
+      setSelectedWorkflow(updatedWorkflow as Workflow);
+    },
+    [selectedWorkflow]
+  );
+
+  useEffect(() => {
+    const updatedWorkflows = workflows.map((w) => ({
+      ...w,
+      isDefault: w.isDefault || false,
+    }));
+
+    if (selectedWorkflow) {
+      const updatedSelected = updatedWorkflows.find(
+        (w) => w.id === selectedWorkflow.id
+      );
+      if (updatedSelected) {
+        setSelectedWorkflow(updatedSelected);
       }
-    } catch (error) {
-    } finally {
-      setIsUpdating(false);
     }
-  }, [workflows, selectedWorkflow, onDeleteWorkflow, onRefresh]);
-
-  const handleSetDefault = useCallback(async (workflowId: string) => {
-    try {
-      setIsUpdating(true);
-      
-      await workflowsApi.setAsDefaultWorkflow(workflowId);
-      
-      if (onSetDefaultWorkflow) {
-        onSetDefaultWorkflow(workflowId);
-      }
-      
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error) {
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [onSetDefaultWorkflow, onRefresh]);
-
-  const handleUpdateStatus = useCallback((statusId: string, updatedStatus: Partial<TaskStatus>) => {
-    if (!selectedWorkflow) {
-      return;
-    }
-
-    const updatedWorkflow = {
-      ...selectedWorkflow,
-      statuses: selectedWorkflow.statuses?.map((status) =>
-        status.id === statusId ? { ...status, ...updatedStatus } : status
-      ),
-      _count: {
-        statuses: selectedWorkflow.statuses?.length || 0,
-        transitions: selectedWorkflow._count?.transitions ?? 0,
-      },
-    };
-
-    setSelectedWorkflow(updatedWorkflow as Workflow);
-    setHasUnsavedChanges(true);
-  }, [selectedWorkflow]);
-
-  const handleCreateStatus = useCallback((
-    newStatus: Omit<TaskStatus, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">
-  ) => {
-    if (!selectedWorkflow || !currentUser) {
-      return;
-    }
-
-    // const status: TaskStatus = {
-    //   ...newStatus,
-    //   id: `status-${Date.now()}`,
-    //   workflowId: selectedWorkflow.id,
-    //   createdAt: new Date().toISOString(),
-    //   updatedAt: new Date().toISOString(),
-    //   createdBy: currentUser.id,
-    //   updatedBy: currentUser.id,
-    // };
-
-    const updatedWorkflow = {
-      ...selectedWorkflow,
-      statuses: [...(selectedWorkflow.statuses || []), status],
-      _count: {
-        statuses: ((selectedWorkflow._count?.statuses) || 0) + 1,
-        transitions: selectedWorkflow._count?.transitions ?? 0,
-      },
-    };
-
-    setSelectedWorkflow(updatedWorkflow as Workflow);
-    setHasUnsavedChanges(true);
-  }, [selectedWorkflow, currentUser]);
-
-  const handleDeleteStatus = useCallback((statusId: string) => {
-    if (!selectedWorkflow) {
-      return;
-    }
-
-    const status = (selectedWorkflow.statuses || []).find((s) => s.id === statusId);
-    if (status) {
-      return;
-    }
-
-    const updatedWorkflow = {
-      ...selectedWorkflow,
-      statuses: (selectedWorkflow.statuses || []).filter((s) => s.id !== statusId),
-      _count: {
-        statuses: ((selectedWorkflow._count?.statuses) || 0) - 1,
-        transitions: selectedWorkflow._count?.transitions ?? 0,
-      },
-    };
-
-    setSelectedWorkflow(updatedWorkflow as Workflow);
-    setHasUnsavedChanges(true);
-  }, [selectedWorkflow]);
-
-  const getCategoryVariant = (category: string) => {
-    switch (category) {
-      case "TODO":
-        return "bg-[var(--muted)] text-[var(--muted-foreground)] border-none";
-      case "IN_PROGRESS":
-        return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800 border-none";
-      case "DONE":
-        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 border-none";
-      default:
-        return "bg-[var(--muted)] text-[var(--muted-foreground)] border-none";
-    }
-  };
+  }, [workflows]);
 
   const tabs = [
     { id: "overview", label: "Overview", icon: HiEye },
@@ -370,9 +360,9 @@ export default function WorkflowManager({
             <p className="text-sm text-[var(--destructive)]/80">{error}</p>
           </div>
           {onRefresh && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onRefresh}
               className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
             >
@@ -419,8 +409,8 @@ export default function WorkflowManager({
             ? "Create your first workflow for this project."
             : "Create your first workflow template."}
         </p>
-        <Button 
-          onClick={() => setShowCreateForm(true)} 
+        <Button
+          onClick={() => setShowCreateForm(true)}
           disabled={isUpdating}
           className="h-9 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium"
         >
@@ -450,21 +440,6 @@ export default function WorkflowManager({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {hasUnsavedChanges && (
-            <Button
-              onClick={() => selectedWorkflow && handleUpdateWorkflow(selectedWorkflow)}
-              disabled={isUpdating}
-              variant="outline"
-              size="sm"
-              className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
-            >
-              {isUpdating ? (
-                <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin mr-2"></div>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-          )}
           <Button
             onClick={() => setShowCreateForm(true)}
             disabled={isUpdating}
@@ -473,7 +448,7 @@ export default function WorkflowManager({
             {isUpdating ? (
               <div className="w-4 h-4 border-2 border-[var(--primary-foreground)] border-t-transparent rounded-full animate-spin mr-2"></div>
             ) : (
-              <HiPlus className="w-4 h-4 mr-2" />
+              <HiPlus className="w-4 h-4" />
             )}
             Create
           </Button>
@@ -485,7 +460,9 @@ export default function WorkflowManager({
           <div className="flex items-start gap-2">
             <HiExclamationTriangle className="w-4 h-4 text-[var(--muted-foreground)] flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-[var(--foreground)] mb-1">Some workflows have data issues:</p>
+              <p className="text-sm font-medium text-[var(--foreground)] mb-1">
+                Some workflows have data issues:
+              </p>
               <ul className="text-xs text-[var(--muted-foreground)] space-y-0.5">
                 {validationErrors.slice(0, 3).map((error, index) => (
                   <li key={index}>• {error}</li>
@@ -523,7 +500,6 @@ export default function WorkflowManager({
                       }`}
                       onClick={() => {
                         setSelectedWorkflow(workflow);
-                        setHasUnsavedChanges(false);
                       }}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -566,10 +542,10 @@ export default function WorkflowManager({
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`flex items-center gap-2 px-3 py-2 border-b-2 border-transparent text-sm font-medium transition-colors ${
+                        className={`flex cursor-pointer items-center gap-2 px-3 py-2 border-b-2 text-sm font-medium transition-all duration-200 ease-in-out ${
                           isActive
-                            ? "border-[var(--primary)] text-[var(--primary)]"
-                            : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                            ? "border-b-[var(--primary)] text-[var(--primary)]"
+                            : "border-b-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                         }`}
                       >
                         <IconComponent className="w-4 h-4" />
@@ -584,24 +560,31 @@ export default function WorkflowManager({
                 {activeTab === "overview" && (
                   <div className="space-y-4">
                     <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-                      <CardContent className="p-4">
+                      <CardContent>
                         <div className="flex justify-between items-start">
                           <div>
                             <h3 className="text-md font-semibold text-[var(--foreground)] mb-2">
                               {selectedWorkflow.name || "Unnamed Workflow"}
                             </h3>
                             <p className="text-sm text-[var(--muted-foreground)] mb-3">
-                              {selectedWorkflow.description || "No description provided"}
+                              {selectedWorkflow.description ||
+                                "No description provided"}
                             </p>
                             <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
                               <span>
-                                Created: {selectedWorkflow.createdAt
-                                  ? new Date(selectedWorkflow.createdAt).toLocaleDateString()
+                                Created:{" "}
+                                {selectedWorkflow.createdAt
+                                  ? new Date(
+                                      selectedWorkflow.createdAt
+                                    ).toLocaleDateString()
                                   : "Unknown"}
                               </span>
                               <span>
-                                Updated: {selectedWorkflow.updatedAt
-                                  ? new Date(selectedWorkflow.updatedAt).toLocaleDateString()
+                                Updated:{" "}
+                                {selectedWorkflow.updatedAt
+                                  ? new Date(
+                                      selectedWorkflow.updatedAt
+                                    ).toLocaleDateString()
                                   : "Unknown"}
                               </span>
                             </div>
@@ -611,24 +594,34 @@ export default function WorkflowManager({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleSetDefault(selectedWorkflow.id)}
+                                onClick={() =>
+                                  handleSetDefault(selectedWorkflow.id)
+                                }
                                 disabled={isUpdating}
                                 className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
                               >
+                                <Check className="w-3 h-3"/>
                                 Set as Default
                               </Button>
                             )}
                             {!selectedWorkflow.isDefault && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteWorkflow(selectedWorkflow.id)}
-                                disabled={isUpdating}
-                                className="h-8 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
+                              <Tooltip
+                                content="Delete workflow"
+                                position="top"
+                                color="primary"
                               >
-                                <HiTrash className="w-3 h-3 mr-1" />
-                                Delete
-                              </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDeleteWorkflow(selectedWorkflow.id)
+                                  }
+                                  disabled={isUpdating}
+                                  className="h-8 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
+                                >
+                                  <HiTrash className="w-3 h-3" />
+                                </Button>
+                              </Tooltip>
                             )}
                           </div>
                         </div>
@@ -642,30 +635,32 @@ export default function WorkflowManager({
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="pt-0">
-                        {selectedWorkflow.statuses && selectedWorkflow.statuses.length > 0 ? (
+                        {selectedWorkflow.statuses &&
+                        selectedWorkflow.statuses.length > 0 ? (
                           <div className="flex flex-wrap items-center gap-3">
                             {(selectedWorkflow.statuses as TaskStatus[])
-                              .sort((a, b) => (a.position || 0) - (b.position || 0))
+                              .sort(
+                                (a, b) => (a.position || 0) - (b.position || 0)
+                              )
                               .map((status, index) => (
                                 <React.Fragment key={status.id}>
                                   <div className="flex items-center gap-2">
                                     <div
                                       className="w-3 h-3 rounded-full border border-[var(--border)]"
                                       style={{
-                                        backgroundColor: status.color || "#gray",
+                                        backgroundColor:
+                                          status.color || "#gray",
                                       }}
                                     />
                                     <div>
                                       <div className="text-sm font-medium text-[var(--foreground)]">
                                         {status.name || "Unnamed Status"}
                                       </div>
-                                      <Badge className={`mt-1 text-xs ${getCategoryVariant(status.category)}`}>
-                                        {(status.category || "UNKNOWN").replace("_", " ")}
-                                      </Badge>
                                     </div>
                                   </div>
                                   {selectedWorkflow.statuses &&
-                                    index < selectedWorkflow.statuses.length - 1 && (
+                                    index <
+                                      selectedWorkflow.statuses.length - 1 && (
                                       <HiChevronRight className="w-4 h-4 text-[var(--muted-foreground)]" />
                                     )}
                                 </React.Fragment>
@@ -686,7 +681,6 @@ export default function WorkflowManager({
                     workflow={selectedWorkflow}
                     onUpdate={(updatedWorkflow) => {
                       setSelectedWorkflow(updatedWorkflow);
-                      setHasUnsavedChanges(true);
                     }}
                     isUpdating={isUpdating}
                   />
@@ -696,20 +690,25 @@ export default function WorkflowManager({
                   <StatusConfiguration
                     workflow={{
                       ...selectedWorkflow,
-                      statuses: (selectedWorkflow.statuses || []).map((s: any) => ({
-                        ...s,
-                        order: s.position ?? 0,
-                      })),
+                      statuses: (selectedWorkflow.statuses || []).map(
+                        (s: any) => ({
+                          ...s,
+                          order: s.position ?? 0,
+                        })
+                      ),
                     }}
                     onUpdateStatus={handleUpdateStatus}
                     onCreateStatus={(newStatus) => {
-                      handleCreateStatus({
-                        ...newStatus,
-                        position: (newStatus as any).order ?? 0,
-                        color: (newStatus as any).color ?? "#64748b",
-                        isDefault: (newStatus as any).isDefault ?? false,
-                        workflowId: selectedWorkflow.id,
-                      });
+                      if (typeof newStatus === "object" && newStatus !== null) {
+                        handleCreateStatus({
+                          name: (newStatus as any).name ?? "",
+                          category: (newStatus as any).category ?? "TODO",
+                          position: (newStatus as any).position ?? 0,
+                          color: (newStatus as any).color ?? "#64748b",
+                          isDefault: (newStatus as any).isDefault ?? false,
+                          workflowId: selectedWorkflow.id,
+                        });
+                      }
                     }}
                     onDeleteStatus={handleDeleteStatus}
                   />

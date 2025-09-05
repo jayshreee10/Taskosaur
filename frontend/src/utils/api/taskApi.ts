@@ -1,220 +1,48 @@
 import api from "@/lib/api";
+import {
+  AssignLabelRequest,
+  AssignMultipleLabelsRequest,
+  AttachmentStats,
+  CreateAttachmentRequest,
+  CreateLabelRequest,
+  CreateSubtaskRequest,
+  CreateTaskCommentRequest,
+  CreateTaskRequest,
+  GetTasksParams,
+  Task,
+  TaskAttachment,
+  TaskComment,
+  TaskLabel,
+  TasksResponse,
+  TaskStatus,
+  UpdateLabelRequest,
+  UpdateTaskCommentRequest,
+  UpdateTaskRequest,
+} from "@/types";
 
 // Task interfaces
-export interface Task {
-  id: string;
-  title: string;
-  description: string | null;
-  type: "TASK" | "BUG" | "EPIC" | "STORY" | "SUBTASK";
-  priority: "LOWEST" | "LOW" | "MEDIUM" | "HIGH" | "HIGHEST";
-  taskNumber: number;
-  slug: string;
-  startDate: string ;
-  dueDate: string ;
-  completedAt: string;
-  storyPoints: number ;
-  originalEstimate: number ;
-  remainingEstimate: number;
-  customFields: any;
-  projectId: string;
-  assigneeId: string ;
-  reporterId: string;
-  statusId: string;
-  sprintId: string;
-  parentTaskId: string;
-  createdBy: string;
-  updatedBy: string ;
-  createdAt: string;
-  updatedAt: string;
-  
-  // Related objects
-  project: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  assignee: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    avatar: string;
-    email: string;
-  } | null;
-  reporter: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    avatar: string;
-  };
-  status: {
-    id: string;
-    name: string;
-    color: string;
-    category: "TODO" | "IN_PROGRESS" | "DONE";
-  };
-  sprint: {
-    id: string;
-    name: string;
-    status: string;
-  } | null;
-  parentTask: {
-    id: string;
-    title: string;
-    slug: string;
-    type: string;
-  } | null;
-  _count: {
-    childTasks: number;
-    comments: number;
-  };
-}
-
-
-export interface CreateTaskRequest {
-  title: string;
-  description: string;
-  priority: "LOW" | "MEDIUM" | "HIGH" | "HIGHEST";
-  startDate: string;
-  dueDate: string;
-  projectId: string;
-  assigneeId?: string;
-  reporterId?: string;
-  statusId: string;
-  parentTaskId?: string;
-}
-
-export interface CreateSubtaskRequest extends CreateTaskRequest {
-  parentTaskId: string;
-}
-
-export interface UpdateTaskRequest {
-  title?: string;
-  description?: string;
-  priority?: "LOW" | "MEDIUM" | "HIGH" | "HIGHEST";
-  startDate?: string;
-  dueDate?: string;
-  remainingEstimate?: number;
-  assigneeId?: string;
-  reporterId?: string;
-  statusId?: string;
-  projectId?: string;
-}
-
-export interface TaskStatus {
-  
-  id: string;
-  name: string;
-  color?: string;
-  order?: number;
-}
-
-// Task Comment interfaces
-export interface TaskComment {
-  id: string;
-  content: string;
-  taskId: string;
-  authorId: string;
-  parentCommentId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface CreateTaskCommentRequest {
-  content: string;
-  taskId: string;
-  authorId: string;
-  parentCommentId?: string;
-}
-
-export interface UpdateTaskCommentRequest {
-  content: string;
-}
-
-// Task Attachment interfaces
-export interface TaskAttachment {
-  id: string;
-  fileName: string;
-  filePath: string;
-  fileSize: number;
-  mimeType: string;
-  taskId: string;
-  uploadedBy?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface CreateAttachmentRequest {
-  fileName: string;
-  filePath: string;
-  fileSize: number;
-  mimeType: string;
-  taskId: string;
-}
-
-export interface AttachmentStats {
-  totalAttachments: number;
-  totalSize: number;
-  fileTypes: Record<string, number>;
-}
-
-// Task Label interfaces
-export interface TaskLabel {
-  id: string;
-  name: string;
-  color: string;
-  description?: string;
-  projectId: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface CreateLabelRequest {
-  name: string;
-  color: string;
-  description?: string;
-  projectId: string;
-}
-
-export interface UpdateLabelRequest {
-  name?: string;
-  color?: string;
-  description?: string;
-}
-
-export interface AssignLabelRequest {
-  taskId: string;
-  labelId: string;
-}
-
-export interface AssignMultipleLabelsRequest {
-  taskId: string;
-  labelIds: string[];
-}
-export interface TasksResponse {
-  tasks: Task[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
-
-export interface GetTasksParams {
-  page?: number;
-  limit?: number;
-  assigneeId?: string;
-  priority?: "LOW" | "MEDIUM" | "HIGH" | "HIGHEST";
-  search?: string;
+function formatUUID(id: string) {
+  if (!id) return id;
+  if (id.includes("-")) return id; // already valid
+  return id.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
 }
 export const taskApi = {
+  getTaskStatusByProject: async ({ projectId }: { projectId: string }): Promise<{ data: TaskStatus[] }> => {
+    try {
+      if (!projectId) {
+        throw new Error("projectId is required");
+      }
+      const response = await api.get<{ data: TaskStatus[] }>(`/task-statuses/project?projectId=${projectId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Get task statuses by project error:", error);
+      throw error;
+    }
+  },
   // Task CRUD operations
   createTask: async (taskData: CreateTaskRequest): Promise<Task> => {
     try {
-      console.log("Creating task with data:", taskData);
       const response = await api.post<Task>("/tasks", taskData);
-      console.log("Task created successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Create task error:", error);
@@ -224,9 +52,10 @@ export const taskApi = {
 
   createSubtask: async (subtaskData: CreateSubtaskRequest): Promise<Task> => {
     try {
-      console.log("Creating subtask with data:", subtaskData);
-      const response = await api.post<Task>("/tasks", subtaskData);
-      console.log("Subtask created successfully:", response.data);
+      const response = await api.post<Task>("/tasks", {
+        ...subtaskData,
+        parentTaskId: formatUUID(subtaskData.parentTaskId),
+      });
       return response.data;
     } catch (error) {
       console.error("Create subtask error:", error);
@@ -234,10 +63,44 @@ export const taskApi = {
     }
   },
 
-  getAllTasks: async (): Promise<Task[]> => {
+  getAllTasks: async (
+    organizationId: string,
+    params?: {
+      workspaceId?: string;
+      projectId?: string;
+      sprintId?: string;
+      parentTaskId?: string;
+      priorities?: string;
+      statuses?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }
+  ): Promise<Task[]> => {
     try {
-      console.log("Fetching all tasks");
-      const response = await api.get<Task[]>("/tasks");
+      const queryParams = new URLSearchParams();
+      queryParams.append("organizationId", organizationId);
+
+      if (params?.priorities) {
+        queryParams.append("priorities", params.priorities);
+      }
+      if (params?.statuses) {
+        queryParams.append("statuses", params.statuses);
+      }
+      if (params?.workspaceId) {
+        queryParams.append("workspaceId", params.workspaceId);
+      }
+      if (params?.projectId) {
+        queryParams.append("projectId", params.projectId);
+      }
+      if (params?.sprintId) {
+        queryParams.append("sprintId", params.sprintId);
+      }
+
+      const query = queryParams.toString();
+      const url = `/tasks${query ? `?${query}` : ""}`;
+
+      const response = await api.get<Task[]>(url);
       return response.data;
     } catch (error) {
       console.error("Get all tasks error:", error);
@@ -245,16 +108,39 @@ export const taskApi = {
     }
   },
 
-  getTasksByProject: async (projectId: string): Promise<Task[]> => {
+getTasksByProject: async (projectId: string, organizationId: string): Promise<Task[]> => {
     try {
-      console.log("Fetching tasks for project:", projectId);
-      const response = await api.get<Task[]>(`/tasks?projectId=${projectId}`);
+      if (!organizationId) {
+        throw new Error("organizationId is required");
+      }
+      const response = await api.get<Task[]>(`/tasks?organizationId=${organizationId}&projectId=${projectId}`);
       return response.data;
     } catch (error) {
       console.error("Get tasks by project error:", error);
       throw error;
     }
   },
+  getTasksBySprint: async (
+    sprintId: string,
+    organizationId: string
+  ): Promise<Task[]> => {
+    try {
+      if (!sprintId || typeof sprintId !== "string") {
+        throw new Error(`Invalid sprintId: ${sprintId}`);
+      }
+      if (!organizationId || typeof organizationId !== "string") {
+        throw new Error(`Invalid organizationId: ${organizationId}`);
+      }
+      const response = await api.get<Task[]>(
+        `/tasks?sprintId=${sprintId}&organizationId=${organizationId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Get tasks by sprint error:", error);
+      throw error;
+    }
+  },
+
   getTasksByOrganization: async (
     organizationId: string,
     params: GetTasksParams = {}
@@ -292,8 +178,18 @@ export const taskApi = {
 
   getSubtasksByParent: async (parentTaskId: string): Promise<Task[]> => {
     try {
+      const uuid = formatUUID(parentTaskId);
+      let organizationId = null;
+      if (typeof window !== "undefined") {
+        organizationId = localStorage.getItem("currentOrganizationId");
+      }
+      if (!organizationId) {
+        throw new Error("Organization ID not found in localStorage");
+      }
       const response = await api.get<Task[]>(
-        `/tasks?parentTaskId=${parentTaskId}`
+        `/tasks?organizationId=${encodeURIComponent(
+          organizationId
+        )}&parentTaskId=${encodeURIComponent(uuid)}`
       );
       return response.data;
     } catch (error) {
@@ -358,15 +254,35 @@ export const taskApi = {
     }
   },
 
-  getAllTaskStatuses: async (): Promise<TaskStatus[]> => {
+  getAllTaskStatuses: async (params?: { workflowId?: string; organizationId?: string }): Promise<TaskStatus[]> => {
     try {
-      const response = await api.get<TaskStatus[]>("/task-statuses");
+      let query = "";
+      if (params) {
+        const queryParams = new URLSearchParams();
+        if (params.workflowId) queryParams.append("workflowId", params.workflowId);
+        if (params.organizationId) queryParams.append("organizationId", params.organizationId);
+        query = queryParams.toString();
+      }
+      const url = `/task-statuses${query ? `?${query}` : ""}`;
+      const response = await api.get<TaskStatus[]>(url);
       return response.data;
     } catch (error) {
       console.error("Get task statuses error:", error);
       throw error;
     }
   },
+
+  getTaskActivity: async (taskId: string, page: number = 1, limit: number = 10): Promise<any> => {
+    try {
+        const response = await api.get<Task[]>(
+          `/activity-logs/task/${taskId}/activities?limit=${limit}&page=${page}`
+        );
+        return response.data;
+      } catch (error) {
+        console.error("Get tasks by workspace error:", error);
+        throw error;
+      }
+    },
 
   getTasksByWorkspace: async (workspaceId: string): Promise<Task[]> => {
     try {
@@ -443,8 +359,6 @@ export const taskApi = {
     file: File
   ): Promise<TaskAttachment> => {
     try {
-      console.log("Uploading attachment for task:", taskId, "file:", file.name);
-
       const formData = new FormData();
       formData.append("file", file);
 
@@ -459,7 +373,6 @@ export const taskApi = {
         }
       );
 
-      console.log("Attachment uploaded successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Upload attachment error:", error);
@@ -471,7 +384,6 @@ export const taskApi = {
     attachmentData: CreateAttachmentRequest
   ): Promise<TaskAttachment> => {
     try {
-      console.log("Creating attachment:", attachmentData);
       const response = await api.post<TaskAttachment>(
         "/task-attachments",
         attachmentData
@@ -485,7 +397,6 @@ export const taskApi = {
 
   getTaskAttachments: async (taskId: string): Promise<TaskAttachment[]> => {
     try {
-      console.log("Fetching attachments for task:", taskId);
       const response = await api.get<TaskAttachment[]>(
         `/task-attachments/task/${taskId}`
       );
@@ -498,7 +409,6 @@ export const taskApi = {
 
   getAttachmentById: async (attachmentId: string): Promise<TaskAttachment> => {
     try {
-      console.log("Fetching attachment by ID:", attachmentId);
       const response = await api.get<TaskAttachment>(
         `/task-attachments/${attachmentId}`
       );
@@ -511,7 +421,6 @@ export const taskApi = {
 
   downloadAttachment: async (attachmentId: string): Promise<Blob> => {
     try {
-      console.log("Downloading attachment:", attachmentId);
       const response = await api.get(
         `/task-attachments/${attachmentId}/download`,
         {
@@ -527,7 +436,6 @@ export const taskApi = {
 
   previewFile: async (attachmentId: string): Promise<Blob> => {
     try {
-      console.log("Previewing file:", attachmentId);
       const response = await api.get(
         `/task-attachments/${attachmentId}/preview`,
         {
@@ -544,7 +452,6 @@ export const taskApi = {
   getAttachmentStats: async (taskId?: string): Promise<AttachmentStats> => {
     try {
       const query = taskId ? `?taskId=${taskId}` : "";
-      console.log("Fetching attachment stats with query:", query);
       const response = await api.get<AttachmentStats>(
         `/task-attachments/stats${query}`
       );
@@ -560,16 +467,9 @@ export const taskApi = {
     requestUserId: string
   ): Promise<void> => {
     try {
-      console.log(
-        "Deleting attachment:",
-        attachmentId,
-        "by user:",
-        requestUserId
-      );
       await api.delete(
         `/task-attachments/${attachmentId}?requestUserId=${requestUserId}`
       );
-      console.log("Attachment deleted successfully");
     } catch (error) {
       console.error("Delete attachment error:", error);
       throw error;
@@ -579,9 +479,7 @@ export const taskApi = {
   // Task Label operations
   createLabel: async (labelData: CreateLabelRequest): Promise<TaskLabel> => {
     try {
-      console.log("Creating label:", labelData);
       const response = await api.post<TaskLabel>("/labels", labelData);
-      console.log("Label created successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Create label error:", error);
@@ -591,7 +489,6 @@ export const taskApi = {
 
   getProjectLabels: async (projectId: string): Promise<TaskLabel[]> => {
     try {
-      console.log("Fetching labels for project:", projectId);
       const response = await api.get<TaskLabel[]>(
         `/labels?projectId=${projectId}`
       );
@@ -604,7 +501,6 @@ export const taskApi = {
 
   getLabelById: async (labelId: string): Promise<TaskLabel> => {
     try {
-      console.log("Fetching label by ID:", labelId);
       const response = await api.get<TaskLabel>(`/labels/${labelId}`);
       return response.data;
     } catch (error) {
@@ -618,12 +514,10 @@ export const taskApi = {
     labelData: UpdateLabelRequest
   ): Promise<TaskLabel> => {
     try {
-      console.log("Updating label:", labelId, "with data:", labelData);
       const response = await api.patch<TaskLabel>(
         `/labels/${labelId}`,
         labelData
       );
-      console.log("Label updated successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Update label error:", error);
@@ -633,9 +527,7 @@ export const taskApi = {
 
   deleteLabel: async (labelId: string): Promise<void> => {
     try {
-      console.log("Deleting label:", labelId);
       await api.delete(`/labels/${labelId}`);
-      console.log("Label deleted successfully");
     } catch (error) {
       console.error("Delete label error:", error);
       throw error;
@@ -644,9 +536,7 @@ export const taskApi = {
 
   assignLabelToTask: async (assignData: AssignLabelRequest): Promise<void> => {
     try {
-      console.log("Assigning label to task:", assignData);
-      await api.post("/task-labels/assign", assignData);
-      console.log("Label assigned successfully");
+      await api.post("/task-labels", assignData);
     } catch (error) {
       console.error("Assign label to task error:", error);
       throw error;
@@ -657,9 +547,7 @@ export const taskApi = {
     assignData: AssignMultipleLabelsRequest
   ): Promise<void> => {
     try {
-      console.log("Assigning multiple labels to task:", assignData);
       await api.post("/task-labels/assign-multiple", assignData);
-      console.log("Multiple labels assigned successfully");
     } catch (error) {
       console.error("Assign multiple labels to task error:", error);
       throw error;
@@ -671,11 +559,7 @@ export const taskApi = {
     labelId: string
   ): Promise<void> => {
     try {
-      console.log("Removing label from task:", { taskId, labelId });
-      await api.delete(
-        `/task-labels/remove?taskId=${taskId}&labelId=${labelId}`
-      );
-      console.log("Label removed successfully");
+      await api.delete(`/task-labels/${taskId}/${labelId}`);
     } catch (error) {
       console.error("Remove label from task error:", error);
       throw error;
@@ -684,7 +568,6 @@ export const taskApi = {
 
   getTaskLabels: async (taskId: string): Promise<TaskLabel[]> => {
     try {
-      console.log("Fetching labels for task:", taskId);
       const response = await api.get<TaskLabel[]>(
         `/task-labels?taskId=${taskId}`
       );
@@ -700,12 +583,6 @@ export const taskApi = {
     query: string
   ): Promise<TaskLabel[]> => {
     try {
-      console.log(
-        "Searching labels for project:",
-        projectId,
-        "with query:",
-        query
-      );
       const response = await api.get<TaskLabel[]>(
         `/labels/search?projectId=${projectId}&q=${encodeURIComponent(query)}`
       );
@@ -720,7 +597,6 @@ export const taskApi = {
       if (typeof window === "undefined") return null;
 
       const orgId = localStorage.getItem("currentOrganizationId");
-      console.log("Getting current organization ID:", orgId);
       return orgId;
     } catch (error) {
       console.error("Error getting current organization:", error);
@@ -755,6 +631,99 @@ export const taskApi = {
       return response.data;
     } catch (error) {
       console.error("Get today agenda error:", error);
+      throw error;
+    }
+  },
+
+  getTaskKanbanStatus: async (params: {
+    type: "project" | "workspace";
+    slug: string;
+    userId?: string;
+    includeSubtasks?: boolean;
+  }): Promise<any> => {
+    try {
+      const query = new URLSearchParams();
+      query.append("type", params.type);
+      query.append("slug", params.slug);
+      if (params.userId) query.append("userId", params.userId);
+      if (typeof params.includeSubtasks !== "undefined")
+        query.append("includeSubtasks", String(params.includeSubtasks));
+      const response = await api.get(`/tasks/by-status?${query.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error("Get task kanban status error:", error);
+      throw error;
+    }
+  },
+
+  updateTaskStatus: async (taskId: string, statusId: string): Promise<Task> => {
+    try {
+      const response = await api.patch<Task>(`/tasks/${taskId}/status`, {
+        statusId,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Update task status error:", error);
+      throw error;
+    }
+  },
+
+  // Task filtering operations
+  getFilteredTasks: async (params: {
+    organizationId: string; // Required parameter
+    projectId?: string;
+    sprintId?: string;
+    workspaceId?: string;
+    parentTaskId?: string;
+    statuses?: string[];
+    priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
+  }): Promise<Task[]> => {
+    try {
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(params.organizationId)) {
+        throw new Error(
+          `Invalid organizationId format: ${params.organizationId}. Expected UUID format.`
+        );
+      }
+
+      const queryParams = new URLSearchParams();
+
+      // Add required organizationId
+      queryParams.append("organizationId", params.organizationId);
+
+      if (params.projectId) {
+        queryParams.append("projectId", params.projectId);
+      }
+      if (params.sprintId) {
+        queryParams.append("sprintId", params.sprintId);
+      }
+      if (params.workspaceId) {
+        queryParams.append("workspaceId", params.workspaceId);
+      }
+      if (params.parentTaskId) {
+        queryParams.append("parentTaskId", params.parentTaskId);
+      }
+      if (params.statuses && params.statuses.length > 0) {
+        queryParams.append("statuses", params.statuses.join(","));
+      }
+      if (params.priorities && params.priorities.length > 0) {
+        queryParams.append("priorities", params.priorities.join(","));
+      }
+
+      const query = queryParams.toString();
+      const url = `/tasks${query ? `?${query}` : ""}`;
+
+      const response = await api.get<Task[]>(url);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        console.error("Invalid request parameters:", error.response.data);
+        throw new Error(
+          error.response.data.message || "Invalid request parameters"
+        );
+      }
+      console.error("Get filtered tasks error:", error);
       throw error;
     }
   },

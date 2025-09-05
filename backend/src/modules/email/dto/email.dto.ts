@@ -18,7 +18,11 @@ export enum EmailTemplate {
   SPRINT_STARTED = 'sprint-started',
   SPRINT_COMPLETED = 'sprint-completed',
   PASSWORD_RESET = 'password-reset',
-  PASSWORD_RESET_CONFIRMATION = 'password-reset-confirmation'
+  PASSWORD_RESET_CONFIRMATION = 'password-reset-confirmation',
+  SEND_INVITATION = 'send-invitation',
+  INVITATION_ACCEPTED = 'invitation-accepted',
+  INVITATION_DECLINED = 'invitation-declined',
+  INVITATION_EXPIRED = 'invitation-expired',
 }
 
 export enum EmailPriority {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { WorkspaceRole, Workspace } from '@prisma/client';
+import { Role as WorkspaceRole, Workspace } from '@prisma/client';
 
 @Injectable()
 export class WorkspacesSeederService {
@@ -201,7 +201,7 @@ export class WorkspacesSeederService {
     });
 
     const memberRoles = [
-      WorkspaceRole.ADMIN, // First user
+      WorkspaceRole.OWNER, // First user
       WorkspaceRole.MANAGER, // Second user
       WorkspaceRole.MEMBER, // Third user
       WorkspaceRole.MEMBER, // Fourth user

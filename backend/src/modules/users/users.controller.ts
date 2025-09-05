@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -24,13 +25,33 @@ import {
 } from '@nestjs/swagger';
 import { User } from './entities/user.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
+import { ChangePasswordDto } from '../auth/dto/change-password.dto';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
+
+  @Public()
+  @Get('exists')
+  @ApiOperation({ summary: 'Check if any users exist in the system' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns whether any users exist',
+    schema: {
+      type: 'object',
+      properties: {
+        exists: { type: 'boolean' },
+      },
+    },
+  })
+  async checkUsersExist() {
+    const exists = await this.usersService.checkUsersExist();
+    return { exists };
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create a new user' })
@@ -84,6 +105,31 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(id, updateUserDto);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change current user password' })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Password changed successfully' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Password validation failed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async changePassword(
+    @Body() changePasswordDto: ChangePasswordDto,
+    @Req() req: any,
+  ): Promise<{ success: boolean; message: string }> {
+    
+    return this.usersService.changePassword(req.user.id, changePasswordDto);
   }
 
   @Delete(':id')

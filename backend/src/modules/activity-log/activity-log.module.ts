@@ -6,7 +6,7 @@ import { ActivityLogController } from './activity-log.controller';
 
 @Module({
   imports: [PrismaModule],
-  controllers:[ActivityLogController],
+  controllers: [ActivityLogController],
   providers: [ActivityLogService],
   exports: [ActivityLogService],
 })

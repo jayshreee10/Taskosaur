@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsInt,
   IsHexColor,
+  IsUUID,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { StatusCategory } from '@prisma/client';
@@ -64,4 +65,13 @@ export class CreateTaskStatusDto {
   @IsString()
   @IsNotEmpty()
   workflowId: string;
+}
+export class CreateTaskStatusFromProjectDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  projectId: string;
 }

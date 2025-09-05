@@ -1,4 +1,4 @@
-'use client';
+;
 
 import { useState } from 'react';
 import { Task, TaskDependency, DependencyType } from '@/types/tasks';
@@ -125,9 +125,7 @@ export default function TaskDependencies({
                     </span>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {blockingTask.key}
-                        </span>
+                   
                         <span className="text-gray-600 dark:text-gray-400">
                           {blockingTask.title}
                         </span>
@@ -203,9 +201,7 @@ export default function TaskDependencies({
                       </span>
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {blockedTask.key}
-                          </span>
+
                           <span className="text-gray-600 dark:text-gray-400">
                             {blockedTask.title}
                           </span>
@@ -257,31 +253,31 @@ export default function TaskDependencies({
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="form-label-primary mb-2">
                   Task that blocks this task
                 </label>
                 <select
                   value={newDependency.taskId}
                   onChange={(e) => setNewDependency(prev => ({ ...prev, taskId: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="form-select-primary"
                 >
                   <option value="">Select a task...</option>
                   {availableTasks.map(t => (
                     <option key={t.id} value={t.id}>
-                      {t.key} - {t.title}
+                      {t.slug} - {t.title}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="form-label-primary mb-2">
                   Dependency Type
                 </label>
                 <select
                   value={newDependency.type}
                   onChange={(e) => setNewDependency(prev => ({ ...prev, type: e.target.value as DependencyType }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="form-select-primary"
                 >
                   {Object.values(DependencyType).map(type => (
                     <option key={type} value={type}>

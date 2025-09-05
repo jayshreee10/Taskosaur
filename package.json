@@ -1,18 +1,22 @@
 {
     "name": "taskosaur-server",
-    "version": "1.0.0",
-    "description": "A Fastify-based reverse proxy with environment-based targets.",
+    "version": "0.1.0",
+    "description": "",
+    "author": "Taskosaur Team",
+    "private": true,
+    "license": "SEE LICENSE IN https://github.com/Taskosaur/Taskosaur/blob/main/LICENSE.md",
     "main": "taskosaur.js",
     "scripts": {
         "setup": "node taskosaur.js setup && npm run be:install && npm run fe:install",
         "start": "node taskosaur.js run",
         "start:dev": "node taskosaur.js run --dev",
+        "build:dist": "rm -rf dist && npm run be:build:dist && npm run fe:build:dist && rm -rf backend/public && cp -rvf dist/public backend/public",
         "db:migrate": "node taskosaur.js be:npm run prisma:migrate:dev",
         "db:reset": "node taskosaur.js be:npm run prisma:reset",
         "db:seed": "node taskosaur.js be:npm run seed:core seed",
         "db:generate": "node taskosaur.js be:npm run prisma:generate",
-        
         "be:build": "node taskosaur.js be:npm run build",
+        "be:build:dist": "node taskosaur.js be:npm run build:dist",
         "be:format": "node taskosaur.js be:npm run format",
         "be:start": "node taskosaur.js be:npm run start",
         "be:start:dev": "node taskosaur.js be:npm run start:dev",
@@ -31,12 +35,11 @@
         "be:prisma:reset": "node taskosaur.js be:npm run prisma:reset",
         "be:prisma": "node taskosaur.js be:npm run prisma",
         "be:seed:core": "node taskosaur.js be:npm run seed:core",
-
         "be:install": "cd backend && npm install",
         "fe:install": "cd frontend && npm install",
-
         "fe:dev": "node taskosaur.js fe:npm run dev",
         "fe:build": "node taskosaur.js fe:npm run build",
+        "fe:build:dist": "node taskosaur.js fe:npm run build:dist",
         "fe:start": "node taskosaur.js fe:npm run start",
         "fe:lint": "node taskosaur.js fe:npm run lint",
         "fe:start:dev": "node taskosaur.js fe:npm run start:dev"
@@ -47,8 +50,6 @@
         "proxy",
         "http-proxy"
     ],
-    "author": "",
-    "license": "CUSTOM",
     "dependencies": {
         "@fastify/http-proxy": "^11.3.0",
         "dotenv": "^17.2.0",

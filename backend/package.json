@@ -7,6 +7,7 @@
   "license": "SEE LICENSE IN https://github.com/Taskosaur/Taskosaur/blob/main/LICENSE.md",
   "scripts": {
     "build": "nest build",
+    "build:dist": "node build.js --outDir=../dist",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

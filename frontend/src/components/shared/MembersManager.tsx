@@ -1,14 +1,27 @@
-"use client";
+;
 
 import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useProjectContext } from "@/contexts/project-context";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useGlobalFetchPrevention } from "@/hooks/useGlobalFetchPrevention";
+import { invitationApi } from "@/utils/api/invitationsApi"; // Add this import
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/ui/DropdownMenu";
 import UserAvatar from "@/components/ui/avatars/UserAvatar";
 import { HiPlus } from "react-icons/hi2";
 import { HiTrash } from "react-icons/hi2";
@@ -78,25 +91,31 @@ const MembersManagerComponent = memo(function MembersManager({
   className = "",
   title,
 }: MembersManagerProps) {
-  console.log("Rendering MembersManager for type:", type, "entityId:", entityId, "organizationId:", organizationId);
   const [members, setMembers] = useState<Member[]>([]);
-  const [organizationMembers, setOrganizationMembers] = useState<OrganizationMember[]>([]);
+  const [organizationMembers, setOrganizationMembers] = useState<
+    OrganizationMember[]
+  >([]);
   const [workspaceMembers, setWorkspaceMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingOrgMembers, setIsLoadingOrgMembers] = useState(false);
-  const [isLoadingWorkspaceMembers, setIsLoadingWorkspaceMembers] = useState(false);
+  const [isLoadingWorkspaceMembers, setIsLoadingWorkspaceMembers] =
+    useState(false);
   const [orgMembersLoaded, setOrgMembersLoaded] = useState(false);
   const [workspaceMembersLoaded, setWorkspaceMembersLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(type === "workspace" ? "MEMBER" : "DEVELOPER");
+  const [selectedRole, setSelectedRole] = useState(
+    type === "workspace" ? "MEMBER" : "DEVELOPER"
+  );
   const [inviteEmail, setInviteEmail] = useState("");
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [isFetchingMembers, setIsFetchingMembers] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
-  
-  const lastFetchParamsRef = useRef<string>('');
+  const [inviteLoading, setInviteLoading] = useState(false); // Add this state
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null); // Add this state
+
+  const lastFetchParamsRef = useRef<string>("");
   const mountedRef = useRef(true);
 
   const {
@@ -105,7 +124,7 @@ const MembersManagerComponent = memo(function MembersManager({
     markFetchComplete,
     markFetchError,
     getCachedData,
-    reset
+    reset,
   } = useGlobalFetchPrevention();
 
   const projectContext = useProjectContext();
@@ -113,14 +132,14 @@ const MembersManagerComponent = memo(function MembersManager({
   const { getCurrentUser } = useAuth();
 
   const workspaceRoles: MemberRole[] = [
-    { value: "ADMIN", label: "Admin", variant: "secondary" },
+    { value: "SUPER_ADMIN", label: "Super Admin", variant: "secondary" },
     { value: "MANAGER", label: "Manager", variant: "default" },
     { value: "MEMBER", label: "Member", variant: "default" },
     { value: "VIEWER", label: "Viewer", variant: "secondary" },
   ];
 
   const projectRoles: MemberRole[] = [
-    { value: "ADMIN", label: "Admin", variant: "secondary" },
+    { value: "SUPER_ADMIN", label: "Super Admin", variant: "secondary" },
     { value: "DEVELOPER", label: "Developer", variant: "default" },
     { value: "MANAGER", label: "Manager", variant: "default" },
     { value: "VIEWER", label: "Viewer", variant: "secondary" },
@@ -129,23 +148,25 @@ const MembersManagerComponent = memo(function MembersManager({
   const roles = type === "workspace" ? workspaceRoles : projectRoles;
 
   const getRoleLabel = (role: string) => {
-    const roleConfig = roles.find(r => r.value === role);
+    const roleConfig = roles.find((r) => r.value === role);
     return roleConfig?.label || role;
   };
 
+  // ... (keep all existing functions unchanged until handleInviteMember)
+
   const fetchMembers = useCallback(async () => {
     const fetchKey = `${type}-${entityId}-${organizationId}`;
-    
+
     if (shouldPreventFetch(fetchKey)) return;
-    
+
     const cachedData = getCachedData(fetchKey);
     if (cachedData) {
-      setMembers(cachedData);
+      setMembers(cachedData as Member[]);
       setIsLoading(false);
       setIsFetchingMembers(false);
       return;
     }
-    
+
     if (!entityId || !mountedRef.current) return;
 
     try {
@@ -156,18 +177,32 @@ const MembersManagerComponent = memo(function MembersManager({
 
       let membersData;
       if (type === "workspace") {
-        membersData = await workspaceContext.getWorkspaceMembers?.(entityId) || [];
+        membersData =
+          (await workspaceContext.getWorkspaceMembers?.(entityId)) || [];
       } else {
         membersData = await projectContext.getProjectMembers(entityId);
       }
 
+      const normalized = (membersData || []).map((member: any) => ({
+        id: member.id,
+        role: member.role,
+        userId: member.userId || member.user?.id || "",
+        user: {
+          id: member.user?.id || member.userId || "",
+          firstName: member.user?.firstName || "",
+          lastName: member.user?.lastName || "",
+          email: member.user?.email || member.email || "",
+          avatar: member.user?.avatar || undefined,
+        },
+      }));
+
       if (mountedRef.current) {
-        setMembers(membersData || []);
+        setMembers(normalized);
         setHasInitialized(true);
-        markFetchComplete(fetchKey, membersData);
+        markFetchComplete(fetchKey, normalized);
       }
     } catch (error: any) {
-      markFetchError(fetchKey);
+      markFetchError(fetchKey, error);
       if (mountedRef.current) {
         setError(error?.message || `Failed to load ${type} members`);
       }
@@ -177,18 +212,42 @@ const MembersManagerComponent = memo(function MembersManager({
         setIsFetchingMembers(false);
       }
     }
-  }, [type, entityId, organizationId, shouldPreventFetch, getCachedData, markFetchStart, markFetchComplete, markFetchError, workspaceContext, projectContext]);
+  }, [
+    type,
+    entityId,
+    organizationId,
+    shouldPreventFetch,
+    getCachedData,
+    markFetchStart,
+    markFetchComplete,
+    markFetchError,
+    workspaceContext,
+    projectContext,
+  ]);
 
   const fetchOrganizationMembers = useCallback(async () => {
     if (orgMembersLoaded || isLoadingOrgMembers) return;
 
     try {
       setIsLoadingOrgMembers(true);
-      const orgMembersData = await projectContext.getOrganizationMembers(organizationId);
-      setOrganizationMembers(orgMembersData || []);
+      const orgMembersData = await projectContext.getOrganizationMembers(
+        organizationId
+      );
+      const normalized = (orgMembersData || []).map((orgMember: any) => ({
+        id: orgMember.id,
+        role: orgMember.role,
+        user: {
+          id: orgMember.user?.id || "",
+          firstName: orgMember.user?.firstName || "",
+          lastName: orgMember.user?.lastName || "",
+          email: orgMember.user?.email || orgMember.email || "",
+          avatar: orgMember.user?.avatar || undefined,
+        },
+      }));
+      setOrganizationMembers(normalized);
       setOrgMembersLoaded(true);
     } catch (error: any) {
-      setError(error?.message || 'Failed to load organization members');
+      setError(error?.message || "Failed to load organization members");
     } finally {
       setIsLoadingOrgMembers(false);
     }
@@ -199,51 +258,63 @@ const MembersManagerComponent = memo(function MembersManager({
 
     try {
       setIsLoadingWorkspaceMembers(true);
-      
-      let targetWorkspaceId = '';
-      if (type === 'project') {
-        targetWorkspaceId = workspaceId || '';
+
+      let targetWorkspaceId = "";
+      if (type === "project") {
+        targetWorkspaceId = workspaceId || "";
       } else {
         targetWorkspaceId = entityId;
       }
 
       if (!targetWorkspaceId) return;
 
-      const workspaceMembersData = await workspaceContext.getWorkspaceMembers?.(targetWorkspaceId) || [];
-      
-      const transformedMembers: Member[] = workspaceMembersData.map((wsMember: any) => ({
-        id: wsMember.id,
-        role: wsMember.role,
-        userId: wsMember.userId || wsMember.user?.id || '',
-        user: {
-          id: wsMember.user?.id || wsMember.userId || '',
-          firstName: wsMember.user?.firstName || '',
-          lastName: wsMember.user?.lastName || '',
-          email: wsMember.user?.email || '',
-          avatar: wsMember.user?.avatar || undefined,
-        }
-      }));
-      
+      const workspaceMembersData =
+        (await workspaceContext.getWorkspaceMembers?.(targetWorkspaceId)) || [];
+
+      const transformedMembers: Member[] = workspaceMembersData.map(
+        (wsMember: any) => ({
+          id: wsMember.id,
+          role: wsMember.role,
+          userId: wsMember.userId || wsMember.user?.id || "",
+          user: {
+            id: wsMember.user?.id || wsMember.userId || "",
+            firstName: wsMember.user?.firstName || "",
+            lastName: wsMember.user?.lastName || "",
+            email: wsMember.user?.email || "",
+            avatar: wsMember.user?.avatar || undefined,
+          },
+        })
+      );
+
       setWorkspaceMembers(transformedMembers);
       setWorkspaceMembersLoaded(true);
     } catch (error: any) {
-      setError(error?.message || 'Failed to load workspace members');
+      setError(error?.message || "Failed to load workspace members");
     } finally {
       setIsLoadingWorkspaceMembers(false);
     }
-  }, [workspaceMembersLoaded, isLoadingWorkspaceMembers, type, workspaceId, entityId, workspaceContext]);
+  }, [
+    workspaceMembersLoaded,
+    isLoadingWorkspaceMembers,
+    type,
+    workspaceId,
+    entityId,
+    workspaceContext,
+  ]);
+
+  // Keep all existing useEffect hooks unchanged...
 
   useEffect(() => {
     mountedRef.current = true;
-    
+
     if (!entityId || !organizationId || isFetchingMembers) return;
-    
+
     const timeoutId = setTimeout(() => {
       if (mountedRef.current) {
         fetchMembers();
       }
     }, 50);
-    
+
     return () => {
       clearTimeout(timeoutId);
       if (isFetchingMembers) {
@@ -254,12 +325,12 @@ const MembersManagerComponent = memo(function MembersManager({
 
   useEffect(() => {
     mountedRef.current = true;
-    
+
     return () => {
       mountedRef.current = false;
       const fetchKey = `${type}-${entityId}-${organizationId}`;
       reset(fetchKey);
-      lastFetchParamsRef.current = '';
+      lastFetchParamsRef.current = "";
       setHasInitialized(false);
     };
   }, [reset, type, entityId, organizationId]);
@@ -291,35 +362,61 @@ const MembersManagerComponent = memo(function MembersManager({
     }
   };
 
+  // Updated handleInviteMember function with invitation API integration
   const handleInviteMember = async () => {
     try {
       if (!inviteEmail.trim()) return;
 
+      setInviteLoading(true);
+      setInviteMessage(null);
+      setError(null);
+
+      // Prepare invitation data based on entity type
+      const inviteData: any = {
+        inviteeEmail: inviteEmail.trim(),
+        role: selectedRole,
+      };
+
+      // Set the appropriate entity ID
       if (type === "workspace") {
-        const inviteData = {
-          email: inviteEmail.trim(),
-          workspaceId: entityId,
-          role: selectedRole as any,
-        };
-        await workspaceContext.inviteMemberToWorkspace?.(inviteData);
+        inviteData.workspaceId = entityId;
       } else {
-        const inviteData = {
-          email: inviteEmail.trim(),
-          projectId: entityId,
-          role: selectedRole,
-        };
-        await projectContext.inviteMemberToProject(inviteData);
+        inviteData.projectId = entityId;
       }
 
-      await fetchMembers();
-      setShowInviteModal(false);
+      // Call the invitation API
+      await invitationApi.createInvitation(inviteData);
+
+      // Success - show success message and reset form
+      setInviteMessage("Invitation sent successfully!");
       setInviteEmail("");
       setSelectedRole(type === "workspace" ? "MEMBER" : "DEVELOPER");
-      setError(null);
+      
+      // Auto-close modal after 2 seconds
+      setTimeout(() => {
+        setShowInviteModal(false);
+        setInviteMessage(null);
+      }, 2000);
+
+      // Refresh members list
+      await fetchMembers();
     } catch (error: any) {
-      setError(error?.message || `Failed to invite ${type} member`);
+      // Handle specific error messages from the backend
+      const errorMessage = error?.response?.data?.message || error?.message;
+      
+      if (errorMessage) {
+        // Check for specific error types
+          setInviteMessage(errorMessage+ ' for this ' + type);
+     
+      } else {
+        setInviteMessage(`❌ Failed to send invitation to ${type}`);
+      }
+    } finally {
+      setInviteLoading(false);
     }
   };
+
+  // Keep all other existing functions unchanged (handleRemoveMember, handleUpdateRole, etc.)...
 
   const handleRemoveMember = async (memberId: string) => {
     try {
@@ -327,7 +424,10 @@ const MembersManagerComponent = memo(function MembersManager({
       if (!currentUser?.id) return;
 
       if (type === "workspace") {
-        await workspaceContext.removeMemberFromWorkspace?.(memberId, currentUser.id);
+        await workspaceContext.removeMemberFromWorkspace?.(
+          memberId,
+          currentUser.id
+        );
       } else {
         await projectContext.removeProjectMember(memberId, currentUser.id);
       }
@@ -345,9 +445,17 @@ const MembersManagerComponent = memo(function MembersManager({
       if (!currentUser?.id) return;
 
       if (type === "workspace") {
-        await workspaceContext.updateMemberRole?.(memberId, { role: newRole as any }, currentUser.id);
+        await workspaceContext.updateMemberRole?.(
+          memberId,
+          { role: newRole as any },
+          currentUser.id
+        );
       } else {
-        await projectContext.updateProjectMemberRole(memberId, currentUser.id, newRole);
+        await projectContext.updateProjectMemberRole(
+          memberId,
+          currentUser.id,
+          newRole
+        );
       }
 
       await fetchMembers();
@@ -360,8 +468,8 @@ const MembersManagerComponent = memo(function MembersManager({
 
   const getAvailableMembers = () => {
     const memberUserIds = members.map((member) => member.userId);
-    
-    if (type === 'project') {
+
+    if (type === "project") {
       return workspaceMembers.filter(
         (wsMember) => !memberUserIds.includes(wsMember.userId)
       );
@@ -372,26 +480,33 @@ const MembersManagerComponent = memo(function MembersManager({
     }
   };
 
+  const isLoadingMembers =
+    type === "project" ? isLoadingWorkspaceMembers : isLoadingOrgMembers;
+  const membersLoaded =
+    type === "project" ? workspaceMembersLoaded : orgMembersLoaded;
 
-  const isLoadingMembers = type === 'project' ? isLoadingWorkspaceMembers : isLoadingOrgMembers;
-  const membersLoaded = type === 'project' ? workspaceMembersLoaded : orgMembersLoaded;
-
-  const displayTitle = title || `${type === "workspace" ? "Workspace" : "Project"} Members`;
+  const displayTitle =
+    title || `${type === "workspace" ? "Workspace" : "Project"} Members`;
 
   if (isLoading) {
     return (
-      <Card className={`rounded-[var(--card-radius)]  border-none ${className}`}>
-        <div className="p-6">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6 animate-pulse"></div>
-          <div className="space-y-4">
+      <Card
+        className={`members-manager-loading-card ${className}`}
+      >
+        <div className="members-manager-loading-container">
+          <div className="members-manager-loading-title members-manager-loading-title-dark"></div>
+          <div className="members-manager-loading-list">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-center space-x-3 animate-pulse">
-                <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+              <div
+                key={i}
+                className="members-manager-loading-item"
+              >
+                <div className="members-manager-loading-avatar members-manager-loading-avatar-dark"></div>
+                <div className="members-manager-loading-content">
+                  <div className="members-manager-loading-name members-manager-loading-name-dark"></div>
+                  <div className="members-manager-loading-email members-manager-loading-email-dark"></div>
                 </div>
-                <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="members-manager-loading-role members-manager-loading-role-dark"></div>
               </div>
             ))}
           </div>
@@ -401,49 +516,60 @@ const MembersManagerComponent = memo(function MembersManager({
   }
 
   return (
-    <Card className={`bg-[var(--card)] rounded-[var(--card-radius)]  border-none ${className}`}>
+    <Card
+      className={`members-manager-card ${className} `}
+    >
       {/* Header */}
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
-              <HiUsers className="w-5 h-5 text-[var(--gray-500)]" />
+      <CardHeader className="members-manager-header ">
+        <div className="members-manager-header-content ">
+          <div className="members-manager-header-info">
+            <CardTitle className="members-manager-title">
+              <HiUsers className="members-manager-title-icon" />
               {displayTitle}
             </CardTitle>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="members-manager-actions">
             <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
               <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="h-9 w-20 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center whitespace-nowrap cursor-pointer transition-all duration-200"
+                <Button
+                  variant="outline"
+                  className="members-manager-invite-button"
                 >
                   Invite
                 </Button>
               </DialogTrigger>
-              <DialogContent className="border-none bg-[var(--card)] rounded-[var(--card-radius)] shadow-lg">
+              <DialogContent className="members-manager-modal">
                 <DialogHeader>
-                  <DialogTitle className="text-[var(--foreground)]">Invite Member via Email</DialogTitle>
+                  <DialogTitle className="members-manager-modal-title">
+                    Invite Member via Email
+                  </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-[var(--foreground)]">Email Address</Label>
+                <div className="members-manager-modal-content">
+                  <div className="members-manager-modal-field">
+                    <Label htmlFor="email" className="members-manager-modal-label">
+                      Email Address
+                    </Label>
                     <Input
                       id="email"
                       type="email"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
                       placeholder="Enter email address"
-                      className="border-input bg-background text-[var(--foreground)]"
+                      className="members-manager-modal-input"
+                      disabled={inviteLoading}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[var(--foreground)]">Role</Label>
-                    <Select value={selectedRole} onValueChange={setSelectedRole}>
-                      <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5  text-[var(--foreground)]">
+                  <div className="members-manager-modal-field">
+                    <Label className="members-manager-modal-label">Role</Label>
+                    <Select
+                      value={selectedRole}
+                      onValueChange={setSelectedRole}
+                      disabled={inviteLoading}
+                    >
+                      <SelectTrigger className="members-manager-modal-select">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-none bg-[var(--card)]">
+                      <SelectContent className="members-manager-modal-select-content">
                         {roles.map((role) => (
                           <SelectItem key={role.value} value={role.value}>
                             {role.label}
@@ -452,61 +578,81 @@ const MembersManagerComponent = memo(function MembersManager({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Show invite message */}
+                  {inviteMessage && (
+                    <div className={`members-manager-invite-message ${
+                      inviteMessage.includes('❌') 
+                        ? 'members-manager-invite-message-error' 
+                        : 'members-manager-invite-message-success'
+                    }`}>
+                      {inviteMessage}
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-end gap-3">
-                  <Button 
-                    variant="outline" 
-                    className="h-9 w-20 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
+                <div className="members-manager-modal-actions">
+                  <Button
+                    variant="outline"
+                    className="members-manager-modal-cancel"
                     onClick={() => {
                       setShowInviteModal(false);
                       setInviteEmail("");
-                      setSelectedRole(type === "workspace" ? "MEMBER" : "DEVELOPER");
+                      setInviteMessage(null);
+                      setSelectedRole(
+                        type === "workspace" ? "MEMBER" : "DEVELOPER"
+                      );
                     }}
+                    disabled={inviteLoading}
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    onClick={handleInviteMember} 
-                    disabled={!inviteEmail.trim()}
-                    className="h-9 w-28 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium rounded-lg"
+                  <Button
+                    onClick={handleInviteMember}
+                    disabled={!inviteEmail.trim() || inviteLoading}
+                    className="members-manager-modal-submit"
                   >
-                    Send Invite
+                    {inviteLoading ? "Sending..." : "Send Invite"}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
 
+            {/* Keep the rest of the component unchanged */}
             <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
               <DialogTrigger asChild>
-                <Button 
+                <Button
                   variant="default"
-                  className="h-9 w-32 border-none bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center justify-center gap-2 text-sm"
+                  className="members-manager-add-button"
                   onClick={() => {
-                    if (type === 'project') {
+                    if (type === "project") {
                       fetchWorkspaceMembers();
                     } else {
                       fetchOrganizationMembers();
                     }
                   }}
                 >
-                  <HiPlus className="w-4 h-4" />
+                  <HiPlus className="members-manager-add-button-icon" />
                   Add Member
                 </Button>
               </DialogTrigger>
-              <DialogContent className="border-none bg-[var(--card)] rounded-[var(--card-radius)] shadow-lg max-w-lg">
+              <DialogContent className="members-manager-modal members-manager-modal-large">
                 <DialogHeader>
-                  <DialogTitle className="text-[var(--foreground)]">
-                    Add Member to {type === "workspace" ? "Workspace" : "Project"}
+                  <DialogTitle className="members-manager-modal-title">
+                    Add Member to{" "}
+                    {type === "workspace" ? "Workspace" : "Project"}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label className="text-[var(--foreground)]">Role</Label>
-                    <Select value={selectedRole} onValueChange={setSelectedRole}>
-                      <SelectTrigger className="h-9 border-none bg-[var(--primary)]/5  text-[var(--foreground)]">
+                <div className="members-manager-modal-content">
+                  <div className="members-manager-modal-field">
+                    <Label className="members-manager-modal-label">Role</Label>
+                    <Select
+                      value={selectedRole}
+                      onValueChange={setSelectedRole}
+                    >
+                      <SelectTrigger className="members-manager-modal-select">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-none bg-[var(--card)]">
+                      <SelectContent className="members-manager-modal-select-content">
                         {roles.map((role) => (
                           <SelectItem key={role.value} value={role.value}>
                             {role.label}
@@ -515,71 +661,92 @@ const MembersManagerComponent = memo(function MembersManager({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[var(--foreground)]">
-                      {type === 'project' ? 'Workspace Members' : 'Organization Members'}
+                  <div className="members-manager-modal-field">
+                    <Label className="members-manager-modal-label">
+                      {type === "project"
+                        ? "Workspace Members"
+                        : "Organization Members"}
                     </Label>
                     {isLoadingMembers ? (
-                      <div className="space-y-3">
+                      <div className="members-manager-modal-loading-list">
                         {[...Array(3)].map((_, i) => (
-                          <div key={i} className="flex items-center space-x-3 p-3 border border-[var(--gray-200)] dark:border-[var(--gray-700)] rounded-lg animate-pulse">
-                            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
-                            <div className="flex-1 space-y-2">
-                              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                          <div
+                            key={i}
+                            className="members-manager-modal-loading-item members-manager-modal-loading-item-dark"
+                          >
+                            <div className="members-manager-modal-loading-item-avatar members-manager-modal-loading-item-avatar-dark"></div>
+                            <div className="members-manager-modal-loading-item-content">
+                              <div className="members-manager-modal-loading-item-name members-manager-modal-loading-item-name-dark"></div>
+                              <div className="members-manager-modal-loading-item-email members-manager-modal-loading-item-email-dark"></div>
                             </div>
-                            <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                            <div className="members-manager-modal-loading-item-button members-manager-modal-loading-item-button-dark"></div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="max-h-64 overflow-y-auto space-y-2">
+                      <div className="members-manager-available-list">
                         {getAvailableMembers().map((member: any) => (
-                          <div key={member.id} className="flex items-center justify-between p-3 border border-[var(--gray-200)] dark:border-[var(--gray-700)] rounded-lg bg-[var(--gray-50)] dark:bg-[var(--gray-900)] hover:bg-[var(--primary)]/5 transition-colors">
-                            <div className="flex items-center space-x-3">
+                          <div
+                            key={member.id}
+                            className="members-manager-available-item members-manager-available-item-dark"
+                          >
+                            <div className="members-manager-available-item-info">
                               <UserAvatar
                                 user={{
-                                  firstName: member.user?.firstName || member.firstName,
-                                  lastName: member.user?.lastName || member.lastName,
+                                  firstName:
+                                    member.user?.firstName || member.firstName,
+                                  lastName:
+                                    member.user?.lastName || member.lastName,
                                   avatar: member.user?.avatar || member.avatar,
                                 }}
                                 size="sm"
                               />
-                              <div>
-                                <div className="text-sm font-medium text-[var(--accent-foreground)]">
-                                  {(member.user?.firstName || member.firstName)} {(member.user?.lastName || member.lastName)}
+                              <div className="members-manager-available-item-details">
+                                <div className="members-manager-available-item-name">
+                                  {member.user?.firstName || member.firstName}{" "}
+                                  {member.user?.lastName || member.lastName}
                                 </div>
-                                <div className="text-xs text-[var(--gray-500)]">
+                                <div className="members-manager-available-item-email">
                                   {member.user?.email || member.email}
                                 </div>
                               </div>
                             </div>
                             <Button
-                              onClick={() => handleAddMember(member.user?.id || member.userId)}
-                              className="h-9 w-16 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center whitespace-nowrap transition-all duration-200"
+                              onClick={() =>
+                                handleAddMember(
+                                  member.user?.id || member.userId
+                                )
+                              }
+                              className="members-manager-available-item-button"
                             >
                               Add
                             </Button>
                           </div>
                         ))}
-                        {getAvailableMembers().length === 0 && membersLoaded && (
-                          <div className="text-center py-8 px-4">
-                            <p className="text-sm text-[var(--gray-500)] font-medium">
-                              All {type === 'project' ? 'workspace' : 'organization'} members are already part of this {type}
-                            </p>
-                            <p className="text-xs text-[var(--gray-500)] mt-1">
-                              Use the "Invite" button to invite new members via email
-                            </p>
-                          </div>
-                        )}
+                        {getAvailableMembers().length === 0 &&
+                          membersLoaded && (
+                            <div className="members-manager-empty-available">
+                              <p className="members-manager-empty-available-title">
+                                All{" "}
+                                {type === "project"
+                                  ? "workspace"
+                                  : "organization"}{" "}
+                                members are already part of this {type}
+                              </p>
+                              <p className="members-manager-empty-available-subtitle">
+                                Use the "Invite" button to invite new members
+                                via email
+                              </p>
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <Button 
-                    variant="outline" 
-                    className="h-9 w-20 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
+                  <Button
+                    variant="outline"
+                    className="members-manager-modal-cancel"
                     onClick={() => setShowAddModal(false)}
                   >
                     Cancel
@@ -593,26 +760,31 @@ const MembersManagerComponent = memo(function MembersManager({
 
       {/* Error Display */}
       {error && (
-        <div className="mx-6 mb-4 p-3 bg-[var(--destructive)]/10 border border-[var(--destructive)]/20 rounded-lg">
-          <p className="text-sm text-[var(--destructive)]">{error}</p>
+        <div className="members-manager-error">
+          <p className="members-manager-error-text">{error}</p>
         </div>
       )}
 
       {/* Members List */}
-      <CardContent className="pt-0">
-        <div className="space-y-3">
+      <CardContent className="members-manager-content">
+        <div className="members-manager-list">
           {members.length === 0 ? (
-            <div className="text-center py-8 flex flex-col items-center justify-center">
-              <HiUserPlus className="w-12 h-12 mx-auto text-[var(--gray-400)] mb-3" />
-              <p className="text-sm font-medium text-[var(--accent-foreground)]">No members yet</p>
-              <p className="text-xs text-[var(--gray-500)] mt-1">
+            <div className="members-manager-empty">
+              <HiUserPlus className="members-manager-empty-icon" />
+              <p className="members-manager-empty-title">
+                No members yet
+              </p>
+              <p className="members-manager-empty-subtitle">
                 Add members to start collaborating on this {type}.
               </p>
             </div>
           ) : (
             members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between py-2 rounded-lg  transition-colors">
-                <div className="flex items-center space-x-3">
+              <div
+                key={member.id}
+                className="members-manager-member-item"
+              >
+                <div className="members-manager-member-info">
                   <UserAvatar
                     user={{
                       firstName: member.user.firstName,
@@ -621,36 +793,39 @@ const MembersManagerComponent = memo(function MembersManager({
                     }}
                     size="sm"
                   />
-                  <div>
-                    <div className="text-sm font-medium text-[var(--accent-foreground)]">
+                  <div className="members-manager-member-details">
+                    <div className="members-manager-member-name">
                       {member.user.firstName} {member.user.lastName}
                     </div>
-                    <div className="text-xs text-[var(--gray-500)]">
+                    <div className="members-manager-member-email">
                       {member.user.email}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="members-manager-member-actions">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        className="cursor-pointer h-9 w-24 border-none  bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-200"
+                      <Button
+                        variant="outline"
+                        className="members-manager-role-button"
                       >
                         {getRoleLabel(member.role)}
-                        <HiChevronDown className="w-3 h-3" />
+                        <HiChevronDown className="size-2" />
                       </Button>
                     </DropdownMenuTrigger>
-<DropdownMenuContent className="z-50 border-none bg-[var(--card)] rounded-[var(--card-radius)] shadow-lg">                      {roles.map((role) => (
+                    <DropdownMenuContent className="members-manager-role-dropdown">
+                      {roles.map((role) => (
                         <DropdownMenuItem
                           key={role.value}
-                          onClick={() => handleUpdateRole(member.id, role.value)}
-                          className="text-[var(--foreground)] hover:bg-[var(--primary)]/10"
+                          onClick={() =>
+                            handleUpdateRole(member.id, role.value)
+                          }
+                          className="members-manager-role-dropdown-item"
                         >
-                          <div className="flex items-center justify-between w-full">
+                          <div className="members-manager-role-dropdown-item-content">
                             {role.label}
                             {member.role === role.value && (
-                              <HiCheck className="w-4 h-4 text-[var(--primary)]" />
+                              <HiCheck className="members-manager-role-dropdown-check" />
                             )}
                           </div>
                         </DropdownMenuItem>
@@ -658,9 +833,9 @@ const MembersManagerComponent = memo(function MembersManager({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => handleRemoveMember(member.id)}
-                        className="text-[var(--destructive)] hover:bg-[var(--destructive)]/10 bg-[var(--primary)]/5"
+                        className="members-manager-role-dropdown-remove"
                       >
-                        <HiTrash className="w-4 h-4 mr-2" />
+                        <HiTrash className="members-manager-role-dropdown-remove-icon" />
                         Remove member
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -675,6 +850,6 @@ const MembersManagerComponent = memo(function MembersManager({
   );
 });
 
-MembersManagerComponent.displayName = 'MembersManager';
+MembersManagerComponent.displayName = "MembersManager";
 
 export default MembersManagerComponent;

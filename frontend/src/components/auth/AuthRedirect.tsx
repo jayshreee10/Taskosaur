@@ -1,5 +1,3 @@
-'use client';
-
 import { useAuth } from '@/contexts/auth-context';
 import { TokenManager } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -7,13 +5,14 @@ import { useEffect, useState, useCallback } from 'react';
 
 interface AuthRedirectProps {
   children: React.ReactNode;
-  redirectTo?: string; // Allow custom redirect destination
-  requireAuth?: boolean; // Allow pages that don't require auth
+  redirectTo?: () => Promise<string>; 
+  requireAuth?: boolean;
 }
+
 
 export default function AuthRedirect({ 
   children, 
-  redirectTo = '/dashboard',
+  redirectTo = async () => '/dashboard',
   requireAuth = true 
 }: AuthRedirectProps) {
   const { getCurrentUser, isAuthenticated: contextIsAuthenticated, isLoading: authLoading } = useAuth();
@@ -23,10 +22,7 @@ export default function AuthRedirect({
 
   const checkAuthStatus = useCallback(() => {
     try {
-      // Use the context's isAuthenticated method which is more reliable
       const isAuth = contextIsAuthenticated();
-      
-      // Double-check with tokens and user data
       const hasTokens = !!TokenManager.getAccessToken();
       const currentUser = getCurrentUser();
       
@@ -40,7 +36,6 @@ export default function AuthRedirect({
   }, [contextIsAuthenticated, getCurrentUser]);
 
   useEffect(() => {
-    // Don't check auth while the auth context is still loading
     if (authLoading) {
       return;
     }
@@ -51,21 +46,17 @@ export default function AuthRedirect({
         
         if (requireAuth) {
           if (isAuthenticated) {
-            
-            router.push(redirectTo);
+
+            router.push(await redirectTo());
+
             setShouldShowChildren(false);
           } else {
-            // User is not authenticated but page requires auth - show auth page
-            console.log('User not authenticated, showing auth page');
             setShouldShowChildren(true);
           }
         } else {
-          // Page doesn't require auth - always show content
           setShouldShowChildren(true);
         }
-      } catch (error) {
-        console.error('Auth redirect error:', error);
-        // On error, show auth page if auth is required, otherwise show content
+      } catch {
         setShouldShowChildren(!requireAuth);
       } finally {
         setIsLoading(false);
@@ -74,8 +65,6 @@ export default function AuthRedirect({
 
     performAuthCheck();
   }, [authLoading, checkAuthStatus, requireAuth, redirectTo, router]);
-
-  // Show loading spinner while checking authentication
   if (isLoading || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
@@ -86,8 +75,6 @@ export default function AuthRedirect({
       </div>
     );
   }
-
-  // Don't render children if we're redirecting authenticated users
   if (!shouldShowChildren) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
@@ -98,7 +85,5 @@ export default function AuthRedirect({
       </div>
     );
   }
-
-  // Render children (auth pages for unauthenticated users or any content for non-auth pages)
   return <>{children}</>;
 }

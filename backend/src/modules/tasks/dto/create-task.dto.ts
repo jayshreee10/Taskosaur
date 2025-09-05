@@ -145,8 +145,8 @@ export class CreateTaskDto {
     format: 'uuid',
   })
   @IsUUID()
-  @IsNotEmpty()
-  reporterId: string;
+  @IsOptional()
+  reporterId?: string;
 
   @ApiProperty({
     description: 'ID of the current task status',
@@ -176,4 +176,13 @@ export class CreateTaskDto {
   @IsUUID()
   @IsOptional()
   parentTaskId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  @ApiProperty({
+    description: 'Date when task was completed',
+    example: '2025-08-20T10:00:00Z',
+    required: false,
+  })
+  completedAt?: string | null;
 }

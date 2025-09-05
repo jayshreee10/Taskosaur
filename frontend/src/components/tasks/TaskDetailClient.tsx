@@ -1,62 +1,44 @@
-"use client";
-
-import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
-import { TagBadge } from '@/components/ui';
-import TagManagerWrapper from "@/components/tasks/TagManagerWrapper";
-import ConfirmationModal from "@/components/modals/ConfirmationModal";
+import { useState, useEffect } from "react";
 import TaskComments from "./TaskComments";
 import Subtasks from "./Subtasks";
-import UserAvatar from "@/components/ui/avatars/UserAvatar";
+import DropdownAction from "@/components/common/DropdownAction";
+import { UpdateTaskRequest } from "@/types/task-dto";
+import TaskAttachments from "./TaskAttachment";
+import TaskLabels from "./TaskLabels";
 import { useTask } from "@/contexts/task-context";
 import { useProjectContext } from "@/contexts/project-context";
 import { useAuth } from "@/contexts/auth-context";
-import { useGlobalFetchPrevention } from '@/hooks/useGlobalFetchPrevention';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { TokenManager } from '@/lib/api';
-import {
-  HiDocumentText,
-  HiCog,
-  HiUsers,
-  HiTag,
-  HiPaperClip,
-  HiTrash,
-  HiPencil,
-  HiChevronDown,
-  HiXMark,
-  HiArrowLeft,
-  HiPlus,
-  HiExclamationTriangle
-} from 'react-icons/hi2';
-
+import { TokenManager } from "@/lib/api";
+import ActionButton from "@/components/common/ActionButton";
+import { DynamicBadge } from "@/components/common/DynamicBadge";
+import { useRouter } from "next/router";
+import { toast } from "sonner";
+import { HiDocumentText, HiCog, HiPencil, HiTrash } from "react-icons/hi2";
+import { HiAdjustments } from "react-icons/hi";
+import { Input } from "@/components/ui/input";
+import TaskDescription from "@/components/tasks/views/TaskDescription";
+import { Label } from "@/components/ui/label";
+import { Maximize2 } from "lucide-react";
+import Tooltip from "../common/ToolTip";
+import ConfirmationModal from "../modals/ConfirmationModal";
+import UserAvatar from "../ui/avatars/UserAvatar";
+import { Badge } from "../ui";
+import { useWorkspaceContext } from "@/contexts/workspace-context";
+import TaskActivities from "./TaskActivities";
 interface TaskDetailClientProps {
   task: any;
-  workspaceSlug: string;
-  projectSlug: string;
   taskId: string;
+  workspaceSlug?: string;
+  projectSlug?: string;
+  open?: string;
+  onTaskRefetch?: () => void;
+  onClose?: () => void;
 }
 
-// Import shadcn UI components
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-
-// Theme-consistent section header component
 const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
   <div className="flex items-center gap-2 mb-4">
-    <Icon className="w-5 h-5 text-[var(--primary)]" />
-    <h3 className="text-md font-semibold text-[var(--foreground)]">{title}</h3>
+      <Icon size={16} className="text-[var(--primary)]" />
+    <h2 className="text-sm font-semibold text-[var(--foreground)]">{title}</h2>
   </div>
 );
 
@@ -65,38 +47,27 @@ export default function TaskDetailClient({
   workspaceSlug,
   projectSlug,
   taskId,
+  open,
+  onTaskRefetch,
+  onClose,
 }: TaskDetailClientProps) {
-  const { 
-    updateTask, 
-    deleteTask, 
-    loading, 
-    error, 
-    getTaskAttachments, 
-    uploadAttachment, 
-    downloadAttachment, 
+  const {
+    updateTask,
+    deleteTask,
+    getTaskAttachments,
+    uploadAttachment,
+    downloadAttachment,
     deleteAttachment,
     createLabel,
     getProjectLabels,
-    getLabelById,
-    updateLabel,
-    deleteLabel,
     assignLabelToTask,
-    assignMultipleLabelsToTask,
     removeLabelFromTask,
-    searchLabels,
   } = useTask();
-  const { getProjectMembersByWorkspace } = useProjectContext();
+
+  const { getProjectMembers, getTaskStatusByProject } = useProjectContext();
   const { getCurrentUser } = useAuth();
   const currentUser = getCurrentUser();
-
-  // Global fetch prevention hook
-  const {
-    shouldPreventFetch,
-    markFetchStart,
-    markFetchComplete,
-    markFetchError,
-    getCachedData
-  } = useGlobalFetchPrevention();
+  const router = useRouter();
 
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -104,210 +75,338 @@ export default function TaskDetailClient({
   const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingAttachments, setLoadingAttachments] = useState(true);
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    type: "info" as "danger" | "warning" | "info",
+  });
+
+  const showConfirmModal = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    type: "danger" | "warning" | "info" = "info"
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: async () => {
+        await onConfirm();
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+      },
+      type,
+    });
+  };
 
   const [editTaskData, setEditTaskData] = useState({
     title: task.title,
     description: task.description,
-    status: typeof task.status === "object" ? task.status?.name : task.status,
-    priority: typeof task.priority === "object" ? task.priority?.name : task.priority,
+    priority:
+      typeof task.priority === "object" ? task.priority?.name : task.priority,
     dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
   });
 
   const [assignee, setAssignee] = useState(task.assignee);
   const [reporter, setReporter] = useState(task.reporter);
-  const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
-  const [isReporterDropdownOpen, setIsReporterDropdownOpen] = useState(false);
-  const assigneeRef = useRef<HTMLDivElement>(null);
-  const reporterRef = useRef<HTMLDivElement>(null);
 
-  // Labels state (renamed from tags for consistency with API)
   const [labels, setLabels] = useState(task.labels || task.tags || []);
   const [availableLabels, setAvailableLabels] = useState<any[]>([]);
-  const [isAddingLabel, setIsAddingLabel] = useState(false);
-  const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState("#3B82F6");
+  const [statuses, setStatuses] = useState<any[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [currentStatus, setCurrentStatus] = useState(task.status);
+  const currentOrganization = TokenManager.getCurrentOrgId();
+  const { getUserAccess } = useAuth();
+  const authContext = useAuth();
+  const workspaceContext = useWorkspaceContext();
+  const projectContext = useProjectContext();
 
-  // Available users from project members
-  const availableUsers = projectMembers;
+  const [workspaceData, setWorkspaceData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<any>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [hasAccessLoaded, setHasAccessLoaded] = useState(false);
 
-  // Label colors with hexadecimal values
-  const labelColors = [
-    { name: "Blue", value: "#3B82F6" },
-    { name: "Purple", value: "#8B5CF6" },
-    { name: "Green", value: "#10B981" },
-    { name: "Yellow", value: "#F59E0B" },
-    { name: "Red", value: "#EF4444" },
-    { name: "Gray", value: "#6B7280" },
-    { name: "Indigo", value: "#6366F1" },
-    { name: "Pink", value: "#EC4899" },
-  ];
+  // Exception: Assignee or reporter has access to all actions except Assignment section
+  const isAssigneeOrReporter =
+    currentUser?.id === assignee?.id || currentUser?.id === reporter?.id;
 
-  // Priority mapping for API
-  const priorityApiMapping = {
-    Low: "LOW",
-    Medium: "MEDIUM",
-    High: "HIGH",
-    Highest: "HIGHEST",
-  } as const;
+  const handleStatusChange = async (item: any) => {
+    if (!item) return;
 
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    type: "danger" | "warning" | "info";
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: "",
-    message: "",
-    type: "info",
-    onConfirm: () => {},
-  });
+    try {
+      await updateTask(taskId, {
+        statusId: item.id,
+      });
+      setCurrentStatus(item);
+      // Update the task object's status
+      task.status = item;
+      toast.success("Task status updated successfully.");
+    } catch (error) {
+      toast.error("Failed to update task status. Please try again.");
+    }
+  };
 
-  // Theme-consistent status and priority colors
+  enum TaskPriority {
+    LOWEST = "LOWEST",
+    LOW = "LOW",
+    MEDIUM = "MEDIUM",
+    HIGH = "HIGH",
+    HIGHEST = "HIGHEST",
+  }
+
   const getStatusConfig = (status: any) => {
     const statusName = typeof status === "object" ? status?.name : status;
     switch (statusName?.toLowerCase()) {
-      case 'done':
-      case 'completed':
-        return 'bg-green-500/15 text-green-700 border border-green-200 dark:bg-green-400/10 dark:text-green-400 dark:border-green-400/30';
-      case 'in progress':
-      case 'in_progress':
-        return 'bg-blue-500/15 text-blue-700 border border-blue-200 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/30';
-      case 'review':
-        return 'bg-purple-500/15 text-purple-700 border border-purple-200 dark:bg-purple-400/10 dark:text-purple-400 dark:border-purple-400/30';
-      case 'todo':
-      case 'to do':
-        // Further improved: even darker text, higher contrast background for accessibility
-        return 'bg-gray-300/40 text-gray-800 border  border-gray-400 dark:bg-gray-700/20 dark:text-gray-100 dark:border-gray-500/40';
+      case "done":
+      case "completed":
+        return "#10B981";
+      case "in progress":
+      case "in_progress":
+        return "#3B82F6";
+      case "review":
+        return "#8B5CF6";
+      case "todo":
+      case "to do":
+        return "#364153";
       default:
-        return 'bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]';
+        return "#6B7280";
     }
   };
 
   const getPriorityConfig = (priority: any) => {
-  const priorityName = typeof priority === "object" ? priority?.name : priority;
-  switch (priorityName?.toLowerCase()) {
-    case 'highest':
-      return 'bg-red-500/15 text-red-700 border border-red-200 dark:bg-red-400/10 dark:text-red-400 dark:border-red-400/30';
-    case 'high':
-      return 'bg-orange-500/15 text-orange-700 border border-orange-200 dark:bg-orange-400/10 dark:text-orange-400 dark:border-orange-400/30';
-    case 'medium':
-      return 'bg-yellow-500/15 text-yellow-700 border border-yellow-200 dark:bg-yellow-400/10 dark:text-yellow-400 dark:border-yellow-400/30';
-    case 'low':
-      return 'bg-green-500/15 text-green-700 border border-green-200 dark:bg-green-400/10 dark:text-green-400 dark:border-green-400/30';
-    default:
-      return 'bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]';
-  }
+    const priorityName =
+      typeof priority === "object" ? priority?.name : priority;
+    switch (priorityName?.toLowerCase()) {
+      case "highest":
+        return "#EF4444";
+      case "high":
+        return "#F97316";
+      case "medium":
+        return "#F59E0B";
+      case "low":
+        return "#10B981";
+      default:
+        return "#6B7280";
+    }
   };
 
-  // Fetch project members
   useEffect(() => {
-    const workspaceId = task.workspace?.id || task.workspaceId;
-    if (!workspaceId) return;
-
-    const fetchKey = `project-members-${workspaceId}`;
-    
-    if (shouldPreventFetch(fetchKey)) {
-      const cachedData = getCachedData(fetchKey);
-      if (cachedData) {
-        setProjectMembers(cachedData);
-        setLoadingMembers(false);
-        return;
-      }
-    }
+    const projectId = task.projectId || task.project?.id;
+    if (!projectId) return;
 
     const fetchProjectMembers = async () => {
       setLoadingMembers(true);
-      markFetchStart(fetchKey);
-      
       try {
         const token = TokenManager.getAccessToken();
-        if (token && workspaceId) {
-          const members = await getProjectMembersByWorkspace(workspaceId);
-          const membersData = members || [];
-          setProjectMembers(membersData);
-          markFetchComplete(fetchKey, membersData);
+        if (token && projectId) {
+          const members = await getProjectMembers(projectId);
+          if (Array.isArray(members)) {
+            const validMembers = members
+              .filter((member) => member?.user)
+              .map((member) => ({
+                id: member.user.id,
+                firstName: member.user.firstName,
+                lastName: member.user.lastName,
+                email: member.user.email,
+                avatar: (member.user as any).avatar || null,
+                role: member.role,
+                username: `${member.user.firstName} ${member.user.lastName}`,
+                status: (member.user as any).status || "active",
+              }));
+            setProjectMembers(validMembers);
+          } else {
+            setProjectMembers([]);
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch project members:', error);
         setProjectMembers([]);
-        markFetchError(fetchKey);
+        toast.error("Failed to fetch project members");
       } finally {
         setLoadingMembers(false);
       }
     };
 
     fetchProjectMembers();
-  }, [task.workspace?.id, task.workspaceId]);
+  }, [task.projectId, task.project?.id]);
 
-  // Fetch project labels
+  const generateProjectSlug = (projectName: string) => {
+    if (!projectName) return "";
+
+    return projectName
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  };
+
+  const findProjectBySlug = (projects: any[], slug: string) => {
+    return projects.find(
+      (project) => generateProjectSlug(project.name) === slug
+    );
+  };
+
+  useEffect(() => {
+    const loadWorkspaceAndProjectData = async () => {
+      try {
+        if (!authContext.isAuthenticated()) {
+          router.push("/auth/login");
+          return;
+        }
+
+        if (typeof workspaceSlug !== "string") {
+          return;
+        }
+
+        const workspace = await workspaceContext.getWorkspaceBySlug(
+          workspaceSlug
+        );
+        if (!workspace) {
+          return;
+        }
+        setWorkspaceData(workspace);
+        if (typeof projectSlug === "string") {
+          const projects = await projectContext.getProjectsByWorkspace(
+            workspace.id
+          );
+          const project = findProjectBySlug(projects || [], projectSlug);
+          if (project) {
+            setProjectData(project);
+          }
+        } else {
+          setProjectData(null);
+        }
+      } catch (err) {
+        console.error("Error loading workspace/project data:", err);
+      }
+    };
+
+    loadWorkspaceAndProjectData();
+  }, [workspaceSlug, projectSlug]);
+
+  useEffect(() => {
+    const loadWorkspaceAndProjectData = async () => {
+      try {
+        if (!authContext.isAuthenticated()) {
+          router.push("/auth/login");
+          return;
+        }
+
+        if (typeof workspaceSlug !== "string") {
+          return;
+        }
+
+        const workspace = await workspaceContext.getWorkspaceBySlug(
+          workspaceSlug
+        );
+        if (!workspace) {
+          return;
+        }
+        setWorkspaceData(workspace);
+
+        if (typeof projectSlug === "string") {
+          const projects = await projectContext.getProjectsByWorkspace(
+            workspace.id
+          );
+          const project = findProjectBySlug(projects || [], projectSlug);
+          if (project) {
+            setProjectData(project);
+          }
+        } else {
+          setProjectData(null);
+        }
+      } catch (err) {
+        console.error("Error loading workspace/project data:", err);
+      }
+    };
+
+    loadWorkspaceAndProjectData();
+  }, [workspaceSlug, projectSlug]);
+
+  useEffect(() => {
+    const loadUserAccess = async () => {
+      let folderName: string;
+      let folderId: string;
+
+      if (projectData?.id && workspaceData?.id) {
+        folderName = "project";
+        folderId = projectData.id;
+      } else if (workspaceData?.id) {
+        folderName = "workspace";
+        folderId = workspaceData.id;
+      } else if (currentOrganization) {
+        folderName = "organization";
+        folderId = currentOrganization;
+      } else {
+        return;
+      }
+
+      try {
+        const accessData = await getUserAccess({
+          name: folderName,
+          id: folderId,
+        });
+
+        // Main logic: access from API, but override for assignee/reporter
+        setHasAccess(accessData?.canChange || isAssigneeOrReporter || false);
+        setHasAccessLoaded(true);
+      } catch (error) {
+        console.error("Error fetching user access:", error);
+        setHasAccess(isAssigneeOrReporter || false);
+        setHasAccessLoaded(true);
+      }
+    };
+
+    // Only load access if we haven't loaded it yet and have the required data
+    if (!hasAccessLoaded && (workspaceData?.id || currentOrganization)) {
+      loadUserAccess();
+    }
+  }, [workspaceData, projectData, currentOrganization, hasAccessLoaded]);
+
+  useEffect(() => {
+    setHasAccessLoaded(false);
+    setHasAccess(false);
+  }, [workspaceData?.id, projectData?.id]);
+
   useEffect(() => {
     const projectId = task.projectId || task.project?.id;
     if (!projectId) return;
 
-    const fetchKey = `project-labels-${projectId}`;
-    
-    if (shouldPreventFetch(fetchKey)) {
-      const cachedData = getCachedData(fetchKey);
-      if (cachedData) {
-        setAvailableLabels(cachedData);
-        return;
-      }
-    }
-
     const fetchProjectLabels = async () => {
-      markFetchStart(fetchKey);
-      
       try {
         const projectLabels = await getProjectLabels(projectId);
         const labelsData = projectLabels || [];
         setAvailableLabels(labelsData);
-        markFetchComplete(fetchKey, labelsData);
-        
+
         if (task.labels && task.labels.length > 0) {
           setLabels(task.labels);
         } else if (task.tags && task.tags.length > 0) {
           setLabels(task.tags);
         }
       } catch (error) {
-        console.error('Failed to fetch project labels:', error);
         setAvailableLabels([]);
-        markFetchError(fetchKey);
+        toast.error("Failed to fetch project labels");
       }
     };
 
     fetchProjectLabels();
-  }, [task.projectId, task.project?.id]);
+  }, [task.projectId, task.project?.id, task.labels, task.tags]);
 
-  // Fetch task attachments
   useEffect(() => {
     if (!taskId) return;
 
-    const fetchKey = `task-attachments-${taskId}`;
-    
-    if (shouldPreventFetch(fetchKey)) {
-      const cachedData = getCachedData(fetchKey);
-      if (cachedData) {
-        setAttachments(cachedData);
-        setLoadingAttachments(false);
-        return;
-      }
-    }
-
     const fetchAttachments = async () => {
       setLoadingAttachments(true);
-      markFetchStart(fetchKey);
-      
       try {
         const taskAttachments = await getTaskAttachments(taskId);
         const attachmentsData = taskAttachments || [];
         setAttachments(attachmentsData);
-        markFetchComplete(fetchKey, attachmentsData);
       } catch (error) {
-        console.error('Failed to fetch task attachments:', error);
         setAttachments([]);
-        markFetchError(fetchKey);
+        toast.error("Failed to fetch task attachments");
       } finally {
         setLoadingAttachments(false);
       }
@@ -316,56 +415,59 @@ export default function TaskDetailClient({
     fetchAttachments();
   }, [taskId]);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (assigneeRef.current && !assigneeRef.current.contains(event.target as Node)) {
-        setIsAssigneeDropdownOpen(false);
-      }
-      if (reporterRef.current && !reporterRef.current.contains(event.target as Node)) {
-        setIsReporterDropdownOpen(false);
+    const projectId = task.projectId || task.project?.id;
+    if (!projectId) return;
+
+    const fetchTaskStatuses = async () => {
+      setLoadingStatuses(true);
+      try {
+        const allStatuses = await getTaskStatusByProject(projectId);
+        if (Array.isArray(allStatuses)) {
+          setStatuses(allStatuses);
+        }
+      } catch (error) {
+        toast.error("Failed to fetch task statuses");
+      } finally {
+        setLoadingStatuses(false);
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    fetchTaskStatuses();
+  }, [task.projectId, task.project?.id]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
     try {
-      const maxFileSize = 10 * 1024 * 1024; // 10MB
+      const maxFileSize = 10 * 1024 * 1024;
       const allowedTypes = [
-        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-        'application/pdf', 'application/msword', 
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'text/plain', 'text/csv'
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/plain",
+        "text/csv",
       ];
 
-      const validFiles = Array.from(files).filter(file => {
+      const validFiles = Array.from(files).filter((file) => {
         if (file.size > maxFileSize) {
-          showConfirmModal(
-            "File Too Large",
-            `File "${file.name}" is too large. Maximum size is 10MB.`,
-            () => {},
-            "warning"
+          toast.error(
+            `File "${file.name}" is too large. Maximum size is 10MB.`
           );
           return false;
         }
         if (!allowedTypes.includes(file.type)) {
-          showConfirmModal(
-            "Invalid File Type",
-            `File "${file.name}" has an unsupported format.`,
-            () => {},
-            "warning"
-          );
+          toast.error(`File "${file.name}" has an unsupported format.`);
           return false;
         }
         return true;
@@ -382,115 +484,81 @@ export default function TaskDetailClient({
           const uploadedAttachment = await uploadAttachment(taskId, file);
           return uploadedAttachment;
         } catch (error) {
-          console.error(`Failed to upload ${file.name}:`, error);
-          showConfirmModal(
-            "Upload Error",
-            `Failed to upload "${file.name}". Please try again.`,
-            () => {},
-            "danger"
-          );
+          toast.error(`Failed to upload "${file.name}". Please try again.`);
           return null;
         }
       });
 
       const results = await Promise.all(uploadPromises);
       const successfulUploads = results.filter(Boolean);
-      
+
       if (successfulUploads.length > 0) {
         const updatedAttachments = await getTaskAttachments(taskId);
         setAttachments(updatedAttachments || []);
-        
-        showConfirmModal(
-          "Upload Successful",
-          `${successfulUploads.length} file(s) uploaded successfully.`,
-          () => {},
-          "info"
+        toast.success(
+          `${successfulUploads.length} file(s) uploaded successfully.`
         );
       }
     } catch (error) {
-      console.error("Failed to upload files:", error);
-      showConfirmModal(
-        "Upload Error",
-        "Failed to upload one or more files. Please try again.",
-        () => {},
-        "danger"
-      );
+      toast.error("Failed to upload one or more files. Please try again.");
     } finally {
       setIsUploading(false);
       event.target.value = "";
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  const handleDeleteAttachment = (attachmentId: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!currentUser?.id) {
+        toast.error("You must be logged in to delete attachments.");
+        resolve();
+        return;
+      }
 
-  const handleDeleteAttachment = async (attachmentId: string) => {
-    if (!currentUser?.id) {
-      showConfirmModal(
-        "Error",
-        "You must be logged in to delete attachments.",
-        () => {},
-        "danger"
-      );
-      return;
-    }
-
-    showConfirmModal(
-      "Delete Attachment",
-      "Are you sure you want to delete this attachment? This action cannot be undone.",
-      async () => {
-        try {
-          await deleteAttachment(attachmentId, currentUser.id);
-          const updatedAttachments = await getTaskAttachments(taskId);
-          setAttachments(updatedAttachments || []);
-          
-          showConfirmModal(
-            "Success",
-            "Attachment deleted successfully.",
-            () => {},
-            "info"
-          );
-        } catch (error) {
-          console.error("Failed to delete attachment:", error);
-          showConfirmModal(
-            "Error",
-            "Failed to delete attachment. Please try again.",
-            () => {},
-            "danger"
-          );
-        }
-      },
-      "danger"
-    );
+      setConfirmModal({
+        isOpen: true,
+        title: "Delete Attachment",
+        message:
+          "Are you sure you want to delete this attachment? This action cannot be undone.",
+        type: "danger",
+        onConfirm: async () => {
+          try {
+            await deleteAttachment(attachmentId, currentUser.id);
+            const updatedAttachments = await getTaskAttachments(taskId);
+            setAttachments(updatedAttachments || []);
+            toast.success("Attachment deleted successfully.");
+          } catch (error) {
+            toast.error("Failed to delete attachment. Please try again.");
+          }
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          resolve();
+        },
+      });
+    });
   };
 
   const handleEditTask = () => {
     setIsEditingTask(true);
   };
 
-  const handleSaveTaskEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveTaskEdit = async (
+    e?: React.FormEvent,
+    updatedDescription?: string
+  ) => {
+    e?.preventDefault();
 
-    if (!editTaskData.title.trim()) {
-      showConfirmModal(
-        "Validation Error",
-        "Task title cannot be empty.",
-        () => {},
-        "warning"
-      );
+    const descriptionToSave = updatedDescription || editTaskData.description;
+
+    if (!editTaskData?.title?.trim()) {
+      toast.error("Task title cannot be empty.");
       return;
     }
 
     try {
       const updatedTask = await updateTask(taskId, {
-        title: editTaskData.title.trim(),
-        description: editTaskData.description.trim(),
-        priority: priorityApiMapping[editTaskData.priority as keyof typeof priorityApiMapping] || "MEDIUM",
+        title: editTaskData?.title?.trim(),
+        description: descriptionToSave?.trim(),
+        priority: editTaskData.priority || "MEDIUM",
         startDate: task.startDate || new Date().toISOString(),
         dueDate: editTaskData.dueDate
           ? new Date(editTaskData.dueDate + "T23:59:59.999Z").toISOString()
@@ -504,32 +572,46 @@ export default function TaskDetailClient({
 
       Object.assign(task, updatedTask);
       setIsEditingTask(false);
-      showConfirmModal(
-        "Success",
-        "Task updated successfully.",
-        () => {},
-        "info"
-      );
+      toast.success("Task updated successfully.");
     } catch (error) {
-      console.error("Failed to update task:", error);
-      showConfirmModal(
-        "Error",
-        "Failed to update the task. Please try again.",
-        () => {},
-        "danger"
-      );
+      toast.error("Failed to update the task. Please try again.");
     }
   };
 
+  const handleCheckboxSave = (newValue: string) => {
+    handleTaskFieldChange("description", newValue);
+    handleSaveTaskEdit(undefined, newValue);
+  };
+
   const handleCancelTaskEdit = () => {
-    setEditTaskData({
-      title: task.title,
-      description: task.description,
-      status: typeof task.status === "object" ? task.status?.name : task.status,
-      priority: typeof task.priority === "object" ? task.priority?.name : task.priority,
-      dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
-    });
-    setIsEditingTask(false);
+    const hasChanges =
+      editTaskData.title !== task.title ||
+      editTaskData.description !== task.description ||
+      editTaskData.dueDate !== (task.dueDate ? task.dueDate.split("T")[0] : "");
+
+    if (hasChanges) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Discard Changes",
+        message: "Are you sure you want to discard your changes?",
+        type: "info",
+        onConfirm: () => {
+          setEditTaskData({
+            title: task.title,
+            description: task.description,
+            priority:
+              typeof task.priority === "object"
+                ? task.priority?.name
+                : task.priority,
+            dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
+          });
+          setIsEditingTask(false);
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    } else {
+      setIsEditingTask(false);
+    }
   };
 
   const handleTaskFieldChange = (field: string, value: string) => {
@@ -537,394 +619,270 @@ export default function TaskDetailClient({
   };
 
   const handleDeleteTask = () => {
-    showConfirmModal(
-      "Delete Task",
-      "Are you sure you want to delete this task? This action cannot be undone and will permanently remove all associated data.",
-      async () => {
-        try {
-          await deleteTask(taskId);
-          window.location.href = `/${workspaceSlug}/${projectSlug}/tasks`;
-        } catch (error) {
-          console.error("Failed to delete task:", error);
-          showConfirmModal(
-            "Error",
-            "Failed to delete the task. Please try again.",
-            () => {},
-            "danger"
-          );
-        }
-      },
-      "danger"
-    );
-  };
-
-  const showConfirmModal = (
-    title: string,
-    message: string,
-    onConfirm: () => void,
-    type: "danger" | "warning" | "info" = "info"
-  ) => {
     setConfirmModal({
       isOpen: true,
-      title,
-      message,
-      type,
-      onConfirm: () => {
-        onConfirm();
+      title: "Delete Task",
+      message:
+        "Are you sure you want to delete this task? This action cannot be undone.",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteTask(taskId);
+          toast.success("Task deleted successfully.");
+
+          onTaskRefetch && onTaskRefetch();
+          if (open === "modal") {
+            onClose && onClose();
+          } else {
+            router.back();
+          }
+        } catch (error) {
+          toast.error("Failed to delete the task. Please try again.");
+        }
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       },
     });
   };
 
-  const hideConfirmModal = () => {
-    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-  };
-
-  const handleAssigneeChange = async (user: any) => {
+  const handleAssigneeChange = async (item: any) => {
     try {
+      // Extract user ID from ProjectMember structure
+      const userId = item?.user?.id || item?.id || null;
       await updateTask(taskId, {
-        assigneeId: user?.id || null,
+        assigneeId: userId,
       });
-      setAssignee(user);
-      setIsAssigneeDropdownOpen(false);
+      setAssignee(item);
+      toast.success("Assignee updated successfully.");
     } catch (error) {
-      console.error("Failed to update assignee:", error);
-      showConfirmModal(
-        "Error",
-        "Failed to update assignee. Please try again.",
-        () => {},
-        "danger"
-      );
+      toast.error("Failed to update assignee. Please try again.");
     }
   };
 
-  const handleReporterChange = async (user: any) => {
+  const handleReporterChange = async (item: any) => {
     try {
+      // Extract user ID from ProjectMember structure
+      const userId = item?.user?.id || item?.id || null;
       await updateTask(taskId, {
-        reporterId: user.id,
+        reporterId: userId,
       });
-      setReporter(user);
-      setIsReporterDropdownOpen(false);
+      setReporter(item);
+      toast.success("Reporter updated successfully.");
     } catch (error) {
-      console.error("Failed to update reporter:", error);
-      showConfirmModal(
-        "Error",
-        "Failed to update reporter. Please try again.",
-        () => {},
-        "danger"
-      );
+      toast.error("Failed to update reporter. Please try again.");
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const handleDownloadAttachment = async (
+    attachmentId: string,
+    fileName: string
+  ) => {
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch {
-      return dateString;
+      const blob = await downloadAttachment(attachmentId);
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("File downloaded successfully.");
+    } catch (error) {
+      toast.error("Failed to download attachment. Please try again.");
     }
   };
 
-  // Label management functions
-  const handleAddLabel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLabelName.trim()) return;
-
+  const handleAddLabel = async (name: string, color: string) => {
     try {
       const projectId = task.projectId || task.project?.id;
       if (!projectId) {
-        showConfirmModal(
-          "Error",
-          "Project ID not found. Cannot create label.",
-          () => {},
-          "danger"
-        );
+        toast.error("Project ID not found. Cannot create label.");
         return;
       }
 
       const newLabel = await createLabel({
-        name: newLabelName.trim(),
-        color: newLabelColor,
-        projectId: projectId
+        name,
+        color,
+        projectId,
       });
-      
+
+      onTaskRefetch;
       setAvailableLabels([...availableLabels, newLabel]);
-      
+
       await assignLabelToTask({
         taskId: taskId,
-        labelId: newLabel.id
+        labelId: newLabel.id,
+        userId: currentUser?.id || "",
       });
-      
+
       setLabels([...labels, newLabel]);
-      setIsAddingLabel(false);
-      setNewLabelName("");
-      setNewLabelColor("#3B82F6");
-      
-      showConfirmModal(
-        "Success",
-        "Label created and assigned to task successfully.",
-        () => {},
-        "info"
-      );
+      toast.success("Label created and assigned to task successfully.");
     } catch (error) {
-      console.error("Failed to add label:", error);
-      showConfirmModal(
-        "Error",
-        error instanceof Error ? error.message : "Failed to add label. Please try again.",
-        () => {},
-        "danger"
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to add label. Please try again."
       );
     }
   };
 
-  const handleDeleteLabel = async (labelId: string) => {
-    showConfirmModal(
-      "Remove Label",
-      "Are you sure you want to remove this label from the task?",
-      async () => {
-        try {
-          await removeLabelFromTask(taskId, labelId);
-          setLabels(labels.filter((label: any) => label.id !== labelId));
-          
-          showConfirmModal(
-            "Success",
-            "Label removed from task successfully.",
-            () => {},
-            "info"
-          );
-        } catch (error) {
-          console.error("Failed to remove label:", error);
-          showConfirmModal(
-            "Error",
-            "Failed to remove label. Please try again.",
-            () => {},
-            "danger"
-          );
-        }
-      },
-      "danger"
-    );
+  const handleRemoveLabel = async (labelId: string) => {
+    try {
+      await removeLabelFromTask(taskId, labelId);
+      setLabels(
+        labels.filter((label: any) => {
+          return label.id !== labelId && label.labelId !== labelId;
+        })
+      );
+
+      onTaskRefetch;
+      toast.success("Label removed from task successfully.");
+    } catch (error) {
+      toast.error("Failed to remove label. Please try again.");
+    }
   };
 
   const handleAssignExistingLabel = async (label: any) => {
     try {
       await assignLabelToTask({
         taskId: taskId,
-        labelId: label.id
+        labelId: label.id,
+        userId: currentUser?.id || "",
       });
-      
+
       setLabels([...labels, label]);
-      
-      showConfirmModal(
-        "Success",
-        "Label assigned to task successfully.",
-        () => {},
-        "info"
-      );
+
+      onTaskRefetch;
+
+      toast.success("Label assigned to task successfully.");
     } catch (error) {
-      console.error("Failed to assign label:", error);
-      showConfirmModal(
-        "Error",
-        "Failed to assign label. Please try again.",
-        () => {},
-        "danger"
-      );
+      toast.error("Failed to assign label. Please try again.");
     }
   };
 
-  const handleDownloadAttachment = async (attachmentId: string, fileName: string) => {
-    try {
-      const blob = await downloadAttachment(attachmentId);
-      
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to download attachment:", error);
-      showConfirmModal(
-        "Error",
-        "Failed to download attachment. Please try again.",
-        () => {},
-        "danger"
-      );
-    }
-  };
+  const detailUrl =
+    workspaceSlug && projectSlug
+      ? `/${workspaceSlug}/${projectSlug}/tasks/${task.id}`
+      : workspaceSlug
+      ? `/${workspaceSlug}/tasks/${task.id}`
+      : `/tasks/${task.id}`;
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      <div className="max-w-7xl mx-auto p-4">
-        {/* Header - Following your breadcrumb pattern */}
-        <div className="mb-6">
-          {/* <div className="flex items-center gap-2 text-sm mb-4">
-            <Link href={`/${workspaceSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
-              {task?.workspace?.name || task?.project?.workspace?.name || 'Workspace'}
-            </Link>
-            <span className="text-[var(--muted-foreground)]">/</span>
-            <Link href={`/${workspaceSlug}/${projectSlug}`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
-              {task?.project?.name || 'Project'}
-            </Link>
-            <span className="text-[var(--muted-foreground)]">/</span>
-            <Link href={`/${workspaceSlug}/${projectSlug}/tasks`} className="text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors font-medium">
-              Tasks
-            </Link>
-            <span className="text-[var(--muted-foreground)]">/</span>
-            <span className="text-[var(--foreground)] font-medium">Task {taskId}</span>
-          </div> */}
-          
-          <div className="flex items-center justify-between">
+    <div className="dashboard-container pt-0">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h1 className="text-xl font-bold text-[var(--foreground)]">
+              <h1 className="text-md font-bold text-[var(--foreground)]">
                 {task.title}
               </h1>
               <div className="flex items-center gap-2">
-                <Badge
-                  className={`text-[10px] font-semibold border-none py-0.5 rounded-full capitalize text-center tracking-wide shadow-sm ${getStatusConfig(task.status)}`}
-                >
-                  {typeof task.status === "object" ? task.status?.name || "Unknown" : task.status}
-                </Badge>
-                <Badge
-                  className={`text-[10px] font-semibold border-none py-0.5 rounded-full capitalize text-center tracking-wide shadow-sm ${getPriorityConfig(task.priority)}`}
-                >
-                  {typeof task.priority === "object" ? task.priority?.name || "Unknown" : task.priority} Priority
-                </Badge>
+                <DynamicBadge
+                  label={
+                    typeof task.status === "object"
+                      ? task.status?.name || "Unknown"
+                      : task.status
+                  }
+                  bgColor={getStatusConfig(task.status)}
+                  size="sm"
+                />
+                <DynamicBadge
+                  label={`${
+                    typeof task.priority === "object"
+                      ? task.priority?.name || "Unknown"
+                      : task.priority
+                  } Priority`}
+                  bgColor={getPriorityConfig(task.priority)}
+                  size="sm"
+                />
+                {open === "modal" && (
+                  <Tooltip content="Expand to full screen" position="right">
+                    <div onClick={() => router.push(detailUrl)}>
+                      <Maximize2 className="w-7 h-7 pl-2 cursor-pointer" />
+                    </div>
+                  </Tooltip>
+                )}
               </div>
             </div>
-            <Link href={`/${workspaceSlug}/${projectSlug}/tasks`}>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="relative h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2 text-sm"
-              >
-                <HiArrowLeft className="w-4 h-4" />
-                Back to Tasks
-              </Button>
-            </Link>
+            {task.createdBy === currentUser?.id && (
+              <div className=" flex gap-2">
+                <Tooltip content="Edit task" position="left">
+                  <ActionButton
+                    onClick={handleEditTask}
+                    variant="outline"
+                    secondary
+                    className="cursor-pointer justify-center px-3"
+                  >
+                    <HiPencil className="w-4 h-4" />
+                  </ActionButton>
+                </Tooltip>
+                <Tooltip content="Delete task" position="left">
+                  <ActionButton
+                    onClick={handleDeleteTask}
+                    variant="outline"
+                    className="justify-center cursor-pointer border-none bg-[var(--destructive)]/5 hover:bg-[var(--destructive)]/10 text-[var(--destructive)]"
+                  >
+                    <HiTrash className="w-4 h-4" />
+                  </ActionButton>
+                </Tooltip>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Error Display */}
-        {error && (
-          <Alert variant="destructive" className="mb-6 bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
-            <HiExclamationTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 ">
           <div className="lg:col-span-2 space-y-6">
-            {/* Task Details Section */}
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-              <CardContent className="p-6">
-                <SectionHeader icon={HiDocumentText} title="Task Details" />
-                {isEditingTask ? (
-                  <form onSubmit={handleSaveTaskEdit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-[var(--foreground)] font-medium">Description</Label>
-                      <Textarea
-                        value={editTaskData.description}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleTaskFieldChange("description", e.target.value)}
-                        rows={4}
-                        placeholder="Task description"
-                        className="border-input bg-background text-[var(--foreground)] resize-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-[var(--foreground)] font-medium">Status</Label>
-                        <Select value={editTaskData.status} onValueChange={(value) => handleTaskFieldChange("status", value)}>
-                          <SelectTrigger className="h-9 w-[120px] border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
-                            <SelectValue placeholder="Select status">
-                              {editTaskData.status || 'Select status'}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="border-none bg-[var(--card)]">
-                            <SelectItem value="Todo">Todo</SelectItem>
-                            <SelectItem value="In Progress">In Progress</SelectItem>
-                            <SelectItem value="Review">Review</SelectItem>
-                            <SelectItem value="Done">Done</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-[var(--foreground)] font-medium">Priority</Label>
-                        <Select value={editTaskData.priority} onValueChange={(value) => handleTaskFieldChange("priority", value)}>
-                          <SelectTrigger className="h-9 w-[120px] border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
-                            <SelectValue placeholder="Select priority">
-                              {editTaskData.priority || 'Select priority'}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="border-none bg-[var(--card)]">
-                            <SelectItem value="Low">Low</SelectItem>
-                            <SelectItem value="Medium">Medium</SelectItem>
-                            <SelectItem value="High">High</SelectItem>
-                            <SelectItem value="Highest">Highest</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-[var(--foreground)] font-medium">Due Date</Label>
-                        <Input
-                          type="date"
-                          value={editTaskData.dueDate}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleTaskFieldChange("dueDate", e.target.value)}
-                          className="h-9 border-input bg-background text-[var(--foreground)]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancelTaskEdit}
-                        disabled={loading}
-                        className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className="h-9 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
-                      >
-                        {loading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-[var(--primary-foreground)] border-t-transparent rounded-full animate-spin"></div>
-                            Saving...
-                          </>
-                        ) : (
-                          "Save Changes"
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="prose prose-sm max-w-none">
-                    <p className="text-[var(--muted-foreground)] leading-relaxed">
-                      {task.description || "No description provided."}
-                    </p>
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm p-6">
+              <SectionHeader icon={HiDocumentText} title="Description" />
+              {isEditingTask ? (
+                <div className="space-y-4">
+                  <Input
+                    value={editTaskData.title}
+                    onChange={(e) =>
+                      handleTaskFieldChange("title", e.target.value)
+                    }
+                    placeholder="Task title"
+                    className="text-xs bg-[var(--background)] border-[var(--border)] "
+                  />
+                  <TaskDescription
+                    value={editTaskData.description}
+                    onChange={(value) =>
+                      handleTaskFieldChange("description", value)
+                    }
+                    editMode={true}
+                  />
+                  <div className="flex items-center gap-4 mt-4">
+                    <ActionButton
+                      onClick={handleSaveTaskEdit}
+                      variant="outline"
+                      secondary
+                      className="justify-center bg-[var(--primary)] text-white hover:bg-[var(--primary)]/90"
+                    >
+                      Save Changes
+                    </ActionButton>
+                    <ActionButton
+                      onClick={handleCancelTaskEdit}
+                      variant="outline"
+                      className="justify-center"
+                    >
+                      Cancel
+                    </ActionButton>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              ) : (
+                <TaskDescription
+                  value={editTaskData.description}
+                  editMode={false}
+                  onChange={(value) =>
+                    handleTaskFieldChange("description", value)
+                  }
+                  onSaveRequest={handleCheckboxSave}
+                />
+              )}
+            </div>
 
-            {/* Subtasks Section */}
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-              <CardContent className="p-6">
+            {!task.parentTaskId && (
+              <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm p-6">
                 <Subtasks
                   taskId={taskId}
                   projectId={task.projectId || task.project?.id}
@@ -933,407 +891,295 @@ export default function TaskDetailClient({
                   onSubtaskDeleted={() => {}}
                   showConfirmModal={showConfirmModal}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
-            {/* Attachments Section */}
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-              <CardContent className="p-6">
-                <SectionHeader icon={HiPaperClip} title={`Attachments (${attachments.length})`} />
-                <div>
-                  {loadingAttachments ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="w-6 h-6 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
-                      <span className="ml-2 text-sm text-[var(--muted-foreground)]">Loading attachments...</span>
-                    </div>
-                  ) : attachments.length > 0 ? (
-                    <div className="space-y-3 mb-6">
-                      {attachments.map((attachment: any) => (
-                        <div
-                          key={attachment.id}
-                          className="flex items-center justify-between p-3 border border-[var(--border)] rounded-lg bg-[var(--muted)]/30 hover:bg-[var(--accent)] transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <HiPaperClip className="w-4 h-4 text-[var(--muted-foreground)]" />
-                            <div>
-                              <p className="text-sm font-medium text-[var(--foreground)]">
-                                {attachment.fileName}
-                              </p>
-                              <p className="text-xs text-[var(--muted-foreground)]">
-                                {formatFileSize(attachment.fileSize)} • {formatDate(attachment.createdAt)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDownloadAttachment(attachment.id, attachment.fileName)}
-                              className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
-                            >
-                              Download
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteAttachment(attachment.id)}
-                              className="h-8 border-none bg-[var(--destructive)]/5 hover:bg-[var(--destructive)]/10 text-[var(--destructive)]"
-                            >
-                              <HiTrash className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm p-6">
+              <TaskAttachments
+                attachments={attachments}
+                isUploading={isUploading}
+                loadingAttachments={loadingAttachments}
+                onFileUpload={handleFileUpload}
+                onDownloadAttachment={handleDownloadAttachment}
+                onDeleteAttachment={handleDeleteAttachment}
+                hasAccess={hasAccess}
+              />
+            </div>
 
-                  <div className="flex flex-col space-y-3">
-                    <input
-                      type="file"
-                      id="file-upload"
-                      multiple
-                      onChange={handleFileUpload}
-                      disabled={isUploading}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="file-upload"
-                      className={`inline-flex items-center justify-center w-full p-6 border-2 border-dashed border-[var(--border)] rounded-lg text-sm cursor-pointer transition-colors ${
-                        isUploading
-                          ? "text-[var(--muted-foreground)] cursor-not-allowed border-[var(--muted)]"
-                          : "text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/5"
-                      }`}
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <HiPaperClip className="w-6 h-6" />
-                        <span className="font-medium">
-                          {isUploading ? "Uploading files..." : "Click to upload files"}
-                        </span>
-                        <span className="text-xs text-[var(--muted-foreground)]">
-                          PNG, JPG, PDF up to 10MB
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Comments Section */}
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-              <CardContent className="p-6">
-                <TaskComments
-                  taskId={taskId}
-                  onCommentAdded={() => {}}
-                  onCommentUpdated={() => {}}
-                  onCommentDeleted={() => {}}
-                />
-              </CardContent>
-            </Card>
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm p-6">
+              <TaskComments
+                taskId={taskId}
+                onCommentAdded={() => {}}
+                onCommentUpdated={() => {}}
+                onCommentDeleted={() => {}}
+                hasAccess={hasAccess}
+              />
+            </div>
           </div>
 
-          {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Assignment Section */}
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-              <CardContent className="p-6">
-                <SectionHeader icon={HiUsers} title="Assignment" />
-                <div className="space-y-4">
-                  <div className="relative" ref={assigneeRef}>
-                    <Label className="text-[var(--foreground)] font-medium mb-2 block">Assignee</Label>
-                    {assignee ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                        className="w-full flex items-center justify-between p-3 border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <UserAvatar
-                            user={{
-                              firstName: assignee.firstName || '',
-                              lastName: assignee.lastName || '',
-                              avatar: assignee.avatar,
-                            }}
-                            size="sm"
-                          />
-                          <span className="text-sm font-medium text-[var(--foreground)]">
-                            {assignee.username || `${assignee.firstName} ${assignee.lastName}`}
-                          </span>
-                        </div>
-                        <HiChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                        className="w-full p-3 border border-[var(--border)] rounded-lg text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors text-left text-sm"
-                      >
-                        Select assignee...
-                      </button>
-                    )}
-
-                    {isAssigneeDropdownOpen && (
-                      <div className="absolute z-10 mt-1 w-full bg-[var(--card)] shadow-lg rounded-lg border border-[var(--border)] max-h-48 overflow-y-auto">
-                        {assignee && (
-                          <button
-                            type="button"
-                            onClick={() => handleAssigneeChange(null)}
-                            className="w-full px-3 py-2 text-left text-sm text-[var(--destructive)] hover:bg-[var(--destructive)]/10 flex items-center gap-2"
-                          >
-                            <HiXMark className="w-4 h-4" />
-                            Unassign
-                          </button>
-                        )}
-                        {availableUsers.map((user) => (
-                          <button
-                            key={user.id}
-                            type="button"
-                            onClick={() => handleAssigneeChange(user)}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-[var(--accent)] flex items-center gap-3 ${
-                              assignee?.id === user.id ? "bg-[var(--primary)]/10" : ""
-                            }`}
-                          >
-                            <UserAvatar
-                              user={{
-                                firstName: user.firstName || '',
-                                lastName: user.lastName || '',
-                                avatar: user.avatar,
-                              }}
-                              size="sm"
-                            />
-                            <div className="min-w-0">
-                              <div className="font-medium text-[var(--foreground)]">
-                                {user.username || `${user.firstName} ${user.lastName}`}
-                              </div>
-                              <div className="text-xs text-[var(--muted-foreground)]">
-                                {user.role || "Member"}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="relative" ref={reporterRef}>
-                    <Label className="text-[var(--foreground)] font-medium mb-2 block">Reporter</Label>
-                    {reporter ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsReporterDropdownOpen(!isReporterDropdownOpen)}
-                        className="w-full flex items-center justify-between p-3 border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <UserAvatar
-                            user={{
-                              firstName: reporter.firstName || '',
-                              lastName: reporter.lastName || '',
-                              avatar: reporter.avatar,
-                            }}
-                            size="sm"
-                          />
-                          <span className="text-sm font-medium text-[var(--foreground)]">
-                            {reporter.username || `${reporter.firstName} ${reporter.lastName}`}
-                          </span>
-                        </div>
-                        <HiChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsReporterDropdownOpen(!isReporterDropdownOpen)}
-                        className="w-full p-3 border border-[var(--border)] rounded-lg text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors text-left text-sm"
-                      >
-                        Select reporter...
-                      </button>
-                    )}
-
-                    {isReporterDropdownOpen && (
-                      <div className="absolute z-10 mt-1 w-full bg-[var(--card)] shadow-lg rounded-lg border border-[var(--border)] max-h-48 overflow-y-auto">
-                        {reporter && (
-                          <button
-                            type="button"
-                            onClick={() => handleReporterChange(null)}
-                            className="w-full px-3 py-2 text-left text-sm text-[var(--destructive)] hover:bg-[var(--destructive)]/10 flex items-center gap-2"
-                          >
-                            <HiXMark className="w-4 h-4" />
-                            Remove reporter
-                          </button>
-                        )}
-                        {availableUsers.map((user) => (
-                          <button
-                            key={user.id}
-                            type="button"
-                            onClick={() => handleReporterChange(user)}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-[var(--accent)] flex items-center gap-3 ${
-                              reporter?.id === user.id ? "bg-[var(--primary)]/10" : ""
-                            }`}
-                          >
-                            <UserAvatar
-                              user={{
-                                firstName: user.firstName || '',
-                                lastName: user.lastName || '',
-                                avatar: user.avatar,
-                              }}
-                              size="sm"
-                            />
-                            <div className="min-w-0">
-                              <div className="font-medium text-[var(--foreground)]">
-                                {user.username || `${user.firstName} ${user.lastName}`}
-                              </div>
-                              <div className="text-xs text-[var(--muted-foreground)]">
-                                {user.role || "Member"}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {!assignee && !reporter && (
-                    <Alert className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
-                      <HiExclamationTriangle className="h-4 w-4" />
-                      <AlertDescription className="text-sm">
-                        Please assign at least one assignee or reporter
-                      </AlertDescription>
-                    </Alert>
+            {/* Task Settings Section */}
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm p-6">
+              <SectionHeader icon={HiAdjustments} title="Task Settings" />
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm mb-2 block">Priority</Label>
+                  {hasAccess ? (
+                    <DropdownAction
+                      currentItem={{
+                        id: editTaskData.priority || "MEDIUM",
+                        name:
+                          editTaskData.priority?.charAt(0).toUpperCase() +
+                            editTaskData.priority?.slice(1).toLowerCase() ||
+                          "Medium",
+                        color: getPriorityConfig(
+                          editTaskData.priority || "MEDIUM"
+                        ),
+                      }}
+                      availableItems={["LOW", "MEDIUM", "HIGH", "HIGHEST"].map(
+                        (priority) => ({
+                          id: priority,
+                          name:
+                            priority.charAt(0) +
+                            priority.slice(1).toLowerCase(),
+                          color: getPriorityConfig(priority),
+                        })
+                      )}
+                      loading={false}
+                      onItemSelect={async (item) => {
+                        try {
+                          const updateData: UpdateTaskRequest = {
+                            priority: item.id as
+                              | "LOW"
+                              | "MEDIUM"
+                              | "HIGH"
+                              | "HIGHEST",
+                          };
+                          await updateTask(taskId, updateData);
+                          handleTaskFieldChange("priority", item.id);
+                          // Update the task object's priority
+                          task.priority = {
+                            name: item,
+                            id: item.id,
+                          };
+                          toast.success("Task priority updated successfully.");
+                        } catch (error) {
+                          toast.error("Failed to update task priority.");
+                        }
+                      }}
+                      placeholder="Select priority..."
+                      showUnassign={false}
+                      hideAvatar={true}
+                      hideSubtext={true}
+                      itemType="user"
+                    />
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-[var(--muted)] border-[var(--border)] ml-auto flex-shrink-0"
+                    >
+                      {editTaskData?.priority}
+                    </Badge>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions Section */}
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-              <CardContent className="p-6">
-                <SectionHeader icon={HiCog} title="Actions" />
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleEditTask}
-                    variant="outline"
-                    className="w-full h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center gap-2"
-                  >
-                    <HiPencil className="w-4 h-4" />
-                    Edit Task
-                  </Button>
-                  <Button
-                    onClick={handleDeleteTask}
-                    variant="outline"
-                    className="w-full h-9 border-none bg-[var(--destructive)]/5 hover:bg-[var(--destructive)]/10 text-[var(--destructive)] flex items-center gap-2"
-                  >
-                    <HiTrash className="w-4 h-4" />
-                    Delete Task
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Labels Section */}
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-              <CardContent className="p-6">
-                <SectionHeader icon={HiTag} title={`Labels (${labels.length})`} />
                 <div>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {labels.map((label: any) => (
-                      <Badge
-                        key={label.id}
-                        className={
-                          `text-[10px] font-semibold border-none py-0.5 rounded-full capitalize text-center tracking-wide shadow-sm ` +
-                          (label.color
-                            ? `bg-[${label.color}]/10 text-[${label.color}]`
-                            : 'bg-[var(--muted)] text-[var(--muted-foreground)]')
+                  <Label className="text-sm mb-2 block">Status</Label>
+                  {hasAccess ? (
+                    <DropdownAction
+                      currentItem={currentStatus}
+                      availableItems={statuses}
+                      loading={loadingStatuses}
+                      onItemSelect={handleStatusChange}
+                      placeholder="Select status..."
+                      showUnassign={false}
+                      hideAvatar={true}
+                      hideSubtext={true}
+                      itemType="status"
+                      onDropdownOpen={async () => {
+                        if (statuses.length === 0) {
+                          const projectId = task.projectId || task.project?.id;
+                          if (projectId) {
+                            try {
+                              const allStatuses = await getTaskStatusByProject(
+                                projectId
+                              );
+                              setStatuses(allStatuses || []);
+                            } catch (error) {
+                              toast.error("Failed to fetch task statuses");
+                            }
+                          }
                         }
-                      >
-                        {label.name}
-                      </Badge>
-                    ))}
-                  </div>
+                      }}
+                    />
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-[var(--muted)] border-[var(--border)] ml-auto flex-shrink-0"
+                    >
+                      {currentStatus?.name}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
 
-                  {/* Available labels from project */}
-                  {availableLabels.length > 0 && (
-                    <div className="mb-4">
-                      <div className="text-sm text-[var(--muted-foreground)] mb-2">Available labels:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {availableLabels
-                          .filter(label => !labels.find((l: any) => l.id === label.id))
-                          .map((label: any) => (
-                            <button
-                              key={label.id}
-                              type="button"
-                              onClick={() => handleAssignExistingLabel(label)}
-                              className="text-sm px-3 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)] transition-colors"
-                            >
-                              {label.name}
-                            </button>
-                          ))}
+            {/* Assignment Section */}
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm p-6">
+              <SectionHeader icon={HiCog} title="Assignment" />
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm mb-2 block">Assignee</Label>
+                  {/* Assignment section: Only allow if hasAccess and NOT assignee/reporter exception */}
+                  {hasAccess && !isAssigneeOrReporter ? (
+                    <DropdownAction
+                      currentItem={assignee}
+                      availableItems={projectMembers}
+                      loading={loadingMembers}
+                      onItemSelect={handleAssigneeChange}
+                      placeholder="Select assignee..."
+                      showUnassign={true}
+                      hideAvatar={false}
+                      itemType="projectMember"
+                      onDropdownOpen={async () => {
+                        if (projectMembers.length === 0) {
+                          const projectId = task.projectId || task.project?.id;
+                          if (projectId) {
+                            try {
+                              const members = await getProjectMembers(
+                                projectId
+                              );
+                              if (Array.isArray(members)) {
+                                setProjectMembers(members);
+                              }
+                            } catch (error) {
+                              toast.error("Failed to fetch project members");
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      {assignee?.id ? (
+                        <UserAvatar
+                          user={{
+                            firstName: assignee.firstName || "",
+                            lastName: assignee.lastName || "",
+                            avatar: assignee.avatar,
+                          }}
+                          size="sm"
+                        />
+                      ) : assignee?.color ? (
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: assignee.color }}
+                        >
+                          <div className="w-3 h-3 bg-white rounded-full opacity-80" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 bg-[var(--muted)] rounded-full flex items-center justify-center">
+                          <div className="w-3 h-3 bg-[var(--muted-foreground)] rounded-full opacity-60" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs flex items-start font-medium text-[var(--foreground)] truncate">
+                          {assignee?.firstName} {assignee?.lastName}
+                        </div>
+                        <div className="text-[12px] text-[var(--muted-foreground)] truncate">
+                          {assignee?.email}
+                        </div>
                       </div>
                     </div>
                   )}
-
-                  {isAddingLabel ? (
-                    <form onSubmit={handleAddLabel} className="space-y-3">
-                      <Input
-                        type="text"
-                        value={newLabelName}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewLabelName(e.target.value)}
-                        placeholder="Label name"
-                        autoFocus
-                        className="h-9 border-input bg-background text-[var(--foreground)]"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Select value={newLabelColor} onValueChange={setNewLabelColor}>
-                          <SelectTrigger className="flex-1 h-9 border-none bg-[var(--primary)]/5 text-[var(--foreground)]">
-                            <SelectValue placeholder="Select color" />
-                          </SelectTrigger>
-                          <SelectContent className="border-none bg-[var(--card)]">
-                            {labelColors.map((color) => (
-                              <SelectItem key={color.value} value={color.value}>
-                                {color.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button 
-                          type="submit" 
-                          disabled={!newLabelName.trim()} 
-                          size="sm"
-                          className="h-9 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)]"
-                        >
-                          Add
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsAddingLabel(false);
-                            setNewLabelName("");
-                            setNewLabelColor("#3B82F6");
-                          }}
-                          className="h-9 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
+                </div>
+                <div>
+                  <Label className="text-sm mb-2 block">Reporter</Label>
+                  {hasAccess && !isAssigneeOrReporter ? (
+                    <DropdownAction
+                      currentItem={reporter}
+                      availableItems={projectMembers}
+                      loading={loadingMembers}
+                      onItemSelect={handleReporterChange}
+                      placeholder="Select reporter..."
+                      showUnassign={true}
+                      hideAvatar={false}
+                      itemType="projectMember"
+                      onDropdownOpen={async () => {
+                        // Reuse projectMembers data - only fetch if empty
+                        if (projectMembers.length === 0) {
+                          const projectId = task.projectId || task.project?.id;
+                          if (projectId) {
+                            try {
+                              const members = await getProjectMembers(
+                                projectId
+                              );
+                              if (Array.isArray(members)) {
+                                setProjectMembers(members);
+                              }
+                            } catch (error) {
+                              toast.error("Failed to fetch project members");
+                            }
+                          }
+                        }
+                      }}
+                    />
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingLabel(true)}
-                      className="text-sm text-[var(--primary)] hover:text-[var(--primary)]/80 flex items-center gap-1 transition-colors"
-                    >
-                      <HiPlus className="w-4 h-4" />
-                      Add new label
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {reporter?.id ? (
+                        <UserAvatar
+                          user={{
+                            firstName: reporter?.firstName || "",
+                            lastName: reporter?.lastName || "",
+                            avatar: reporter?.avatar,
+                          }}
+                          size="sm"
+                        />
+                      ) : reporter?.color ? (
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: reporter?.color }}
+                        >
+                          <div className="w-3 h-3 bg-white rounded-full opacity-80" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 bg-[var(--muted)] rounded-full flex items-center justify-center">
+                          <div className="w-3 h-3 bg-[var(--muted-foreground)] rounded-full opacity-60" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs flex items-start font-medium text-[var(--foreground)] truncate">
+                          {reporter?.firstName} {reporter?.lastName}
+                        </div>
+                        <div className="text-[12px] text-[var(--muted-foreground)] truncate">
+                          {reporter?.email}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+
+            {/* Labels Section */}
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm p-6">
+              <TaskLabels
+                labels={labels}
+                availableLabels={availableLabels}
+                onAddLabel={handleAddLabel}
+                onAssignExistingLabel={handleAssignExistingLabel}
+                onRemoveLabel={handleRemoveLabel}
+                hasAccess={hasAccess}
+              />
+            </div>
+
+
+            <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm">
+              <TaskActivities taskId={taskId} />
+            </div>
+            
           </div>
         </div>
       </div>
-
-      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
@@ -1341,9 +1187,15 @@ export default function TaskDetailClient({
         title={confirmModal.title}
         message={confirmModal.message}
         type={confirmModal.type}
-        confirmText={confirmModal.type === "danger" ? "Delete" : "OK"}
+        confirmText={
+          confirmModal.type === "danger"
+            ? "Delete"
+            : confirmModal.type === "warning"
+            ? "Continue"
+            : "Confirm"
+        }
         cancelText="Cancel"
       />
     </div>
   );
-} 
+}

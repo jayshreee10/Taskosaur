@@ -1,5 +1,5 @@
 import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
-import { ProjectRole } from '@prisma/client';
+import { Role as ProjectRole } from '@prisma/client';
 
 export class CreateProjectMemberDto {
   @IsString()

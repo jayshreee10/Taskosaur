@@ -1,7 +1,7 @@
-'use client';
+;
 
+import { cn } from '@/lib/utils';
 import React from 'react';
-import { cn } from '@/utils/classNames';
 
 interface IconButtonProps {
   icon: React.ReactNode;
@@ -14,17 +14,17 @@ interface IconButtonProps {
 }
 
 const iconButtonVariants = {
-  primary: 'bg-primary-600 hover:bg-primary-700 text-white focus:ring-primary-500',
-  secondary: 'bg-secondary-600 hover:bg-secondary-700 dark:bg-secondary-700 dark:hover:bg-secondary-600 text-white focus:ring-secondary-500',
-  outline: 'border border-border dark:border-border-dark bg-card dark:bg-card-dark hover:bg-secondary-50 dark:hover:bg-secondary-800 text-foreground dark:text-foreground-dark focus:ring-primary-500',
-  ghost: 'bg-transparent hover:bg-secondary-100 dark:hover:bg-secondary-800 text-foreground dark:text-foreground-dark focus:ring-primary-500',
+  primary: 'iconbutton-primary',
+  secondary: 'iconbutton-secondary',
+  outline: 'iconbutton-outline',
+  ghost: 'iconbutton-ghost',
 };
 
 const iconButtonSizes = {
-  xs: 'p-1',
-  sm: 'p-1.5',
-  md: 'p-2',
-  lg: 'p-3',
+  xs: 'iconbutton-xs',
+  sm: 'iconbutton-sm',
+  md: 'iconbutton-md',
+  lg: 'iconbutton-lg',
 };
 
 export function IconButton({
@@ -42,7 +42,7 @@ export function IconButton({
       disabled={disabled}
       title={title}
       className={cn(
-        'inline-flex items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+        'iconbutton-base',
         iconButtonVariants[variant],
         iconButtonSizes[size],
         className

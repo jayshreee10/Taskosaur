@@ -1,79 +1,95 @@
-'use client';
+import type React from "react";
+import { Badge } from "../ui";
 
-import React from 'react';
-import { Badge } from '@/components/ui/badge';
+export type TaskStatus =
+  | "todo"
+  | "in-progress"
+  | "in-review"
+  | "completed"
+  | "done"
+  | "backlog"
+  | "cancelled";
 
-export type TaskStatus = 'todo' | 'in-progress' | 'in-review' | 'completed' | 'done' | 'backlog' | 'cancelled';
-export type ProjectStatus = 'active' | 'completed' | 'on-hold' | 'cancelled' | 'planning';
+export type ProjectStatus =
+  | "active"
+  | "completed"
+  | "on_hold"
+  | "cancelled"
+  | "planning";
 
 interface StatusBadgeProps {
-  status: TaskStatus | ProjectStatus | string;
-  type?: 'task' | 'project';
+  status:
+    | TaskStatus
+    | ProjectStatus
+    | string
+    | { name: string; color?: string; category?: string };
+  type?: "task" | "project";
   className?: string;
 }
 
-const taskStatusVariantMap: Record<TaskStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  'todo': 'default',
-  'backlog': 'default',
-  'in-progress': 'secondary',
-  'in-review': 'outline',
-  'completed': 'secondary',
-  'done': 'secondary',
-  'cancelled': 'destructive',
+const taskStatusClassMap: Record<TaskStatus, string> = {
+  todo: "",
+  backlog: "statusbadge-todo",
+  "in-progress": "statusbadge-inprogress",
+  "in-review": "statusbadge-inreview",
+  completed: "statusbadge-done",
+  done: "statusbadge-done",
+  cancelled: "statusbadge-cancelled",
 };
 
-const projectStatusVariantMap: Record<ProjectStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  'active': 'secondary',
-  'completed': 'outline',
-  'on-hold': 'default',
-  'cancelled': 'destructive',
-  'planning': 'default',
+const projectStatusClassMap: Record<ProjectStatus, string> = {
+  active: "statusbadge-inprogress",
+  completed: "statusbadge-done",
+  "on_hold": "statusbadge-todo",
+  cancelled: "statusbadge-cancelled",
+  planning: "statusbadge-todo",
 };
 
 const taskStatusLabels: Record<TaskStatus, string> = {
-  'todo': 'To Do',
-  'backlog': 'Backlog',
-  'in-progress': 'In Progress',
-  'in-review': 'In Review',
-  'completed': 'Completed',
-  'done': 'Done',
-  'cancelled': 'Cancelled',
+  todo: "To Do",
+  backlog: "Backlog",
+  "in-progress": "In Progress",
+  "in-review": "In Review",
+  completed: "Completed",
+  done: "Done",
+  cancelled: "Cancelled",
 };
 
 const projectStatusLabels: Record<ProjectStatus, string> = {
-  'active': 'Active',
-  'completed': 'Completed',
-  'on-hold': 'On Hold',
-  'cancelled': 'Cancelled',
-  'planning': 'Planning',
+  active: "Active",
+  completed: "Completed",
+  "on_hold": "On Hold",
+  cancelled: "Cancelled",
+  planning: "Planning",
 };
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
-  type = 'task',
+  type = "task",
   className,
 }) => {
-  const normalizedStatus = status.toLowerCase().replace(/\s+/g, '-');
-  
-  let variant: 'default' | 'secondary' | 'destructive' | 'outline' = 'default';
-  let label = status;
-  
-  if (type === 'task') {
+  const statusName =
+    typeof status === "string" ? status : status?.name || "unknown";
+  const normalizedStatus = statusName.toLowerCase().replace(/\s+/g, "-");
+
+  let statusClass = "statusbadge-todo";
+  let label = statusName;
+
+  if (type === "task") {
     const taskStatus = normalizedStatus as TaskStatus;
-    variant = taskStatusVariantMap[taskStatus] || 'default';
-    label = taskStatusLabels[taskStatus] || status;
-  } else if (type === 'project') {
+    statusClass = taskStatusClassMap[taskStatus] || "statusbadge-todo";
+    label = taskStatusLabels[taskStatus] || statusName;
+  } else if (type === "project") {
     const projectStatus = normalizedStatus as ProjectStatus;
-    variant = projectStatusVariantMap[projectStatus] || 'default';
-    label = projectStatusLabels[projectStatus] || status;
+    statusClass = projectStatusClassMap[projectStatus] || "statusbadge-todo";
+    label = projectStatusLabels[projectStatus] || statusName;
   }
 
+  const combinedClasses = `statusbadge-base ${statusClass} ${className || ""}`;
+
   return (
-    <Badge 
-      variant={variant} 
-      className={className}
-    >
-      {label}
+    <Badge className={`${combinedClasses} `}>
+      <span className="text-white">{label}</span>
     </Badge>
   );
 };

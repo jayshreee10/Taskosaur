@@ -1,43 +1,213 @@
+import type { User } from "./users";
+import type { Project } from "./projects";
+import type { Sprint } from "./sprint";
+import { TaskStatus } from "./task-status";
 
-export enum TaskType {
-  TASK = 'TASK',
-  BUG = 'BUG',
-  EPIC = 'EPIC',
-  STORY = 'STORY',
-  SUBTASK = 'SUBTASK'
+export type TaskPriority =
+  | "LOWEST"
+  | "LOW"
+  | "MEDIUM"
+  | "HIGH"
+  | "HIGHEST"
+  | "URGENT";
+export type TaskCategory = "TODO" | "IN_PROGRESS" | "DONE";
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string | null;
+  type?: TaskType;
+  priority: TaskPriority;
+  taskNumber?: number;
+  slug?: string;
+  startDate?: string;
+  dueDate?: string;
+  completedAt?: string;
+  storyPoints?: number;
+  originalEstimate?: number;
+  remainingEstimate?: number;
+  customFields?: any;
+  projectId?: string;
+  assigneeId?: string;
+  reporterId?: string;
+  statusId?: string;
+  sprintId?: string;
+  parentTaskId?: string;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  project?: Project;
+  assignee?: User | null;
+  reporter?: User;
+  status?: TaskStatus;
+  sprint?: Sprint;
+  parentTask?: Partial<Task>;
+  childTasks?: Task[];
+  comments?: TaskComment[];
+  attachments?: TaskAttachment[];
+  dependsOn?: any;
+  timeEntries?: any[];
+  _count?: {
+    childTasks?: number;
+    comments?: number;
+    subTasks?: number;
+    attachments?: number;
+  };
 }
 
-export enum TaskPriority {
-  LOWEST = 'LOWEST',
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  HIGHEST = 'HIGHEST'
+export interface ColumnConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  width?: number;
+  type?: string;
+}
+
+export type ActivityType =
+  | "TASK_CREATED"
+  | "TASK_UPDATED"
+  | "TASK_DELETED"
+  | "TASK_ASSIGNED"
+  | "TASK_COMMENTED"
+  | "TASK_LABEL_ADDED"
+  | "TASK_LABEL_REMOVED"
+  | "TASK_STATUS_CHANGED"
+  | "TASK_ATTACHMENT_ADDED"
+  | "TASK_ATTACHMENT_REMOVED";
+
+export interface ActivityUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  avatar: string;
+}
+
+export interface ActivityTask {
+  id: string;
+  title: string;
+  slug: string;
+}
+
+export interface ActivityRelatedData {
+  type: string;
+}
+
+export interface TaskActivityType {
+  id: string;
+  type: ActivityType;
+  description: string;
+  entityType: string;
+  entityId: string;
+  oldValue: Task | string | number | null;
+  newValue: Task | string | number | null;
+  createdAt: string;
+  user: ActivityUser;
+  task: ActivityTask;
+  relatedData: ActivityRelatedData;
+}
+
+export interface ActivityApiResponse {
+  activities: TaskActivityType[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPrevious: boolean;
+  };
+}
+
+export interface DynamicColumn {
+  id: string;
+  label: string;
+  type:
+    | "task-type"
+    | "task-id"
+    | "description"
+    | "timeline"
+    | "completed-date"
+    | "story-points"
+    | "original-estimate"
+    | "remaining-estimate"
+    | "reporter"
+    | "created-by"
+    | "updated-by"
+    | "created-date"
+    | "updated-date"
+    | "sprint"
+    | "parent-task"
+    | "child-tasks"
+    | "comments-count"
+    | "attachments-count"
+    | "time-entries";
+  icon: React.ReactNode;
+}
+export interface CreateTaskCommentRequest {
+  content: string;
+  taskId: string;
+  authorId: string;
+  parentCommentId?: string;
+}
+
+export interface UpdateTaskCommentRequest {
+  content: string;
+}
+
+export interface TaskLabel {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
+  projectId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateLabelRequest {
+  name: string;
+  color: string;
+  description?: string;
+  projectId: string;
+}
+
+export interface UpdateLabelRequest {
+  name?: string;
+  color?: string;
+  description?: string;
+}
+
+export interface AssignLabelRequest {
+  taskId: string;
+  labelId: string;
+  userId: string;
+}
+
+export interface AssignMultipleLabelsRequest {
+  taskId: string;
+  labelIds: string[];
+}
+export enum TaskType {
+  TASK = "TASK",
+  BUG = "BUG",
+  EPIC = "EPIC",
+  STORY = "STORY",
+  SUBTASK = "SUBTASK",
 }
 
 export enum StatusCategory {
-  TODO = 'TODO',
-  IN_PROGRESS = 'IN_PROGRESS',
-  DONE = 'DONE'
+  TODO = "TODO",
+  IN_PROGRESS = "IN_PROGRESS",
+  DONE = "DONE",
 }
 
 export enum DependencyType {
-  BLOCKS = 'BLOCKS',
-  FINISH_START = 'FINISH_START',
-  START_START = 'START_START',
-  FINISH_FINISH = 'FINISH_FINISH',
-  START_FINISH = 'START_FINISH'
-}
-
-export interface TaskStatus {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  category: StatusCategory;
-  order: number;
-  isDefault: boolean;
-  workflowId: string;
+  BLOCKS = "BLOCKS",
+  FINISH_START = "FINISH_START",
+  START_START = "START_START",
+  FINISH_FINISH = "FINISH_FINISH",
+  START_FINISH = "START_FINISH",
 }
 
 export interface Tag {
@@ -73,6 +243,7 @@ export interface TaskComment {
     firstName: string;
     lastName: string;
     avatar?: string;
+    email: string;
   };
   taskId: string;
   createdAt: string;
@@ -109,70 +280,6 @@ export interface TimeEntry {
     lastName: string;
     avatar?: string;
   };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  type: TaskType;
-  priority: TaskPriority;
-  
-  // Identifiers
-  taskNumber: number;
-  key: string; // Generated key like "PROJ-123"
-  
-  // Dates
-  startDate?: string;
-  dueDate?: string;
-  completedAt?: string;
-  
-  // Story Points & Estimation
-  storyPoints?: number;
-  originalEstimate?: number; // in minutes
-  remainingEstimate?: number; // in minutes
-  
-  // Custom Fields
-  customFields?: Record<string, any>;
-  
-  // Relations
-  projectId: string;
-  assigneeId?: string;
-  assignee?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    avatar?: string;
-  };
-  reporterId: string;
-  reporter: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    avatar?: string;
-  };
-  statusId: string;
-  status: TaskStatus;
-  sprintId?: string;
-  
-  // Hierarchy
-  parentTaskId?: string;
-  parentTask?: Task;
-  childTasks?: Task[];
-  
-  // Many-to-many relations
-  labels?: TaskLabel[];
-  watchers?: Array<{ id: string; firstName: string; lastName: string; avatar?: string }>;
-  comments?: TaskComment[];
-  attachments?: TaskAttachment[];
-  timeEntries?: TimeEntry[];
-  
-  // Task Dependencies
-  dependsOn?: TaskDependency[];
-  blocks?: TaskDependency[];
-  
   createdAt: string;
   updatedAt: string;
 }
@@ -214,24 +321,15 @@ export interface TaskFilter {
   hasAttachments?: boolean;
   hasComments?: boolean;
 }
-
-export enum SprintStatus {
-  PLANNED = 'PLANNED',
-  ACTIVE = 'ACTIVE',
-  COMPLETED = 'COMPLETED'
+export interface CreateAttachmentRequest {
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  mimeType: string;
+  taskId: string;
 }
-
-export interface Sprint {
-  id: string;
-  name: string;
-  goal?: string;
-  description?: string;
-  startDate: string; // YYYY-MM-DD format
-  endDate: string; // YYYY-MM-DD format
-  status: SprintStatus;
-  projectId: string;
-  capacity?: number; // in hours
-  velocity?: number; // story points per day
-  createdAt: string;
-  updatedAt: string;
+export interface AttachmentStats {
+  totalAttachments: number;
+  totalSize: number;
+  fileTypes: Record<string, number>;
 }

@@ -1,15 +1,12 @@
-"use client";
-
 import React, {
   createContext,
   useContext,
   useState,
-  useEffect,
   useMemo,
   useCallback,
 } from "react";
+import { workspaceApi } from "@/utils/api/workspaceApi";
 import {
-  workspaceApi,
   Workspace,
   WorkspaceData,
   WorkspaceMember,
@@ -21,8 +18,16 @@ import {
   CreateWorkspaceData,
   GetWorkspaceActivityParams,
   WorkspaceActivityResponse,
-} from "@/utils/api/workspaceApi";
+} from "@/types";
 
+interface AnalyticsData {
+  projectStatus: any[];
+  taskPriority: any[];
+  kpiMetrics: any;
+  taskType: any[];
+  sprintStatus: any[];
+  monthlyCompletion: any[];
+}
 interface WorkspaceState {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
@@ -30,6 +35,11 @@ interface WorkspaceState {
   workspaceStats: WorkspaceStats | null;
   isLoading: boolean;
   error: string | null;
+  analyticsData: AnalyticsData | null;
+  analyticsLoading: boolean;
+  analyticsError: string | null;
+  refreshingAnalytics: boolean;
+  workspaceRole: WorkspaceRole | null;
 }
 
 interface WorkspaceContextType extends WorkspaceState {
@@ -49,6 +59,9 @@ interface WorkspaceContextType extends WorkspaceState {
     workspaceData: Partial<WorkspaceData>
   ) => Promise<Workspace>;
   deleteWorkspace: (
+    workspaceId: string
+  ) => Promise<{ success: boolean; message: string }>;
+  archiveWorkspace: (
     workspaceId: string
   ) => Promise<{ success: boolean; message: string }>;
 
@@ -96,6 +109,11 @@ interface WorkspaceContextType extends WorkspaceState {
     organizationId: string,
     search: string
   ) => Promise<Workspace[]>;
+  // Add analytics methods
+  fetchAnalyticsData: (organizationId: string, workspaceSlug: string) => Promise<void>;
+  workspaceRoleSet: (workspace: Workspace) => Promise<void>;
+
+  clearAnalyticsError: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
@@ -125,19 +143,21 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     workspaceStats: null,
     isLoading: false,
     error: null,
+    analyticsData: null,
+    analyticsLoading: false,
+    analyticsError: null,
+    refreshingAnalytics: false,
+    workspaceRole: null
   });
-
-  // Cache for workspaces by organization
-  const [workspaceCache, setWorkspaceCache] = useState<{
-    [key: string]: { data: Workspace[]; timestamp: number };
-  }>({});
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   // Helper to handle API operations with error handling
   const handleApiOperation = useCallback(async function <T>(
     operation: () => Promise<T>,
     loadingState: boolean = true
   ): Promise<T> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
       if (loadingState) {
         setWorkspaceState((prev) => ({
@@ -147,64 +167,127 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         }));
       }
 
-      const result = await operation();
+      const result = await Promise.race([
+        operation(),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener("abort", () =>
+            reject(new Error("Operation timed out"))
+          );
+        }),
+      ]);
+
+      clearTimeout(timeoutId);
 
       if (loadingState) {
-        setWorkspaceState((prev) => ({ ...prev, isLoading: false }));
+        setWorkspaceState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: null,
+        }));
       }
 
       return result;
     } catch (error) {
+      clearTimeout(timeoutId);
       const errorMessage =
         error instanceof Error ? error.message : "An error occurred";
+
       setWorkspaceState((prev) => ({
         ...prev,
         isLoading: false,
         error: errorMessage,
+        // Clear current workspace on critical errors
+        currentWorkspace: errorMessage.includes("not found")
+          ? null
+          : prev.currentWorkspace,
       }));
       throw error;
     }
   },
   []);
-
-  const getCurrentOrganizationId = useCallback((): string | null => {
-    return workspaceApi.getCurrentOrganization();
-  }, []);
-
-  // Cache management for workspaces by organization
-  const getCachedWorkspaces = useCallback(
-    (organizationId: string): Workspace[] | null => {
-      const cached = workspaceCache[organizationId];
-      if (!cached) return null;
-
-      const now = Date.now();
-      if (now - cached.timestamp > CACHE_DURATION) {
-        // Cache expired
-        setWorkspaceCache((prev) => {
-          const newCache = { ...prev };
-          delete newCache[organizationId];
-          return newCache;
-        });
-        return null;
-      }
-
-      return cached.data;
-    },
-    [workspaceCache, CACHE_DURATION]
-  );
-
-  const setCachedWorkspaces = useCallback(
-    (organizationId: string, data: Workspace[]) => {
-      setWorkspaceCache((prev) => ({
+  const workspaceRoleSet = (workspace: Workspace): Promise<void> => {
+    return new Promise((resolve) => {
+      setWorkspaceState((prev) => ({
         ...prev,
-        [organizationId]: {
-          data,
-          timestamp: Date.now(),
-        },
+        workspaceRole: workspace.members?.[0]?.role || null,
       }));
+      resolve();
+    });
+  };
+  const fetchAnalyticsData = useCallback(
+    async (organizationId:string, workspaceSlug: string): Promise<void> => {
+      try {
+        setWorkspaceState((prev) => ({
+          ...prev,
+          analyticsLoading: true,
+          analyticsError: null,
+          refreshingAnalytics: true,
+        }));
+
+        const requests = [
+          workspaceApi.getProjectStatusDistribution(organizationId, workspaceSlug),
+          workspaceApi.getTaskPriorityBreakdown(organizationId, workspaceSlug),
+          workspaceApi.getKPIMetrics(organizationId, workspaceSlug),
+          workspaceApi.getTaskTypeDistribution(organizationId, workspaceSlug),
+          workspaceApi.getSprintStatusOverview(organizationId, workspaceSlug),
+          workspaceApi.getMonthlyTaskCompletion(organizationId, workspaceSlug),
+        ];
+
+        const results = await Promise.allSettled(requests);
+
+        // Check if any requests failed
+        const failedRequests = results.filter(
+          (result) => result.status === "rejected"
+        );
+
+        if (failedRequests.length > 0) {
+          console.error("Some requests failed:", failedRequests);
+        }
+
+        const [
+          projectStatus,
+          taskPriority,
+          kpiMetrics,
+          taskType,
+          sprintStatus,
+          monthlyCompletion,
+        ] = results.map((result) =>
+          result.status === "fulfilled" ? result.value : null
+        );
+
+        setWorkspaceState((prev) => ({
+          ...prev,
+          analyticsData: {
+            projectStatus,
+            taskPriority,
+            kpiMetrics,
+            taskType,
+            sprintStatus,
+            monthlyCompletion,
+          },
+          analyticsLoading: false,
+          refreshingAnalytics: false,
+        }));
+      } catch (err) {
+        console.error("Error fetching analytics data:", err);
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : "Failed to load organization analytics data";
+
+        setWorkspaceState((prev) => ({
+          ...prev,
+          analyticsLoading: false,
+          refreshingAnalytics: false,
+          analyticsError: errorMessage,
+        }));
+      }
     },
     []
   );
+  const getCurrentOrganizationId = useCallback((): string | null => {
+    return workspaceApi.getCurrentOrganization();
+  }, []);
 
   // Memoized context value
   const contextValue = useMemo(
@@ -237,13 +320,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           workspaces: [...prev.workspaces, result],
         }));
 
-        // Clear cache for the organization
-        setWorkspaceCache((prev) => {
-          const newCache = { ...prev };
-          delete newCache[organizationId];
-          return newCache;
-        });
-
         return result;
       },
 
@@ -260,25 +336,28 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         return result;
       },
 
+      archiveWorkspace: async (
+        workspaceId: string
+      ): Promise<{ success: boolean; message: string }> => {
+        const result = await handleApiOperation(() =>
+          workspaceApi.archiveWorkspace(workspaceId)
+        );
+
+        if (result.success) {
+          // Refresh the workspace list after successful archive
+          await contextValue.getWorkspaces();
+        }
+
+        return result;
+      },
+
       getWorkspacesByOrganization: async (
         organizationId?: string
       ): Promise<Workspace[]> => {
         const orgId = organizationId || getCurrentOrganizationId();
         if (!orgId) {
-          throw new Error(
-            "No organization selected. Please select an organization first."
-          );
-        }
-
-        // Check cache first
-        const cachedData = getCachedWorkspaces(orgId);
-        if (cachedData) {
-          console.log("Using cached workspaces for organization:", orgId);
-          setWorkspaceState((prev) => ({
-            ...prev,
-            workspaces: cachedData,
-          }));
-          return cachedData;
+          console.error("No organization selected. Please select an organization first.")
+          return;
         }
 
         const result = await handleApiOperation(() =>
@@ -289,9 +368,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           ...prev,
           workspaces: result,
         }));
-
-        // Update cache
-        setCachedWorkspaces(orgId, result);
 
         return result;
       },
@@ -325,11 +401,33 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           );
         }
 
-        const result = await handleApiOperation(
-          () => workspaceApi.getWorkspaceBySlug(slug, orgId),
-          false
-        );
-        return result;
+        try {
+          const result = await handleApiOperation(
+            () => workspaceApi.getWorkspaceBySlug(slug, orgId),
+            false
+          );
+
+          // Update workspace in state if found
+          if (result) {
+            setWorkspaceState((prev) => ({
+              ...prev,
+              currentWorkspace: result,
+              error: null,
+            }));
+          }
+
+          return result;
+        } catch (error) {
+          // Set error state and clear current workspace on 404
+          if (error instanceof Error && error.message.includes("not found")) {
+            setWorkspaceState((prev) => ({
+              ...prev,
+              currentWorkspace: null,
+              error: "Workspace not found",
+            }));
+          }
+          throw error;
+        }
       },
 
       updateWorkspace: async (
@@ -355,16 +453,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
               : prev.currentWorkspace,
         }));
 
-        // Clear cache since workspace was updated
-        const orgId = getCurrentOrganizationId();
-        if (orgId) {
-          setWorkspaceCache((prev) => {
-            const newCache = { ...prev };
-            delete newCache[orgId];
-            return newCache;
-          });
-        }
-
         return result;
       },
 
@@ -387,16 +475,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
               ? null
               : prev.currentWorkspace,
         }));
-
-        // Clear cache since workspace was deleted
-        const orgId = getCurrentOrganizationId();
-        if (orgId) {
-          setWorkspaceCache((prev) => {
-            const newCache = { ...prev };
-            delete newCache[orgId];
-            return newCache;
-          });
-        }
 
         return result;
       },
@@ -517,11 +595,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       refreshWorkspaces: async (organizationId?: string): Promise<void> => {
         if (organizationId) {
           // Clear cache first
-          setWorkspaceCache((prev) => {
-            const newCache = { ...prev };
-            delete newCache[organizationId];
-            return newCache;
-          });
+
           await contextValue.getWorkspacesByOrganization(organizationId);
         } else {
           await contextValue.getWorkspaces();
@@ -570,33 +644,27 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         organizationId: string,
         search: string
       ): Promise<Workspace[]> => {
-        // Trim search query and handle empty searches
         const trimmedSearch = search.trim();
-
         if (!trimmedSearch || trimmedSearch.length < 2) {
-          console.log("Search query too short, returning empty results");
           return [];
         }
-
         const result = await handleApiOperation(
           () =>
             workspaceApi.searchWorkspacesByOrganization(
               organizationId,
               trimmedSearch
             ),
-          false // Don't show global loading state for search
+          false
         );
-
         return result;
       },
+      fetchAnalyticsData,
+      workspaceRoleSet,
+      clearAnalyticsError: (): void => {
+        setWorkspaceState((prev) => ({ ...prev, analyticsError: null }));
+      },
     }),
-    [
-      workspaceState,
-      handleApiOperation,
-      getCurrentOrganizationId,
-      getCachedWorkspaces,
-      setCachedWorkspaces,
-    ]
+    [workspaceState, handleApiOperation, getCurrentOrganizationId]
   );
 
   return (

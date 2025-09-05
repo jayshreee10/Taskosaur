@@ -56,6 +56,9 @@ function getConfig() {
         // Frontend-specific environment variables (with FE_ prefix)
         FE_NEXT_PUBLIC_API_BASE_URL = '/api',
         FE_NEXT_PUBLIC_DEFAULT_ORGANIZATION_ID,
+        FE_NEXT_PUBLIC_APP_URL,
+        FE_NEXT_PUBLIC_APP_NAME,
+        FE_NEXT_PUBLIC_ENABLE_AUTOMATION,
     } = processedEnv;
 
     return {
@@ -100,6 +103,9 @@ function getConfig() {
         // Frontend environment variables (mapped from FE_ prefix)
         NEXT_PUBLIC_API_BASE_URL: FE_NEXT_PUBLIC_API_BASE_URL,
         NEXT_PUBLIC_DEFAULT_ORGANIZATION_ID: FE_NEXT_PUBLIC_DEFAULT_ORGANIZATION_ID,
+        NEXT_PUBLIC_APP_URL: FE_NEXT_PUBLIC_APP_URL,
+        NEXT_PUBLIC_APP_NAME: FE_NEXT_PUBLIC_APP_NAME,
+        NEXT_PUBLIC_ENABLE_AUTOMATION: FE_NEXT_PUBLIC_ENABLE_AUTOMATION,
     };
 }
 

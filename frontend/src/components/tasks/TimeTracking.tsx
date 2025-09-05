@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState } from 'react';
 import { Task, TimeEntry } from '@/types/tasks';
 import UserAvatar from '@/components/ui/avatars/UserAvatar';

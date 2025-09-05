@@ -7,9 +7,9 @@ import {
 } from '@nestjs/common';
 import {
   ProjectMember,
-  ProjectRole,
-  WorkspaceRole,
-  OrganizationRole,
+  Role as ProjectRole,
+  Role as WorkspaceRole,
+  Role as OrganizationRole,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -28,7 +28,7 @@ export class ProjectMembersService {
     const {
       userId,
       projectId,
-      role = ProjectRole.DEVELOPER,
+      role = ProjectRole.MEMBER,
     } = createProjectMemberDto;
 
     // Verify project exists and get workspace/organization info
@@ -147,7 +147,7 @@ export class ProjectMembersService {
     const {
       email,
       projectId,
-      role = ProjectRole.DEVELOPER,
+      role = ProjectRole.MEMBER,
     } = inviteProjectMemberDto;
 
     // Find user by email
@@ -447,10 +447,10 @@ export class ProjectMembersService {
     // Permission check: organization owner, org/workspace/project admins can update
     const isOrgOwner =
       member.project.workspace.organization.ownerId === requestUserId;
-    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.ADMIN;
+    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.OWNER;
     const isWorkspaceAdmin =
-      requesterWorkspaceMember?.role === WorkspaceRole.ADMIN;
-    const isProjectAdmin = requesterProjectMember?.role === ProjectRole.ADMIN;
+      requesterWorkspaceMember?.role === WorkspaceRole.OWNER;
+    const isProjectAdmin = requesterProjectMember?.role === ProjectRole.OWNER;
 
     if (!isOrgOwner && !isOrgAdmin && !isWorkspaceAdmin && !isProjectAdmin) {
       throw new ForbiddenException('Only admins can update member roles');
@@ -542,10 +542,10 @@ export class ProjectMembersService {
     const isSelfRemoval = member.userId === requestUserId;
     const isOrgOwner =
       member.project.workspace.organization.ownerId === requestUserId;
-    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.ADMIN;
+    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.OWNER;
     const isWorkspaceAdmin =
-      requesterWorkspaceMember?.role === WorkspaceRole.ADMIN;
-    const isProjectAdmin = requesterProjectMember?.role === ProjectRole.ADMIN;
+      requesterWorkspaceMember?.role === WorkspaceRole.OWNER;
+    const isProjectAdmin = requesterProjectMember?.role === ProjectRole.OWNER;
 
     if (
       !isSelfRemoval &&

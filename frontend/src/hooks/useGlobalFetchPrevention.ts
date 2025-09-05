@@ -13,7 +13,16 @@ const globalFetchState = new Map<string, FetchState>();
 
 const CACHE_DURATION = 30000; // 30 seconds cache
 
-export function useGlobalFetchPrevention() {
+interface UseGlobalFetchPreventionReturn {
+  shouldPreventFetch: (fetchKey: string) => boolean;
+  markFetchStart: (fetchKey: string) => void;
+  markFetchComplete: <T>(fetchKey: string, data: T) => void;
+  markFetchError: (fetchKey: string, error: Error) => void;
+  getCachedData: <T>(fetchKey: string) => T | null;
+  reset: (fetchKey?: string) => void;
+}
+
+export function useGlobalFetchPrevention(): UseGlobalFetchPreventionReturn {
   const isInitialRender = useRef(true);
 
   useEffect(() => {
@@ -30,13 +39,10 @@ export function useGlobalFetchPrevention() {
     
     // Prevent if currently loading
     if (currentState.isLoading) {
-      // console.log('🚫 Preventing duplicate fetch - already loading:', fetchKey);
       return true;
     }
-    
     // Prevent if recently completed (within cache duration)
     if (currentState.hasCompleted && (now - currentState.timestamp) < CACHE_DURATION) {
-      // console.log('🚫 Preventing duplicate fetch - recently completed:', fetchKey);
       return true;
     }
     
@@ -47,11 +53,8 @@ export function useGlobalFetchPrevention() {
     // Additional check to prevent React strict mode double calls
     const currentState = globalFetchState.get(fetchKey);
     if (currentState && currentState.isLoading) {
-      // console.log('🚫 Ignoring duplicate markFetchStart for:', fetchKey);
       return;
     }
-
-    // console.log('🚀 Starting global fetch for:', fetchKey);
     globalFetchState.set(fetchKey, {
       isLoading: true,
       lastFetchKey: fetchKey,
@@ -62,7 +65,6 @@ export function useGlobalFetchPrevention() {
   }, []);
 
   const markFetchComplete = useCallback((fetchKey: string, data?: any) => {
-    // console.log('✅ Completed global fetch for:', fetchKey);
     globalFetchState.set(fetchKey, {
       isLoading: false,
       lastFetchKey: fetchKey,
@@ -73,7 +75,6 @@ export function useGlobalFetchPrevention() {
   }, []);
 
   const markFetchError = useCallback((fetchKey: string) => {
-    // console.log('❌ Failed global fetch for:', fetchKey);
     globalFetchState.set(fetchKey, {
       isLoading: false,
       lastFetchKey: fetchKey,
@@ -96,10 +97,8 @@ export function useGlobalFetchPrevention() {
 
   const reset = useCallback((fetchKey?: string) => {
     if (fetchKey) {
-      // console.log('🔄 Resetting global fetch state for:', fetchKey);
       globalFetchState.delete(fetchKey);
     } else {
-      // console.log('🔄 Resetting all global fetch state');
       globalFetchState.clear();
     }
   }, []);

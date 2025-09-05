@@ -18,13 +18,14 @@ model User {
   bio                      String?
   timezone                 String               @default("UTC")
   language                 String               @default("en")
-  role                     UserRole             @default(MEMBER)
+  role                     Role                 @default(MEMBER)
   status                   UserStatus           @default(ACTIVE)
   lastLoginAt              DateTime?            @map("last_login_at")
   emailVerified            Boolean              @default(false) @map("email_verified")
   password                 String?
   refreshToken             String?              @map("refresh_token")
   preferences              Json?
+  onboardInfo              Json?
   createdAt                DateTime             @default(now()) @map("created_at")
   updatedAt                DateTime             @updatedAt @map("updated_at")
   resetToken               String?              @unique @map("reset_token")
@@ -86,6 +87,7 @@ model User {
   updatedTaskDependencies  TaskDependency[]     @relation("TaskDependencyUpdatedBy")
   timeEntries              TimeEntry[]
   workspaceMembers         WorkspaceMember[]
+  sentInvitations          Invitation[]         @relation("InvitationInviter")
 
   @@map("users")
 }
@@ -106,6 +108,7 @@ model Organization {
   automationRules AutomationRule[]
   customFields    CustomField[]
   members         OrganizationMember[]
+  archive         Boolean              @default(false)
   owner           User                 @relation("OrganizationOwner", fields: [ownerId], references: [id])
   createdByUser   User?                @relation("OrganizationCreatedBy", fields: [createdBy], references: [id])
   updatedByUser   User?                @relation("OrganizationUpdatedBy", fields: [updatedBy], references: [id])
@@ -113,24 +116,25 @@ model Organization {
   workspaces      Workspace[]
   ActivityLog     ActivityLog[]
   Notification    Notification[]
+  Invitation      Invitation[]
 
   @@map("organizations")
 }
 
 model OrganizationMember {
-  id             String           @id @default(uuid()) @db.Uuid
-  role           OrganizationRole @default(MEMBER)
-  joinedAt       DateTime         @default(now()) @map("joined_at")
-  userId         String           @map("user_id") @db.Uuid
-  organizationId String           @map("organization_id") @db.Uuid
-  createdBy      String?          @map("created_by_id") @db.Uuid
-  updatedBy      String?          @map("updated_by_id") @db.Uuid
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdByUser  User?            @relation("OrganizationMemberCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser  User?            @relation("OrganizationMemberUpdatedBy", fields: [updatedBy], references: [id])
+  id             String       @id @default(uuid()) @db.Uuid
+  role           Role         @default(MEMBER)
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+  userId         String       @map("user_id") @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  createdBy      String?      @map("created_by_id") @db.Uuid
+  updatedBy      String?      @map("updated_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser  User?        @relation("OrganizationMemberCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser  User?        @relation("OrganizationMemberUpdatedBy", fields: [updatedBy], references: [id])
 
   @@unique([userId, organizationId])
   @@map("organization_members")
@@ -149,31 +153,33 @@ model Workspace {
   updatedBy       String?           @map("updated_by_id") @db.Uuid
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
+  archive         Boolean           @default(false)
   automationRules AutomationRule[]
   projects        Project[]
   members         WorkspaceMember[]
   organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByUser   User?             @relation("WorkspaceCreatedBy", fields: [createdBy], references: [id])
   updatedByUser   User?             @relation("WorkspaceUpdatedBy", fields: [updatedBy], references: [id])
+  Invitation      Invitation[]
 
   @@unique([organizationId, slug])
   @@map("workspaces")
 }
 
 model WorkspaceMember {
-  id            String        @id @default(uuid()) @db.Uuid
-  role          WorkspaceRole @default(MEMBER)
-  joinedAt      DateTime      @default(now()) @map("joined_at")
-  userId        String        @map("user_id") @db.Uuid
-  workspaceId   String        @map("workspace_id") @db.Uuid
-  createdBy     String?       @map("created_by_id") @db.Uuid
-  updatedBy     String?       @map("updated_by_id") @db.Uuid
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdByUser User?         @relation("WorkspaceMemberCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser User?         @relation("WorkspaceMemberUpdatedBy", fields: [updatedBy], references: [id])
+  id            String    @id @default(uuid()) @db.Uuid
+  role          Role      @default(MEMBER)
+  joinedAt      DateTime  @default(now()) @map("joined_at")
+  userId        String    @map("user_id") @db.Uuid
+  workspaceId   String    @map("workspace_id") @db.Uuid
+  createdBy     String?   @map("created_by_id") @db.Uuid
+  updatedBy     String?   @map("updated_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser User?     @relation("WorkspaceMemberCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?     @relation("WorkspaceMemberUpdatedBy", fields: [updatedBy], references: [id])
 
   @@unique([userId, workspaceId])
   @@map("workspace_members")
@@ -197,6 +203,7 @@ model Project {
   updatedBy       String?          @map("updated_by_id") @db.Uuid
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
+  archive         Boolean          @default(false)
   automationRules AutomationRule[]
   labels          Label[]
   members         ProjectMember[]
@@ -206,71 +213,74 @@ model Project {
   updatedByUser   User?            @relation("ProjectUpdatedBy", fields: [updatedBy], references: [id])
   sprints         Sprint[]
   tasks           Task[]
+  Invitation      Invitation[]
 
   @@unique([workspaceId, slug])
   @@map("projects")
 }
 
 model ProjectMember {
-  id            String      @id @default(uuid()) @db.Uuid
-  role          ProjectRole @default(DEVELOPER)
-  joinedAt      DateTime    @default(now()) @map("joined_at")
-  userId        String      @map("user_id") @db.Uuid
-  projectId     String      @map("project_id") @db.Uuid
-  createdBy     String?     @map("created_by_id") @db.Uuid
-  updatedBy     String?     @map("updated_by_id") @db.Uuid
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdByUser User?       @relation("ProjectMemberCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser User?       @relation("ProjectMemberUpdatedBy", fields: [updatedBy], references: [id])
+  id            String   @id @default(uuid()) @db.Uuid
+  role          Role     @default(MEMBER)
+  joinedAt      DateTime @default(now()) @map("joined_at")
+  userId        String   @map("user_id") @db.Uuid
+  projectId     String   @map("project_id") @db.Uuid
+  createdBy     String?  @map("created_by_id") @db.Uuid
+  updatedBy     String?  @map("updated_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser User?    @relation("ProjectMemberCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?    @relation("ProjectMemberUpdatedBy", fields: [updatedBy], references: [id])
 
   @@unique([userId, projectId])
   @@map("project_members")
 }
 
 model Task {
-  id                String           @id @default(uuid()) @db.Uuid
+  id                String       @id @default(uuid()) @db.Uuid
   title             String
   description       String?
-  type              TaskType         @default(TASK)
-  priority          TaskPriority     @default(MEDIUM)
-  taskNumber        Int              @map("task_number")
+  type              TaskType     @default(TASK)
+  priority          TaskPriority @default(MEDIUM)
+  taskNumber        Int          @map("task_number")
   slug              String
-  startDate         DateTime?        @map("start_date")
-  dueDate           DateTime?        @map("due_date")
-  completedAt       DateTime?        @map("completed_at")
-  storyPoints       Int?             @map("story_points")
-  originalEstimate  Int?             @map("original_estimate")
-  remainingEstimate Int?             @map("remaining_estimate")
-  customFields      Json?            @map("custom_fields")
-  projectId         String           @map("project_id") @db.Uuid
-  assigneeId        String?          @map("assignee_id") @db.Uuid
-  reporterId        String           @map("reporter_id") @db.Uuid
-  statusId          String           @map("status_id") @db.Uuid
-  sprintId          String?          @map("sprint_id") @db.Uuid
-  parentTaskId      String?          @map("parent_task_id") @db.Uuid
-  createdBy         String?          @map("created_by_id") @db.Uuid
-  updatedBy         String?          @map("updated_by_id") @db.Uuid
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
-  attachments       TaskAttachment[]
-  comments          TaskComment[]
-  blocks            TaskDependency[] @relation("BlockingTask")
-  dependsOn         TaskDependency[] @relation("DependentTask")
-  labels            TaskLabel[]
-  watchers          TaskWatcher[]
-  assignee          User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  parentTask        Task?            @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
-  childTasks        Task[]           @relation("TaskHierarchy")
-  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  reporter          User             @relation("TaskReporter", fields: [reporterId], references: [id])
-  createdByUser     User?            @relation("TaskCreatedBy", fields: [createdBy], references: [id])
-  updatedByUser     User?            @relation("TaskUpdatedBy", fields: [updatedBy], references: [id])
-  sprint            Sprint?          @relation(fields: [sprintId], references: [id])
-  status            TaskStatus       @relation(fields: [statusId], references: [id])
-  timeEntries       TimeEntry[]
+  startDate         DateTime?    @map("start_date")
+  dueDate           DateTime?    @map("due_date")
+  completedAt       DateTime?    @map("completed_at")
+  storyPoints       Int?         @map("story_points")
+  originalEstimate  Int?         @map("original_estimate")
+  remainingEstimate Int?         @map("remaining_estimate")
+  customFields      Json?        @map("custom_fields")
+  projectId         String       @map("project_id") @db.Uuid
+  assigneeId        String?      @map("assignee_id") @db.Uuid
+  reporterId        String?      @map("reporter_id") @db.Uuid
+  statusId          String       @map("status_id") @db.Uuid
+  sprintId          String?      @map("sprint_id") @db.Uuid
+  parentTaskId      String?      @map("parent_task_id") @db.Uuid
+  createdBy         String?      @map("created_by_id") @db.Uuid
+  updatedBy         String?      @map("updated_by_id") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  attachments   TaskAttachment[]
+  comments      TaskComment[]
+  blocks        TaskDependency[] @relation("BlockingTask")
+  dependsOn     TaskDependency[] @relation("DependentTask")
+  labels        TaskLabel[]
+  watchers      TaskWatcher[]
+  assignee      User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  parentTask    Task?            @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
+  childTasks    Task[]           @relation("TaskHierarchy")
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter      User?            @relation("TaskReporter", fields: [reporterId], references: [id])
+  createdByUser User?            @relation("TaskCreatedBy", fields: [createdBy], references: [id])
+  updatedByUser User?            @relation("TaskUpdatedBy", fields: [updatedBy], references: [id])
+  sprint        Sprint?          @relation(fields: [sprintId], references: [id])
+  status        TaskStatus       @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  timeEntries   TimeEntry[]
 
   @@unique([projectId, taskNumber])
   @@map("tasks")
@@ -364,6 +374,7 @@ model Sprint {
   goal          String?
   status        SprintStatus @default(PLANNING)
   isDefault     Boolean      @default(false) // ✅ Add this field
+  archive       Boolean      @default(false)
   startDate     DateTime?    @map("start_date")
   endDate       DateTime?    @map("end_date")
   projectId     String       @map("project_id") @db.Uuid
@@ -528,7 +539,7 @@ model Notification {
   readAt         DateTime?            @map("read_at")
 
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization  Organization? @relation(fields: [organizationId], references: [id])
+  organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByUser User?         @relation("NotificationCreatedBy", fields: [createdBy], references: [id])
 
   @@map("notifications")
@@ -556,7 +567,7 @@ model ActivityLog {
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdByUser  User?         @relation("ActivityLogCreatedBy", fields: [createdBy], references: [id])
   updatedByUser  User?         @relation("ActivityLogUpdatedBy", fields: [updatedBy], references: [id])
 
@@ -612,12 +623,39 @@ model RuleExecution {
   @@map("rule_executions")
 }
 
-enum UserRole {
-  SUPER_ADMIN
-  ADMIN
-  MANAGER
-  MEMBER
-  VIEWER
+model Invitation {
+  id             String           @id @default(uuid()) @db.Uuid
+  inviterId      String           @map("inviter_id") @db.Uuid
+  inviteeEmail   String           @map("invitee_email")
+  organizationId String?          @map("organization_id") @db.Uuid
+  workspaceId    String?          @map("workspace_id") @db.Uuid
+  projectId      String?          @map("project_id") @db.Uuid
+  role           String
+  status         InvitationStatus @default(PENDING)
+  token          String           @unique
+  expiresAt      DateTime         @map("expires_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  inviter      User          @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([token])
+  @@index([inviteeEmail])
+  @@map("invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
 }
 
 enum UserStatus {
@@ -627,15 +665,9 @@ enum UserStatus {
   PENDING
 }
 
-enum OrganizationRole {
-  ADMIN
-  MANAGER
-  MEMBER
-  VIEWER
-}
-
-enum WorkspaceRole {
-  ADMIN
+enum Role {
+  SUPER_ADMIN
+  OWNER
   MANAGER
   MEMBER
   VIEWER
@@ -654,13 +686,6 @@ enum ProjectPriority {
   MEDIUM
   HIGH
   URGENT
-}
-
-enum ProjectRole {
-  ADMIN
-  MANAGER
-  DEVELOPER
-  VIEWER
 }
 
 enum TaskType {
@@ -729,7 +754,11 @@ enum ActivityType {
   TASK_DELETED
   TASK_ASSIGNED
   TASK_COMMENTED
+  TASK_LABEL_ADDED
+  TASK_LABEL_REMOVED
   TASK_STATUS_CHANGED
+  TASK_ATTACHMENT_ADDED
+  TASK_ATTACHMENT_REMOVED
   PROJECT_CREATED
   PROJECT_UPDATED
   PROJECT_DELETED
@@ -770,4 +799,17 @@ enum RuleStatus {
   ACTIVE
   INACTIVE
   DRAFT
+}
+
+model Settings {
+  id            String   @id @default(uuid()) @db.Uuid
+  key           String   @unique
+  value         String?
+  description   String?
+  category      String   @default("general")
+  isEncrypted   Boolean  @default(false) @map("is_encrypted")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
 }

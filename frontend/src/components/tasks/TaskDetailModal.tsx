@@ -1,4 +1,4 @@
-'use client';
+;
 
 import { useState } from 'react';
 import { Task, TaskDependency, DependencyType, TimeEntry } from '@/types/tasks';
@@ -18,10 +18,6 @@ export default function TaskDetailModal({ task, allTasks, onClose, onUpdate }: T
   const [activeTab, setActiveTab] = useState<'details' | 'dependencies' | 'hierarchy' | 'time'>('details');
 
   const handleAddDependency = (taskId: string, dependsOnTaskId: string, type: DependencyType) => {
-    // In a real app, this would make an API call
-
-    
-    // Mock implementation - in real app, refetch the task data
     const newDependency: TaskDependency = {
       id: `dep-${Date.now()}`,
       type,
@@ -31,50 +27,36 @@ export default function TaskDetailModal({ task, allTasks, onClose, onUpdate }: T
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
     const updatedTask = {
       ...task,
       dependsOn: [...(task.dependsOn || []), newDependency]
     };
-    
     onUpdate(updatedTask);
   };
 
   const handleRemoveDependency = (dependencyId: string) => {
-    // In a real app, this would make an API call
-
-    
     const updatedTask = {
       ...task,
       dependsOn: task.dependsOn?.filter(dep => dep.id !== dependencyId) || []
     };
-    
     onUpdate(updatedTask);
   };
 
   const handleUpdateDependency = (dependencyId: string, type: DependencyType) => {
-    // In a real app, this would make an API call
-
-    
     const updatedTask = {
       ...task,
       dependsOn: task.dependsOn?.map(dep => 
         dep.id === dependencyId ? { ...dep, type } : dep
       ) || []
     };
-    
     onUpdate(updatedTask);
   };
 
   const handleCreateSubtask = (parentId: string, subtaskData: any) => {
-    // In a real app, this would make an API call
-    console.log('Creating subtask:', { parentId, subtaskData });
-    
-    // Mock implementation
     const newSubtask: Task = {
       id: `task-${Date.now()}`,
       ...subtaskData,
-      key: `${task.key}-${Date.now()}`,
+      key: `${task.slug}-${Date.now()}`,
       taskNumber: Date.now(),
       parentTaskId: parentId,
       projectId: task.projectId,
@@ -85,82 +67,57 @@ export default function TaskDetailModal({ task, allTasks, onClose, onUpdate }: T
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
-    // In real app, this would update the allTasks array and refetch
-    console.log('New subtask created:', newSubtask);
   };
 
   const handleConvertToSubtask = (taskId: string, parentId: string) => {
-    // In a real app, this would make an API call
-    console.log('Converting to subtask:', { taskId, parentId });
-    
     const updatedTask = {
       ...task,
       parentTaskId: parentId
     };
-    
     onUpdate(updatedTask);
   };
 
   const handlePromoteToParent = (taskId: string) => {
-    // In a real app, this would make an API call
-    console.log('Promoting to parent:', taskId);
-    
     const updatedTask = {
       ...task,
       parentTaskId: undefined
     };
-    
     onUpdate(updatedTask);
   };
 
   const handleMoveSubtask = (taskId: string, newParentId: string) => {
-    // In a real app, this would make an API call
-    console.log('Moving subtask:', { taskId, newParentId });
+    
   };
 
   const handleLogTime = (timeEntry: Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
-    // In a real app, this would make an API call
-    console.log('Logging time:', timeEntry);
-    
     const newTimeEntry: TimeEntry = {
       id: `time-${Date.now()}`,
       ...timeEntry,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
     const updatedTask = {
       ...task,
       timeEntries: [...(task.timeEntries || []), newTimeEntry]
     };
-    
     onUpdate(updatedTask);
   };
 
   const handleUpdateTime = (timeEntryId: string, timeEntry: Partial<TimeEntry>) => {
-    // In a real app, this would make an API call
-    console.log('Updating time:', { timeEntryId, timeEntry });
-    
     const updatedTask = {
       ...task,
       timeEntries: task.timeEntries?.map(entry => 
         entry.id === timeEntryId ? { ...entry, ...timeEntry, updatedAt: new Date().toISOString() } : entry
       ) || []
     };
-    
     onUpdate(updatedTask);
   };
 
   const handleDeleteTime = (timeEntryId: string) => {
-    // In a real app, this would make an API call
-    console.log('Deleting time:', timeEntryId);
-    
     const updatedTask = {
       ...task,
       timeEntries: task.timeEntries?.filter(entry => entry.id !== timeEntryId) || []
     };
-    
     onUpdate(updatedTask);
   };
 
@@ -195,7 +152,7 @@ export default function TaskDetailModal({ task, allTasks, onClose, onUpdate }: T
               <span className="text-xl">{getTaskTypeIcon(task.type)}</span>
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {task.key}: {task.title}
+                  {task.slug}: {task.title}
                 </h2>
                 <div className="flex items-center space-x-3 mt-1">
                   <span className={`px-2 py-1 text-xs rounded-full ${getPriorityColor(task.priority)}`}>

@@ -12,24 +12,45 @@ import {
   Req,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { getAuthUser } from 'src/common/request.utils';
 import { Request } from 'express';
-import { NotificationPriority, NotificationType, TaskPriority } from '@prisma/client';
+import {
+  NotificationPriority,
+  NotificationType,
+  TaskPriority,
+  Role,
+} from '@prisma/client';
 import { AutoNotify } from 'src/common/decorator/auto-notify.decorator';
 import { LogActivity } from 'src/common/decorator/log-activity.decorator';
+import {
+  GetTasksByStatusQueryDto,
+  GetTasksByStatusResponseDto,
+  TasksByStatusParams,
+} from './dto/task-by-status.dto';
+import { Roles } from 'src/common/decorator/roles.decorator';
+import { Scope } from 'src/common/decorator/scope.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
+  @Scope('PROJECT', 'projectId')
+  @Roles(Role.MEMBER, Role.MANAGER, Role.OWNER)
   @LogActivity({
     type: 'TASK_CREATED',
     entityType: 'Task',
@@ -50,30 +71,122 @@ export class TasksController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'Get all tasks with filters' })
+  @ApiQuery({
+    name: 'organizationId',
+    required: true,
+    description: 'Organization ID (required)',
+  })
+  @ApiQuery({
+    name: 'projectId',
+    required: false,
+    description: 'Filter by project ID',
+  })
+  @ApiQuery({
+    name: 'sprintId',
+    required: false,
+    description: 'Filter by sprint ID',
+  })
+  @ApiQuery({
+    name: 'workspaceId',
+    required: false,
+    description: 'Filter by workspace ID',
+  })
+  @ApiQuery({
+    name: 'parentTaskId',
+    required: false,
+    description: 'Filter by parent task ID',
+  })
+  @ApiQuery({
+    name: 'priorities',
+    required: false,
+    description: 'Filter by priorities (comma-separated)',
+    example: 'HIGH,MEDIUM',
+  })
+  @ApiQuery({
+    name: 'statuses',
+    required: false,
+    description: 'Filter by status IDs (comma-separated)',
+    example: 'status-1,status-2',
+  })
+  @Scope('ORGANIZATION', 'organizationId')
+  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
   findAll(
+    @CurrentUser() user: any,
+    @Query('organizationId', ParseUUIDPipe) organizationId: string,
     @Query('projectId') projectId?: string,
     @Query('sprintId') sprintId?: string,
     @Query('workspaceId') workspaceId?: string,
     @Query('parentTaskId') parentTaskId?: string,
+    @Query('priorities') priorities?: string,
+    @Query('statuses') statuses?: string,
   ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+    const priorityArray = priorities
+      ? priorities.split(',').filter(Boolean)
+      : undefined;
+    const statusArray = statuses
+      ? statuses.split(',').filter(Boolean)
+      : undefined;
+    // Support multiple projectIds via comma-separated values
+    let projectIdArray: string[] | undefined = undefined;
+    if (projectId) {
+      projectIdArray = projectId.split(',').filter(Boolean);
+    }
+    // Support multiple workspaceIds via comma-separated values
+    let workspaceIdArray: string[] | undefined = undefined;
+    if (workspaceId) {
+      workspaceIdArray = workspaceId.split(',').filter(Boolean);
+    }
     return this.tasksService.findAll(
-      projectId,
+      organizationId,
+      projectIdArray,
       sprintId,
-      workspaceId,
+      workspaceIdArray,
       parentTaskId,
+      priorityArray,
+      statusArray,
+      user.id,
     );
+  }
+
+  @Get('by-status')
+  @ApiOperation({ summary: 'Get tasks grouped by status' })
+  @ApiResponse({ status: 200, type: GetTasksByStatusResponseDto })
+  @Scope('PROJECT','slug')
+  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
+  async getTasksByStatus(
+    @Query() query: TasksByStatusParams,
+    @Req() req: Request,
+  ) {
+    const user = getAuthUser(req);
+    const tasks = await this.tasksService.getTasksGroupedByStatus(
+      query,
+      user.id,
+    );
+
+    return {
+      data: tasks,
+      totalTasks: tasks.reduce((sum, status) => sum + status._count, 0),
+      totalStatuses: tasks.length,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
   @Get('today')
   @ApiOperation({
     summary: "Get today's tasks filtered by assignee/reporter and organization",
   })
+  @Scope('ORGANIZATION', 'organizationId')
+  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
   getTodaysTasks(
     @Query('organizationId') organizationId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
     @Req() req: Request,
-  ) {    
+  ) {
     if (!organizationId) {
       throw new BadRequestException('Organization ID is required');
     }
@@ -103,20 +216,26 @@ export class TasksController {
       },
       validatedPage,
       validatedLimit,
+      user.id,
     );
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.tasksService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    const user = getAuthUser(req);
+    return this.tasksService.findOne(id, user.id);
   }
 
   @Get('key/:key')
-  findByKey(@Param('key') key: string) {
-    return this.tasksService.findByKey(key);
+  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
+  findByKey(@Param('key') key: string, @Req() req: Request) {
+    const user = getAuthUser(req);
+    return this.tasksService.findByKey(key, user.id);
   }
 
   @Get('organization/:orgId')
+  @Scope('ORGANIZATION', 'orgId')
+  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
   getTasksByOrganization(
     @Param('orgId', ParseUUIDPipe) orgId: string,
     @Req() req: Request,
@@ -141,6 +260,7 @@ export class TasksController {
       search,
       validatedPage,
       validatedLimit,
+      user.id,
     );
   }
 
@@ -162,8 +282,10 @@ export class TasksController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTaskDto: UpdateTaskDto,
+    @Req() req: Request,
   ) {
-    return this.tasksService.update(id, updateTaskDto);
+    const user = getAuthUser(req);
+    return this.tasksService.update(id, updateTaskDto, user.id);
   }
 
   @Patch(':id/status')
@@ -184,8 +306,10 @@ export class TasksController {
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('statusId', ParseUUIDPipe) statusId: string,
+    @Req() req: Request,
   ) {
-    return this.tasksService.update(id, { statusId });
+    const user = getAuthUser(req);
+    return this.tasksService.update(id, { statusId }, user.id);
   }
 
   @Patch(':id/assignee')
@@ -206,8 +330,10 @@ export class TasksController {
   updateAssignee(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('assigneeId', ParseUUIDPipe) assigneeId: string,
+    @Req() req: Request,
   ) {
-    return this.tasksService.update(id, { assigneeId });
+    const user = getAuthUser(req);
+    return this.tasksService.update(id, { assigneeId }, user.id);
   }
 
   @Patch(':id/unassign')
@@ -225,8 +351,9 @@ export class TasksController {
     title: 'Task Unassigned',
     message: 'You have been unassigned from a task',
   })
-  unassignTask(@Param('id', ParseUUIDPipe) id: string) {
-    return this.tasksService.update(id, { assigneeId: undefined });
+  unassignTask(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    const user = getAuthUser(req);
+    return this.tasksService.update(id, { assigneeId: undefined }, user.id);
   }
 
   @Delete(':id')
@@ -243,11 +370,10 @@ export class TasksController {
     title: 'Task Deleted',
     message: 'A task you were involved in has been deleted',
   })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.tasksService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    const user = getAuthUser(req);
+    return this.tasksService.remove(id, user.id);
   }
-
-  // ✅ Additional endpoints you might want to add
 
   @Post(':id/comments')
   @LogActivity({
@@ -291,8 +417,10 @@ export class TasksController {
   updatePriority(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('priority') priority: TaskPriority,
+    @Req() req: Request,
   ) {
-    return this.tasksService.update(id, { priority });
+    const user = getAuthUser(req);
+    return this.tasksService.update(id, { priority }, user.id);
   }
 
   @Patch(':id/due-date')
@@ -313,7 +441,9 @@ export class TasksController {
   updateDueDate(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('dueDate') dueDate: string,
+    @Req() req: Request,
   ) {
-    return this.tasksService.update(id, { dueDate });
+    const user = getAuthUser(req);
+    return this.tasksService.update(id, { dueDate }, user.id);
   }
 }

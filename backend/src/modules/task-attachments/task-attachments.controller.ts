@@ -33,6 +33,7 @@ import * as multer from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Task Attachments')
 @ApiBearerAuth('JWT-auth')
@@ -52,8 +53,9 @@ export class TaskAttachmentsController {
   @ApiResponse({ status: 404, description: 'Task not found' })
   @ApiResponse({ status: 400, description: 'Invalid file data' })
   @ApiBody({ type: CreateTaskAttachmentDto })
-  create(@Body() createTaskAttachmentDto: CreateTaskAttachmentDto) {
-    return this.taskAttachmentsService.create(createTaskAttachmentDto);
+
+  create(@Body() createTaskAttachmentDto: CreateTaskAttachmentDto, @CurrentUser() user: any) {
+    return this.taskAttachmentsService.create(createTaskAttachmentDto, user.id);
   }
 
   @Post('upload/:taskId')
@@ -143,6 +145,7 @@ export class TaskAttachmentsController {
   async uploadFile(
     @Param('taskId', ParseUUIDPipe) taskId: string,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: any
   ) {
     if (!file) {
       throw new BadRequestException('No file provided');
@@ -156,7 +159,7 @@ export class TaskAttachmentsController {
       taskId,
     };
 
-    return this.taskAttachmentsService.create(createTaskAttachmentDto);
+    return this.taskAttachmentsService.create(createTaskAttachmentDto, user.id);
   }
 
   @Get()

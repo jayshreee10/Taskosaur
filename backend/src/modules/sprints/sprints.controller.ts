@@ -27,10 +27,7 @@ export class SprintsController {
   constructor(private readonly sprintsService: SprintsService) {}
 
   @Post()
-  create(
-    @Body() createSprintDto: CreateSprintDto,
-    @CurrentUser() user: any,
-  ) {
+  create(@Body() createSprintDto: CreateSprintDto, @CurrentUser() user: any) {
     return this.sprintsService.create(createSprintDto, user.id);
   }
 
@@ -40,6 +37,13 @@ export class SprintsController {
     @Query('status') status?: SprintStatus,
   ) {
     return this.sprintsService.findAll(projectId, status);
+  }
+  @Get('slug')
+  findAllByProjectSlug(
+    @Query('slug') slug?: string,
+    @Query('status') status?: SprintStatus,
+  ) {
+    return this.sprintsService.findAllByProjectSlug(slug, status);
   }
 
   @Get(':id')
@@ -77,5 +81,12 @@ export class SprintsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.sprintsService.remove(id);
+  }
+
+  // Archive Sprint Controller
+  @Patch('archive/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  archiveSprint(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sprintsService.archiveSprint(id);
   }
 }

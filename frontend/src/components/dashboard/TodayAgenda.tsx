@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,13 +5,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   HiCalendar,
   HiClock,
-  HiFlag,
   HiCheckCircle,
-  HiExclamationTriangle,
   HiSparkles,
 } from 'react-icons/hi2';
 import { HiX } from "react-icons/hi";
-import { Task } from '@/utils/api';
+import { Task } from '@/types';
 
 interface TodayAgendaProps {
   isOpen: boolean;
@@ -84,12 +80,6 @@ export function TodayAgenda({
   upcomingTasks = []
 }: TodayAgendaProps) {
   if (!isOpen) return null;
-
-  console.log('Rendering TodayAgenda with tasks:', upcomingTasks);
-
-  // Only treat 'HIGH' as urgent, since 'URGENT' is not a valid type
-  const urgentTasks = upcomingTasks.filter(task => task.priority === 'HIGH');
-  const regularTasks = upcomingTasks.filter(task => task.priority !== 'HIGH');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -165,7 +155,7 @@ export function TodayAgenda({
                       return (
                         <div
                           key={task.id}
-                          className={`group p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
+                          className={`group p-3 rounded-lg border transition-all duration-200 ${
                             isUrgent 
                               ? 'border-red-200 bg-red-50/30 dark:border-red-800/30 dark:bg-red-900/5 hover:bg-red-50 dark:hover:bg-red-900/10' 
                               : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--accent)]/30 hover:border-[var(--primary)]/20'

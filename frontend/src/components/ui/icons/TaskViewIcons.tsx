@@ -13,11 +13,11 @@ export const taskViewTypes = [
     key: 'list',
     icon: <HiViewList size={16} />,
   },
-  {
-    name: 'Kanban',
-    key: 'kanban', 
-    icon: <HiTemplate size={16} />,
-  },
+  // {
+  //   name: 'Kanban',
+  //   key: 'kanban', 
+  //   icon: <HiTemplate size={16} />,
+  // },
   // {
   //   name: 'Calendar',
   //   key: 'calendar',

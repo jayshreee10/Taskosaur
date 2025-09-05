@@ -1,10 +1,9 @@
-'use client';
+;
 
 import React, { useState, useEffect } from 'react';
-import { Task, Sprint, TaskStatus } from '@/types/tasks';
 import TaskColumn from '@/components/tasks/TaskColumn';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import SprintSelector from './SprintSelector';
 import SprintProgress from './SprintProgress';
@@ -19,23 +18,24 @@ import {
   HiClipboardDocumentList
 } from 'react-icons/hi2';
 import { HiLightningBolt } from "react-icons/hi";
+import { Sprint, Task, TaskStatus } from '@/types';
 interface SprintBoardProps {
   projectId: string;
   sprintId?: string;
 }
 
 const LoadingSkeleton = () => (
-  <div className="space-y-6">
-    <div className="animate-pulse">
-      <div className="h-8 bg-[var(--muted)] rounded w-1/3 mb-4"></div>
-      <div className="h-6 bg-[var(--muted)] rounded w-1/2 mb-6"></div>
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+  <div className="sprints-loading-container">
+    <div className="sprints-loading-skeleton">
+      <div className="sprints-loading-title"></div>
+      <div className="sprints-loading-subtitle"></div>
+      <div className="sprints-loading-columns">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-[var(--card)] rounded-[var(--card-radius)] border-none p-4">
-            <div className="h-6 bg-[var(--muted)] rounded mb-4"></div>
-            <div className="space-y-3">
+          <div key={i} className="sprints-loading-column">
+            <div className="sprints-loading-column-title"></div>
+            <div className="sprints-loading-tasks">
               {[...Array(3)].map((_, j) => (
-                <div key={j} className="h-20 bg-[var(--muted)] rounded"></div>
+                <div key={j} className="sprints-loading-task"></div>
               ))}
             </div>
           </div>
@@ -49,22 +49,22 @@ const getSprintStatusConfig = (status: string) => {
   switch (status) {
     case 'PLANNED':
       return { 
-        className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-none',
+        className: 'sprints-status-planned sprints-status-planned-dark',
         icon: HiClock 
       };
     case 'ACTIVE':
       return { 
-        className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-none',
+        className: 'sprints-status-active sprints-status-active-dark',
         icon: HiPlay 
       };
     case 'COMPLETED':
       return { 
-        className: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-none',
+        className: 'sprints-status-completed sprints-status-completed-dark',
         icon: HiCheck 
       };
     default:
       return { 
-        className: 'bg-[var(--muted)] text-[var(--muted-foreground)] border-none',
+        className: 'sprints-status-default',
         icon: HiClock 
       };
   }
@@ -160,7 +160,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       type: 'STORY' as any,
       priority: 'HIGH' as any,
       taskNumber: 1,
-      key: 'PROJ-1',
       projectId,
       sprintId: 'sprint-1',
       reporterId: 'user-1',
@@ -182,10 +181,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       storyPoints: 8,
       originalEstimate: 480,
       remainingEstimate: 240,
-      labels: [
-        { id: 'label-1', name: 'Authentication', color: '#3b82f6', projectId },
-        { id: 'label-2', name: 'Backend', color: '#10b981', projectId }
-      ],
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-18T14:30:00Z'
     },
@@ -196,7 +191,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       type: 'STORY' as any,
       priority: 'HIGH' as any,
       taskNumber: 2,
-      key: 'PROJ-2',
       projectId,
       sprintId: 'sprint-1',
       reporterId: 'user-1',
@@ -219,10 +213,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       originalEstimate: 300,
       remainingEstimate: 0,
       completedAt: '2024-01-20T16:00:00Z',
-      labels: [
-        { id: 'label-1', name: 'Authentication', color: '#3b82f6', projectId },
-        { id: 'label-3', name: 'Frontend', color: '#f59e0b', projectId }
-      ],
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-20T16:00:00Z'
     },
@@ -233,7 +223,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       type: 'STORY' as any,
       priority: 'MEDIUM' as any,
       taskNumber: 3,
-      key: 'PROJ-3',
       projectId,
       sprintId: 'sprint-1',
       reporterId: 'user-2',
@@ -255,10 +244,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       storyPoints: 3,
       originalEstimate: 180,
       remainingEstimate: 180,
-      labels: [
-        { id: 'label-1', name: 'Authentication', color: '#3b82f6', projectId },
-        { id: 'label-2', name: 'Backend', color: '#10b981', projectId }
-      ],
       createdAt: '2024-01-16T09:00:00Z',
       updatedAt: '2024-01-16T09:00:00Z'
     },
@@ -269,7 +254,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       type: 'STORY' as any,
       priority: 'LOW' as any,
       taskNumber: 4,
-      key: 'PROJ-4',
       projectId,
       sprintId: 'sprint-1',
       reporterId: 'user-3',
@@ -291,10 +275,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       storyPoints: 2,
       originalEstimate: 120,
       remainingEstimate: 60,
-      labels: [
-        { id: 'label-1', name: 'Authentication', color: '#3b82f6', projectId },
-        { id: 'label-2', name: 'Backend', color: '#10b981', projectId }
-      ],
       createdAt: '2024-01-17T11:00:00Z',
       updatedAt: '2024-01-21T15:30:00Z'
     }
@@ -369,7 +349,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
         )
       );
       
-      console.log('Moving task', taskId, 'to status', newStatusId);
     } catch (error) {
       console.error('Error moving task:', error);
     }
@@ -404,7 +383,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
         startDate: (currentDate || new Date()).toISOString().split('T')[0]
       };
       setCurrentSprint(updatedSprint);
-      console.log('Starting sprint:', updatedSprint);
     }
   };
 
@@ -416,7 +394,6 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
         endDate: (currentDate || new Date()).toISOString().split('T')[0]
       };
       setCurrentSprint(updatedSprint);
-      console.log('Completing sprint:', updatedSprint);
     }
   };
 
@@ -426,14 +403,14 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
 
   if (!currentSprint) {
     return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 bg-[var(--muted)] rounded-xl flex items-center justify-center mx-auto mb-4">
-          <HiLightningBolt className="w-8 h-8 text-[var(--muted-foreground)]" />
+      <div className="sprints-empty-state">
+        <div className="sprints-empty-icon-container">
+          <HiLightningBolt className="sprints-empty-icon" />
         </div>
-        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+        <h3 className="sprints-empty-title">
           No Sprint Selected
         </h3>
-        <p className="text-sm text-[var(--muted-foreground)]">
+        <p className="sprints-empty-description">
           Please select a sprint to view the board
         </p>
       </div>
@@ -451,19 +428,19 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
     .reduce((sum, task) => sum + (task.storyPoints || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="sprints-loading-container">
       {/* Sprint Header Card */}
-      <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <Card className="sprints-header-card">
+        <CardContent className="sprints-header-content">
+          <div className="sprints-header-layout">
             {/* Sprint Info */}
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[var(--primary)] flex items-center justify-center text-[var(--primary-foreground)] font-semibold flex-shrink-0">
-                <HiLightningBolt className="w-6 h-6" />
+            <div className="sprints-header-info">
+              <div className="sprints-header-icon">
+                <HiLightningBolt className="sprints-header-icon-lightning" />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-xl font-bold text-[var(--foreground)]">
+              <div className="sprints-header-details">
+                <div className="sprints-header-title-row">
+                  <h2 className="sprints-header-title">
                     {currentSprint.name}
                   </h2>
                   <Badge className={sprintStatusConfig.className}>
@@ -471,20 +448,20 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
                     {currentSprint.status}
                   </Badge>
                 </div>
-                <p className="text-sm text-[var(--muted-foreground)] mb-3">
+                <p className="sprints-header-goal">
                   {currentSprint.goal}
                 </p>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--muted-foreground)]">
-                  <div className="flex items-center gap-1">
-                    <HiCalendar className="w-4 h-4" />
+                <div className="sprints-header-meta">
+                  <div className="sprints-header-meta-item">
+                    <HiCalendar className="sprints-header-meta-icon" />
                     {formatDate(currentSprint.startDate)} - {formatDate(currentSprint.endDate)}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <HiClipboardDocumentList className="w-4 h-4" />
+                  <div className="sprints-header-meta-item">
+                    <HiClipboardDocumentList className="sprints-header-meta-icon" />
                     {completedTasks}/{tasks.length} tasks
                   </div>
-                  <div className="flex items-center gap-1">
-                    <HiFlag className="w-4 h-4" />
+                  <div className="sprints-header-meta-item">
+                    <HiFlag className="sprints-header-meta-icon" />
                     {completedStoryPoints}/{totalStoryPoints} points
                   </div>
                 </div>
@@ -492,19 +469,19 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
             </div>
 
             {/* Sprint Actions */}
-            <div className="flex items-center gap-3">
+            <div className="sprints-header-actions">
               <SprintSelector
                 currentSprint={currentSprint}
                 sprints={sprints}
                 onSprintChange={handleSprintChange}
               />
               
-              {currentSprint.status === 'PLANNED' && (
+              {currentSprint.status === 'PLANNING' && (
                 <Button 
                   onClick={handleStartSprint}
-                  className="h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-2"
+                  className="sprints-start-button"
                 >
-                  <HiPlay className="w-4 h-4" />
+                  <HiPlay className="sprints-button-icon" />
                   Start Sprint
                 </Button>
               )}
@@ -513,9 +490,9 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
                 <Button 
                   onClick={handleCompleteSprint} 
                   variant="outline"
-                  className="h-9 px-4 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] flex items-center gap-2"
+                  className="sprints-complete-button"
                 >
-                  <HiCheck className="w-4 h-4" />
+                  <HiCheck className="sprints-button-icon" />
                   Complete Sprint
                 </Button>
               )}
@@ -528,7 +505,7 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       <SprintProgress selectedSprint={currentSprint.id} />
 
       {/* Sprint Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[600px]">
+      <div className="sprints-board-grid">
         {statuses.map(status => (
           <TaskColumn
             key={status.id}
@@ -545,18 +522,18 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
       </div>
 
       {/* Sprint Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                <HiClipboardDocumentList className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      <div className="sprints-stats-grid">
+        <Card className="sprints-stats-card">
+          <CardContent className="sprints-stats-content">
+            <div className="sprints-stats-item">
+              <div className="sprints-stats-icon-container-blue sprints-stats-icon-container-blue-dark">
+                <HiClipboardDocumentList className="sprints-stats-icon-blue sprints-stats-icon-blue-dark" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-[var(--foreground)]">
+                <p className="sprints-stats-value">
                   {completedTasks}/{tasks.length}
                 </p>
-                <p className="text-sm text-[var(--muted-foreground)]">
+                <p className="sprints-stats-label">
                   Tasks Completed
                 </p>
               </div>
@@ -564,17 +541,17 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                <HiFlag className="w-5 h-5 text-green-600 dark:text-green-400" />
+        <Card className="sprints-stats-card">
+          <CardContent className="sprints-stats-content">
+            <div className="sprints-stats-item">
+              <div className="sprints-stats-icon-container-green sprints-stats-icon-container-green-dark">
+                <HiFlag className="sprints-stats-icon-green sprints-stats-icon-green-dark" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-[var(--foreground)]">
+                <p className="sprints-stats-value">
                   {completedStoryPoints}/{totalStoryPoints}
                 </p>
-                <p className="text-sm text-[var(--muted-foreground)]">
+                <p className="sprints-stats-label">
                   Story Points
                 </p>
               </div>
@@ -582,17 +559,17 @@ export default function SprintBoard({ projectId, sprintId }: SprintBoardProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
-                <HiChartBar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+        <Card className="sprints-stats-card">
+          <CardContent className="sprints-stats-content">
+            <div className="sprints-stats-item">
+              <div className="sprints-stats-icon-container-purple sprints-stats-icon-container-purple-dark">
+                <HiChartBar className="sprints-stats-icon-purple sprints-stats-icon-purple-dark" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-[var(--foreground)]">
+                <p className="sprints-stats-value">
                   {tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0}%
                 </p>
-                <p className="text-sm text-[var(--muted-foreground)]">
+                <p className="sprints-stats-label">
                   Completion Rate
                 </p>
               </div>

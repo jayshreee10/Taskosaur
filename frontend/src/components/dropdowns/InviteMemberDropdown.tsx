@@ -1,4 +1,3 @@
-"use client";
 import { useState, useEffect, useRef } from "react";
 import { useProjectContext } from "@/contexts/project-context";
 import { 
@@ -124,18 +123,13 @@ export default function InviteMemberDropdown() {
     
     setInviting(true);
     try {
-      // Add your invite logic here
-      console.log("Inviting members:", Array.from(selectedMembers));
       
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Reset state after successful invite
       setSelectedMembers(new Set());
       setShowDropdown(false);
       setSearchTerm("");
       
-      // You might want to show a success message here
       
     } catch (error) {
       console.error("Failed to invite members:", error);
@@ -175,11 +169,13 @@ export default function InviteMemberDropdown() {
     return "No Name";
   };
 
-  useEffect(() => {
+ useEffect(() => {
     if (showDropdown && members.length === 0) {
       fetchMembers();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDropdown]);
+  
 
   return (
     <div className="relative" ref={dropdownRef}>

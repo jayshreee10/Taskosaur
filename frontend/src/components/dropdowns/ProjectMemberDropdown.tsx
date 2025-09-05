@@ -1,4 +1,4 @@
-"use client";
+;
 import { useState, useEffect, useRef } from "react";
 import { useProjectContext } from "@/contexts/project-context";
 import { HiChevronDown, HiXMark } from 'react-icons/hi2';
@@ -14,7 +14,7 @@ interface User {
 
 interface Member {
   id: string;
-  user: User;
+  user?: User;
   role: string;
 }
 
@@ -66,7 +66,7 @@ export default function ProjectMemberDropdown({
   placeholder = "Select member...",
   allowUnassign = true,
   unassignText = "Unassign",
-  required = false,
+ 
   disabled = false
 }: ProjectMemberDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -122,19 +122,15 @@ export default function ProjectMemberDropdown({
     }
   }, [projectId]);
 
-  // Fetch members when dropdown opens and we don't have cached data
   const fetchMembers = async () => {
-    // Don't fetch if we already have cached data for this project
     if (!projectId || membersCache.current.has(projectId)) {
       return;
     }
     
-    // Don't fetch if we already fetched for this project
     if (lastFetchedProjectRef.current === projectId) {
       return;
     }
     
-    // Cancel any existing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -143,37 +139,22 @@ export default function ProjectMemberDropdown({
     const currentController = abortControllerRef.current;
     
     setLoading(true);
-    console.log('🔄 [ProjectMemberDropdown] Fetching members for project:', projectId);
     
     try {
       const data = await getProjectMembers(projectId);
       
       // Check if component is still mounted and request wasn't aborted
       if (!isMountedRef.current || currentController.signal.aborted) {
-        console.log('🚫 [ProjectMemberDropdown] Request aborted or component unmounted');
         return;
       }
       
-      const membersList = (data || []).map((pm: any) => {
-        const user = pm.user || {};
-        return {
-          id: pm.id || '',
-          user: {
-            id: user.id || '',
-            email: user.email || '',
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            username: user.username || '',
-            avatar: user.avatar || '',
-          },
-          role: pm.role || '',
-        };
-      });
+      const membersList = data || [];
       setMembers(membersList);
+      
       // Cache the results
       membersCache.current.set(projectId, membersList);
       lastFetchedProjectRef.current = projectId;
-      console.log('✅ [ProjectMemberDropdown] Successfully fetched and cached members:', membersList.length);
+      
     } catch (error) {
       if (!currentController.signal.aborted && isMountedRef.current) {
         console.error("Failed to fetch project members:", error);
@@ -275,8 +256,8 @@ export default function ProjectMemberDropdown({
                   {unassignText}
                 </button>
               )}
-              {members.map((member) => {
-                const user = member.user || member;
+              {members.filter(member => member.user).map((member) => {
+                const user = member.user!;
                 return (
                   <button
                     key={user.id}

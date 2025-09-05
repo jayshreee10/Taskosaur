@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OrganizationRole, Organization } from '@prisma/client';
-import { DEFAULT_WORKFLOW, DEFAULT_TASK_STATUSES, DEFAULT_STATUS_TRANSITIONS } from '../constants/defaultWorkflow';
+import { Role as OrganizationRole, Organization } from '@prisma/client';
+import {
+  DEFAULT_WORKFLOW,
+  DEFAULT_TASK_STATUSES,
+  DEFAULT_STATUS_TRANSITIONS,
+} from '../constants/defaultWorkflow';
 
 @Injectable()
 export class OrganizationsSeederService {
@@ -55,8 +59,10 @@ export class OrganizationsSeederService {
           'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=150',
         ownerId:
           users.find((user) => user.role === 'MANAGER')?.id || users[1]?.id,
-        createdBy: users.find((user) => user.role === 'MANAGER')?.id || users[1]?.id,
-        updatedBy: users.find((user) => user.role === 'MANAGER')?.id || users[1]?.id,
+        createdBy:
+          users.find((user) => user.role === 'MANAGER')?.id || users[1]?.id,
+        updatedBy:
+          users.find((user) => user.role === 'MANAGER')?.id || users[1]?.id,
         settings: {
           allowPublicSignup: true,
           defaultUserRole: 'VIEWER',
@@ -90,7 +96,7 @@ export class OrganizationsSeederService {
                 createdBy: orgData.createdBy,
                 updatedBy: orgData.updatedBy,
                 statuses: {
-                  create: DEFAULT_TASK_STATUSES.map(status => ({
+                  create: DEFAULT_TASK_STATUSES.map((status) => ({
                     name: status.name,
                     color: status.color,
                     category: status.category,
@@ -121,9 +127,11 @@ export class OrganizationsSeederService {
           await this.createDefaultStatusTransitions(
             defaultWorkflow.id,
             defaultWorkflow.statuses,
-            orgData.createdBy
+            orgData.createdBy,
           );
-          console.log(`   ✓ Created default workflow and transitions for: ${organization.name}`);
+          console.log(
+            `   ✓ Created default workflow and transitions for: ${organization.name}`,
+          );
         }
 
         // Add organization members
@@ -153,25 +161,26 @@ export class OrganizationsSeederService {
 
   // Helper method to create status transitions
   private async createDefaultStatusTransitions(
-    workflowId: string, 
-    statuses: any[], 
-    userId: string
+    workflowId: string,
+    statuses: any[],
+    userId: string,
   ) {
     // Create a map of status names to IDs
-    const statusMap = new Map(statuses.map(status => [status.name, status.id]));
+    const statusMap = new Map(
+      statuses.map((status) => [status.name, status.id]),
+    );
 
-    const transitionsToCreate = DEFAULT_STATUS_TRANSITIONS
-      .filter(transition => 
-        statusMap.has(transition.from) && statusMap.has(transition.to)
-      )
-      .map(transition => ({
-        name: `${transition.from} → ${transition.to}`,
-        workflowId,
-        fromStatusId: statusMap.get(transition.from),
-        toStatusId: statusMap.get(transition.to),
-        createdBy: userId,
-        updatedBy: userId,
-      }));
+    const transitionsToCreate = DEFAULT_STATUS_TRANSITIONS.filter(
+      (transition) =>
+        statusMap.has(transition.from) && statusMap.has(transition.to),
+    ).map((transition) => ({
+      name: `${transition.from} → ${transition.to}`,
+      workflowId,
+      fromStatusId: statusMap.get(transition.from),
+      toStatusId: statusMap.get(transition.to),
+      createdBy: userId,
+      updatedBy: userId,
+    }));
 
     if (transitionsToCreate.length > 0) {
       await this.prisma.statusTransition.createMany({
@@ -183,7 +192,7 @@ export class OrganizationsSeederService {
   private async addMembersToOrganization(organizationId: string, users: any[]) {
     // Define roles for users (first user is owner, already created)
     const memberRoles = [
-      OrganizationRole.ADMIN, // Second user
+      OrganizationRole.OWNER, // Second user
       OrganizationRole.MANAGER, // Third user
       OrganizationRole.MEMBER, // Fourth user
       OrganizationRole.MEMBER, // Fifth user

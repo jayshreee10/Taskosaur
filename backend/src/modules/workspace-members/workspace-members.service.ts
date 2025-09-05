@@ -7,8 +7,8 @@ import {
 } from '@nestjs/common';
 import {
   WorkspaceMember,
-  WorkspaceRole,
-  OrganizationRole,
+  Role as WorkspaceRole,
+  Role as OrganizationRole,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -320,10 +320,9 @@ export class WorkspaceMembersService {
 
     // Permission check: organization owner, org admins, or workspace admins can update
     const isOrgOwner = member.workspace.organization.ownerId === requestUserId;
-    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.ADMIN;
+    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.OWNER;
     const isWorkspaceAdmin =
-      requesterWorkspaceMember?.role === WorkspaceRole.ADMIN;
-
+      requesterWorkspaceMember?.role === WorkspaceRole.OWNER;
     if (!isOrgOwner && !isOrgAdmin && !isWorkspaceAdmin) {
       throw new ForbiddenException(
         'Only organization owners/admins or workspace admins can update member roles',
@@ -399,9 +398,9 @@ export class WorkspaceMembersService {
     // Users can remove themselves, or admins can remove others
     const isSelfRemoval = member.userId === requestUserId;
     const isOrgOwner = member.workspace.organization.ownerId === requestUserId;
-    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.ADMIN;
+    const isOrgAdmin = requesterOrgMember?.role === OrganizationRole.OWNER;
     const isWorkspaceAdmin =
-      requesterWorkspaceMember?.role === WorkspaceRole.ADMIN;
+      requesterWorkspaceMember?.role === WorkspaceRole.OWNER;
 
     if (!isSelfRemoval && !isOrgOwner && !isOrgAdmin && !isWorkspaceAdmin) {
       throw new ForbiddenException(

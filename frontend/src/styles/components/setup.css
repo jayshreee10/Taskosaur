@@ -1,0 +1,18 @@
+/* Setup Components Styles */
+
+/* ===== Setup Checker ===== */
+.setup-checker-loading-container {
+  @apply min-h-screen flex items-center justify-center bg-gray-50;
+}
+
+.setup-checker-loading-content {
+  @apply text-center;
+}
+
+.setup-checker-loading-spinner {
+  @apply animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4;
+}
+
+.setup-checker-loading-text {
+  @apply text-gray-600;
+}

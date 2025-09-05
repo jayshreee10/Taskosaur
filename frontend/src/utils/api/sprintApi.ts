@@ -1,92 +1,11 @@
 import api from "@/lib/api";
-
-export type SprintStatus = "PLANNING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-
-export interface Sprint {
-  id: string;
-  name: string;
-  description?: string;
-  startDate?: string;
-  endDate?: string;
-  status: SprintStatus;
-  projectId: string;
-  createdBy: string;
-  updatedBy: string;
-  createdAt: string;
-  updatedAt: string;
-  _count?: {
-    tasks: number;
-    completedTasks: number;
-    inProgressTasks: number;
-    todoTasks: number;
-  };
-  project?: Project;
-  tasks?: Task[];
-  creator?: User;
-  updater?: User;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  key: string;
-  description?: string;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  key: string;
-  priority: string;
-  statusId: string;
-  assigneeId?: string;
-  sprintId?: string;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  username: string;
-  avatar?: string;
-}
-
-export interface CreateSprintData {
-  name: string;
-  description?: string;
-  startDate?: string;
-  endDate?: string;
-  projectId: string;
-}
-
-export interface UpdateSprintData {
-  name?: string;
-  description?: string;
-  startDate?: string;
-  endDate?: string;
-  status?: SprintStatus;
-}
-
-export interface SprintFilters {
-  projectId?: string;
-  status?: SprintStatus;
-}
-
-export interface SprintStats {
-  totalTasks: number;
-  completedTasks: number;
-  inProgressTasks: number;
-  todoTasks: number;
-  completionRate: number;
-  daysRemaining?: number;
-  isOverdue: boolean;
-}
+import { CreateSprintData, Sprint, SprintFilters, SprintStats, SprintStatus, UpdateSprintData } from "@/types";
 
 export const sprintApi = {
   // Sprint CRUD operations
   createSprint: async (sprintData: CreateSprintData): Promise<Sprint> => {
     try {
+      
       const response = await api.post<Sprint>("/sprints", sprintData);
       return response.data;
     } catch (error) {
@@ -99,10 +18,10 @@ export const sprintApi = {
     try {
       const params = new URLSearchParams();
       
-      if (filters.projectId) params.append('projectId', filters.projectId);
+      if (filters.slug) params.append('slug', filters.slug);
       if (filters.status) params.append('status', filters.status);
 
-      const response = await api.get<Sprint[]>(`/sprints?${params.toString()}`);
+      const response = await api.get<Sprint[]>(`/sprints/slug?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error("Get sprints error:", error);
@@ -193,9 +112,10 @@ export const sprintApi = {
   },
 
   // Sprint filtering and querying
-  getSprintsByProject: async (projectId: string): Promise<Sprint[]> => {
+  getSprintsByProject: async (slug: string): Promise<Sprint[]> => {
     try {
-      return await sprintApi.getSprints({ projectId });
+      
+      return await sprintApi.getSprints({ slug });
     } catch (error) {
       console.error("Get sprints by project error:", error);
       throw error;

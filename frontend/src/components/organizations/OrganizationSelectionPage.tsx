@@ -1,4 +1,4 @@
-"use client";
+;
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -19,7 +19,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Organization } from '@/utils/api';
+import { Organization } from '@/types';
 import OrganizationSelectionCard from './OrganizationSelectionCard';
 import OrganizationCreationForm from './OrganizationCreationForm';
 
@@ -29,7 +29,7 @@ export default function OrganizationSelectionPage() {
     organizations, 
     isLoading, 
     error, 
-    getOrganizationsByUser, 
+    getUserOrganizations, 
     setCurrentOrganization,
     clearError 
   } = useOrganization();
@@ -48,11 +48,11 @@ export default function OrganizationSelectionPage() {
         throw new Error('User not authenticated');
       }
 
-      await getOrganizationsByUser(currentUser.id);
+      await getUserOrganizations(currentUser.id);
     } catch (err) {
       console.error('Error fetching organizations:', err);
     }
-  }, [getCurrentUser, getOrganizationsByUser, clearError]);
+  }, [getCurrentUser, getUserOrganizations, clearError]);
 
   useEffect(() => {
     fetchOrganizations();

@@ -1,38 +1,19 @@
-"use client";
-
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertTriangle } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { CreateWorkflowData } from "@/utils/api/workflowsApi";
-import { Workflow } from "@/utils/api/organizationApi";
-
-
-// Import types
+import { Label } from "@/components/ui/label";
+import { HiCog, HiSparkles, HiDocumentText, HiExclamationTriangle } from "react-icons/hi2";
+import ActionButton from "@/components/common/ActionButton";
+import { CreateWorkflowData, Workflow } from "@/types";
 
 interface CreateWorkflowFormProps {
   isOpen: boolean;
@@ -43,21 +24,6 @@ interface CreateWorkflowFormProps {
   isLoading?: boolean;
 }
 
-// Validation schema
-const createWorkflowSchema = z.object({
-  name: z.string()
-    .min(1, "Workflow name is required")
-    .min(3, "Workflow name must be at least 3 characters")
-    .max(50, "Workflow name must be less than 50 characters")
-    .regex(/^[a-zA-Z0-9\s\-_]+$/, "Workflow name can only contain letters, numbers, spaces, hyphens, and underscores"),
-  description: z.string()
-    .max(200, "Description must be less than 200 characters")
-    .optional(),
-  isDefault: z.boolean().optional(),
-});
-
-type CreateWorkflowFormData = z.infer<typeof createWorkflowSchema>;
-
 export default function CreateWorkflowForm({
   isOpen,
   onClose,
@@ -66,19 +32,40 @@ export default function CreateWorkflowForm({
   isProjectLevel = false,
   isLoading = false,
 }: CreateWorkflowFormProps) {
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    isDefault: false,
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm<CreateWorkflowFormData>({
-    resolver: zodResolver(createWorkflowSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      isDefault: false,
-    },
-  });
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = "Workflow name is required";
+    } else if (formData.name.trim().length < 3) {
+      newErrors.name = "Workflow name must be at least 3 characters";
+    } else if (formData.name.trim().length > 50) {
+      newErrors.name = "Workflow name must be less than 50 characters";
+    } else if (!/^[a-zA-Z0-9\s\-_]+$/.test(formData.name.trim())) {
+      newErrors.name = "Workflow name can only contain letters, numbers, spaces, hyphens, and underscores";
+    }
 
-  const handleSubmit = async (data: CreateWorkflowFormData) => {
+    if (formData.description && formData.description.length > 200) {
+      newErrors.description = "Description must be less than 200 characters";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -88,22 +75,16 @@ export default function CreateWorkflowForm({
       }
 
       const workflowData: CreateWorkflowData = {
-        name: data.name.trim(),
-        description: data.description?.trim() || undefined,
+        name: formData.name.trim(),
+        description: formData.description?.trim() || undefined,
         organizationId,
-        isDefault: data.isDefault || false,
+        isDefault: formData.isDefault || false,
       };
 
-      console.log("🆕 CreateWorkflowForm: Submitting workflow data:", workflowData);
-
-      const newWorkflow = await onSuccess(workflowData);
-      console.log("✅ CreateWorkflowForm: Workflow created successfully:", newWorkflow);
-
-      // Reset form and close
-      form.reset();
-      onClose();
+      await onSuccess(workflowData);
+      handleClose();
     } catch (err) {
-      console.error("❌ CreateWorkflowForm: Failed to create workflow:", err);
+      console.error("Failed to create workflow:", err);
       setError(err instanceof Error ? err.message : "Failed to create workflow");
     } finally {
       setIsSubmitting(false);
@@ -113,151 +94,177 @@ export default function CreateWorkflowForm({
   const handleClose = () => {
     if (isSubmitting) return;
     
-    form.reset();
+    setFormData({
+      name: "",
+      description: "",
+      isDefault: false,
+    });
+    setErrors({});
     setError(null);
     onClose();
   };
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      handleClose();
-    }
-  };
+  const isValid = formData.name.trim().length >= 3 && organizationId;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[525px] bg-[var(--card)] border-[var(--border)]">
-        <DialogHeader>
-          <DialogTitle className="text-[var(--foreground)]">
-            Create {isProjectLevel ? "Project" : ""} Workflow
-          </DialogTitle>
-          <DialogDescription className="text-[var(--muted-foreground)]">
-            {isProjectLevel 
-              ? "Create a new workflow for this project. This will define the task statuses and flow for project tasks."
-              : "Create a new workflow template. This can be used across multiple projects in your organization."
-            }
-          </DialogDescription>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="projects-modal-container border-none">
+        <DialogHeader className="projects-modal-header">
+          <div className="projects-modal-header-content">
+            <div className="projects-modal-icon bg-[var(--primary)]">
+              <HiCog className="projects-modal-icon-content" />
+            </div>
+            <div className="projects-modal-info">
+              <DialogTitle className="projects-modal-title">
+                Create {isProjectLevel ? "project" : ""} workflow
+              </DialogTitle>
+              <DialogDescription className="projects-modal-description">
+                {isProjectLevel 
+                  ? "Create a new workflow for this project to define task statuses and flow"
+                  : "Create a new workflow template for use across multiple projects"
+                }
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            {/* Error Alert */}
-            {error && (
-              <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  {error}
-                </AlertDescription>
-              </Alert>
+        <form onSubmit={handleSubmit} className="projects-modal-form">
+          {/* Error Alert */}
+          {error && (
+            <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
+              <HiExclamationTriangle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Workflow Name */}
+          <div className="projects-form-field">
+            <Label htmlFor="name" className="projects-form-label">
+              <HiSparkles 
+                className="projects-form-label-icon" 
+                style={{ color: 'hsl(var(--primary))' }}
+              />
+              Workflow name <span className="projects-form-label-required">*</span>
+            </Label>
+            <Input
+              id="name"
+              placeholder="e.g., Development Workflow, Bug Triage Process"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              className="projects-form-input border-none"
+              style={{
+                '--tw-ring-color': 'hsl(var(--primary) / 0.2)',
+              } as any}
+              onFocus={(e) => {
+                e.target.style.boxShadow = 'none';
+              }}
+              onBlur={(e) => {
+                e.target.style.boxShadow = 'none';
+              }}
+              autoFocus
+              disabled={isSubmitting || isLoading}
+            />
+            <p className="projects-form-hint">
+              <HiSparkles 
+                className="projects-form-hint-icon" 
+                style={{ color: 'hsl(var(--primary))' }}
+              />
+              Choose a clear, descriptive name for your workflow.
+            </p>
+            {errors.name && (
+              <p className="text-sm text-[var(--destructive)] mt-1">{errors.name}</p>
             )}
+          </div>
 
-            {/* Workflow Name */}
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-[var(--foreground)]">
-                    Workflow Name *
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="e.g., Development Workflow, Bug Triage Process"
-                      disabled={isSubmitting || isLoading}
-                      className="bg-[var(--background)] border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-                    />
-                  </FormControl>
-                  <FormDescription className="text-[var(--muted-foreground)]">
-                    Choose a clear, descriptive name for your workflow
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+          {/* Description */}
+          <div className="projects-form-field">
+            <Label htmlFor="description" className="projects-form-label">
+              <HiDocumentText 
+                className="projects-form-label-icon" 
+                style={{ color: 'hsl(var(--primary))' }}
+              />
+              Description
+            </Label>
+            <Textarea
+              id="description"
+              placeholder="Describe the purpose and usage of this workflow..."
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="projects-form-textarea border-none"
+              rows={3}
+              onFocus={(e) => {
+                e.target.style.boxShadow = 'none';
+              }}
+              onBlur={(e) => {
+                e.target.style.boxShadow = 'none';
+              }}
+              disabled={isSubmitting || isLoading}
             />
+            <p className="projects-form-hint">
+              <HiDocumentText 
+                className="projects-form-hint-icon" 
+                style={{ color: 'hsl(var(--primary))' }}
+              />
+              Provide context about when and how this workflow should be used.
+            </p>
+            {errors.description && (
+              <p className="text-sm text-[var(--destructive)] mt-1">{errors.description}</p>
+            )}
+          </div>
 
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-[var(--foreground)]">
-                    Description
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Describe the purpose and usage of this workflow..."
-                      disabled={isSubmitting || isLoading}
-                      className="bg-[var(--background)] border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] min-h-[80px] resize-none"
-                      rows={3}
-                    />
-                  </FormControl>
-                  <FormDescription className="text-[var(--muted-foreground)]">
-                    Optional: Provide context about when and how this workflow should be used
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Set as Default */}
-            <FormField
-              control={form.control}
-              name="isDefault"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-[var(--border)] p-4 bg-[var(--muted)]/30">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isSubmitting || isLoading}
-                      className="border-[var(--border)]"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="text-[var(--foreground)] font-medium">
-                      Set as default workflow
-                    </FormLabel>
-                    <FormDescription className="text-[var(--muted-foreground)]">
-                      {isProjectLevel 
-                        ? "This workflow will be used by default for new tasks in this project"
-                        : "This workflow will be used by default for new projects in your organization"
-                      }
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter className="flex flex-col sm:flex-row gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
+          {/* Set as Default */}
+          <div className="projects-form-field">
+            <div className="flex items-start space-x-3 rounded-md border border-[var(--border)] p-4 bg-[var(--muted)]/30">
+              <Checkbox
+                id="isDefault"
+                checked={formData.isDefault}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isDefault: checked as boolean }))}
                 disabled={isSubmitting || isLoading}
-                className="bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || isLoading || !organizationId}
-                className="bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90"
-              >
-                {isSubmitting || isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create Workflow"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                className="border-[var(--border)] mt-1"
+              />
+              <div className="space-y-1 leading-none">
+                <Label 
+                  htmlFor="isDefault" 
+                  className="text-[var(--foreground)] font-medium cursor-pointer"
+                >
+                  Set as default workflow
+                </Label>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  {isProjectLevel 
+                    ? "This workflow will be used by default for new tasks in this project"
+                    : "This workflow will be used by default for new projects in your organization"
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Buttons */}
+          <div className="projects-form-actions flex gap-2 justify-end mt-6">
+            <ActionButton
+              type="button"
+              secondary
+              onClick={handleClose}
+              disabled={isSubmitting || isLoading}
+            >
+              Cancel
+            </ActionButton>
+            <ActionButton
+              type="submit"
+              primary
+              disabled={!isValid || isSubmitting || isLoading}
+            >
+              {isSubmitting || isLoading ? (
+                <>
+                  <div className="animate-spin -ml-1 mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                  Creating...
+                </>
+              ) : (
+                "Create"
+              )}
+            </ActionButton>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

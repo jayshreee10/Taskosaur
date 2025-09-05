@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { useOrganization } from "@/contexts/organization-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,9 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import {
-  Clock,
   Play,
-  CheckCircle,
   ArrowRight,
   GripVertical,
   RotateCcw,
@@ -24,12 +20,10 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
-
-// Import your existing types
-import { Workflow } from "@/utils/api/organizationApi";
-import { TaskStatus } from "@/utils/api/taskStatusApi";
-import { StatusCategory } from "@/types/workflow";
-
+import { StatusCategory, TaskStatus, Workflow } from "@/types";
+import { toast } from "sonner";
+import ConfirmationModal from "../modals/ConfirmationModal";
+import Tooltip from "../common/ToolTip";
 interface WorkflowEditorProps {
   workflow: Workflow;
   onUpdate: (workflow: any) => void;
@@ -48,12 +42,8 @@ export default function WorkflowEditor({
   isUpdating = false,
 }: WorkflowEditorProps) {
   const { updateWorkflow, updateTaskStatusPositions } = useOrganization();
-
-  // State for drag and drop
   const [draggedStatus, setDraggedStatus] = useState<TaskStatus | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-
-  // State for workflow details editing
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [detailsFormData, setDetailsFormData] =
     useState<WorkflowDetailsFormData>({
@@ -65,12 +55,11 @@ export default function WorkflowEditor({
     {}
   );
   const [isSavingDetails, setIsSavingDetails] = useState(false);
-
-  // State for status reordering
   const [hasStatusChanges, setHasStatusChanges] = useState(false);
   const [isSavingStatuses, setIsSavingStatuses] = useState(false);
+  const [resetToDefaultConfirmation, setResetToDefaultConfirmation] =
+    useState(false);
 
-  // Update form data when workflow changes
   useEffect(() => {
     setDetailsFormData({
       name: workflow.name,
@@ -79,7 +68,6 @@ export default function WorkflowEditor({
     });
   }, [workflow]);
 
-  // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, status: TaskStatus) => {
     e.dataTransfer.effectAllowed = "move";
     setDraggedStatus(status);
@@ -99,7 +87,6 @@ export default function WorkflowEditor({
     setDragOverIndex(null);
   };
 
-  // Fix the handleDrop function
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
 
@@ -114,11 +101,10 @@ export default function WorkflowEditor({
     const [movedStatus] = newStatuses.splice(currentIndex, 1);
     newStatuses.splice(targetIndex, 0, movedStatus);
 
-    // ✅ Fix: Update position values consistently (use position, not order)
     const updatedStatuses = newStatuses.map((status, index) => ({
       ...status,
-      position: index, // ✅ Use position and 0-based indexing
-      order: index + 1, // Keep order as well for backward compatibility
+      position: index,
+      order: index + 1,
     }));
 
     const updatedWorkflow = {
@@ -129,24 +115,9 @@ export default function WorkflowEditor({
     onUpdate(updatedWorkflow);
     setHasStatusChanges(true);
     setDragOverIndex(null);
-
-    // Remove alert for better UX
-    console.log(
-      `Status Reordered: Moved "${draggedStatus.name}" to position ${targetIndex}`
-    );
   };
 
-  // Fix the handleResetToDefault function
   const handleResetToDefault = () => {
-    if (
-      !confirm(
-        "Are you sure you want to reset the workflow to default order? This will undo any custom ordering."
-      )
-    ) {
-      return;
-    }
-
-    // ✅ Fix: Use category field correctly
     const categoryOrder: Record<StatusCategory, number> = {
       TODO: 1,
       IN_PROGRESS: 2,
@@ -155,9 +126,10 @@ export default function WorkflowEditor({
 
     const resetStatuses = [...(workflow.statuses ?? [])]
       .sort((a, b) => {
-        // ✅ Fix: Use category field, not name field
-        const aPriority = categoryOrder[a.category] ?? 999;
-        const bPriority = categoryOrder[b.category] ?? 999;
+        const aCat = a.category ?? "TODO";
+        const bCat = b.category ?? "TODO";
+        const aPriority = categoryOrder[aCat as StatusCategory] ?? 999;
+        const bPriority = categoryOrder[bCat as StatusCategory] ?? 999;
 
         if (aPriority !== bPriority) {
           return aPriority - bPriority;
@@ -166,8 +138,8 @@ export default function WorkflowEditor({
       })
       .map((status, index) => ({
         ...status,
-        position: index, // ✅ Use position with 0-based indexing
-        order: index + 1, // Keep order for backward compatibility
+        position: index,
+        order: index + 1,
       }));
 
     const updatedWorkflow = {
@@ -177,22 +149,17 @@ export default function WorkflowEditor({
 
     onUpdate(updatedWorkflow);
     setHasStatusChanges(true);
-
-    console.log("Workflow Reset: Workflow has been reset to default order");
+    setResetToDefaultConfirmation(false);
   };
 
-  // Fix the handleSaveStatusOrder function
   const handleSaveStatusOrder = async () => {
     try {
       setIsSavingStatuses(true);
 
-      // ✅ Fix: Use consistent position field
       const statusUpdates = sortedStatuses.map((status, index) => ({
         id: status.id,
-        position: index, // ✅ Use current sorted index as position
+        position: index,
       }));
-
-      console.log("💾 Saving status order changes:", statusUpdates);
 
       const updatedStatuses = await updateTaskStatusPositions(statusUpdates);
 
@@ -203,11 +170,9 @@ export default function WorkflowEditor({
 
       onUpdate(updatedWorkflow);
       setHasStatusChanges(false);
-
-      console.log("Status order saved successfully");
+      toast.success("Status order updated successfully!");
     } catch (error) {
-      console.error("❌ Failed to save status order:", error);
-      alert(
+      toast.error(
         error instanceof Error ? error.message : "Failed to save status order"
       );
     } finally {
@@ -215,9 +180,6 @@ export default function WorkflowEditor({
     }
   };
 
-  // ✅ Fix: Ensure consistent sorting
-
-  // Workflow details handlers
   const validateDetailsForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -254,19 +216,14 @@ export default function WorkflowEditor({
         isDefault: detailsFormData.isDefault,
       };
 
-      console.log("🔄 Updating workflow details:", updateData);
-
       const updatedWorkflow = await updateWorkflow(workflow.id, updateData);
 
-      // Update local state
-      onUpdate(updatedWorkflow);
+      onUpdate({ ...updatedWorkflow, statuses: workflow.statuses || [] });
       setIsEditingDetails(false);
 
-      alert("Workflow details updated successfully");
-      console.log("Workflow details updated successfully");
+      toast.success("Workflow details updated successfully");
     } catch (error) {
-      console.error("❌ Failed to update workflow details:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Failed to update workflow details"
@@ -287,33 +244,6 @@ export default function WorkflowEditor({
     setIsEditingDetails(false);
   };
 
-  // Helper functions
-  const getCategoryColor = (category: StatusCategory) => {
-    switch (category) {
-      case "TODO":
-        return "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]";
-      case "IN_PROGRESS":
-        return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800";
-      case "DONE":
-        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800";
-      default:
-        return "bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]";
-    }
-  };
-
-  const getStatusIcon = (category: StatusCategory) => {
-    switch (category) {
-      case "TODO":
-        return <Clock className="w-4 h-4 text-[var(--muted-foreground)]" />;
-      case "IN_PROGRESS":
-        return <Play className="w-4 h-4 text-blue-500" />;
-      case "DONE":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-[var(--muted-foreground)]" />;
-    }
-  };
-
   const sortedStatuses = Array.isArray(workflow.statuses)
     ? [...workflow.statuses].sort(
         (a, b) => (a.position ?? 0) - (b.position ?? 0)
@@ -325,27 +255,26 @@ export default function WorkflowEditor({
       {/* Workflow Details Section */}
       <Card className="bg-[var(--card)] border-[var(--border)]">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-lg font-semibold text-[var(--foreground)]">
+          <CardTitle className="text-md font-semibold text-[var(--foreground)]">
             Workflow Details
           </CardTitle>
           {!isEditingDetails && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditingDetails(true)}
-              disabled={isUpdating}
-              className="flex items-center gap-2 bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]"
-            >
-              <Edit3 className="w-4 h-4" />
-              Edit Details
-            </Button>
+            <Tooltip content="Edit details" position="top" color="primary">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditingDetails(true)}
+                disabled={isUpdating}
+                className="flex items-center gap-2 bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]"
+              >
+                <Edit3 className="w-4 h-4" />
+              </Button>
+            </Tooltip>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
           {isEditingDetails ? (
-            // Edit Form
             <div className="space-y-4">
-              {/* Workflow Name */}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-[var(--foreground)]">
                   Workflow Name *
@@ -370,7 +299,6 @@ export default function WorkflowEditor({
                 )}
               </div>
 
-              {/* Description */}
               <div className="space-y-2">
                 <Label
                   htmlFor="description"
@@ -389,7 +317,7 @@ export default function WorkflowEditor({
                   }
                   placeholder="Enter workflow description"
                   disabled={isSavingDetails}
-                  className="bg-[var(--background)] border-[var(--border)] text-[var(--foreground)] min-h-[80px] resize-none"
+                  className="bg-[var(--background)] border-[var(--border)] text-[var(--foreground)] min-h-[80px]"
                   rows={3}
                 />
                 {detailsErrors.description && (
@@ -411,9 +339,12 @@ export default function WorkflowEditor({
                     })
                   }
                   disabled={isSavingDetails}
-                  className="border-[var(--border)]"
+                  className="border-[var(--border)] cursor-pointer"
                 />
-                <Label htmlFor="isDefault" className="text-[var(--foreground)]">
+                <Label
+                  htmlFor="isDefault"
+                  className="text-[var(--foreground)] cursor-pointer"
+                >
                   Set as default workflow
                 </Label>
               </div>
@@ -432,7 +363,7 @@ export default function WorkflowEditor({
                     </>
                   ) : (
                     <>
-                      <Save className="w-4 h-4 mr-2" />
+                      <Save className="w-4 h-4" />
                       Save Details
                     </>
                   )}
@@ -443,17 +374,16 @@ export default function WorkflowEditor({
                   disabled={isSavingDetails}
                   className="bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]"
                 >
-                  <X className="w-4 h-4 mr-2" />
+                  <X className="w-4 h-4" />
                   Cancel
                 </Button>
               </div>
             </div>
           ) : (
-            // Display Mode
             <div className="space-y-3">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-medium text-[var(--foreground)]">
+                  <h3 className="text-md font-medium text-[var(--foreground)]">
                     {workflow.name}
                   </h3>
                   {workflow.isDefault && (
@@ -465,7 +395,7 @@ export default function WorkflowEditor({
                     </Badge>
                   )}
                 </div>
-                <p className="text-[var(--muted-foreground)]">
+                <p className="text-[var(--muted-foreground)] text-sm">
                   {workflow.description || "No description provided"}
                 </p>
               </div>
@@ -486,87 +416,16 @@ export default function WorkflowEditor({
         </CardContent>
       </Card>
 
-      {/* Visual Editor Header */}
-      <Card className="bg-[var(--card)] border-[var(--border)] p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-              Visual Status Flow Editor
-            </h3>
-            <p className="text-[var(--muted-foreground)] mb-4">
-              Drag and drop statuses to reorder them. The order defines the
-              typical flow of tasks through your workflow.
-            </p>
-
-            {/* Legend */}
-            <div className="flex items-center space-x-6 text-sm">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-[var(--muted-foreground)] rounded-full"></div>
-                <span className="text-[var(--muted-foreground)]">To Do</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-[var(--muted-foreground)]">
-                  In Progress
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-[var(--muted-foreground)]">Done</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {hasStatusChanges && (
-              <Button
-                onClick={handleSaveStatusOrder}
-                disabled={isSavingStatuses || isUpdating}
-                className="bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90"
-              >
-                {isSavingStatuses ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Order
-                  </>
-                )}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetToDefault}
-              disabled={
-                isUpdating ||
-                isSavingStatuses ||
-                !Array.isArray(workflow.statuses) ||
-                workflow.statuses.length === 0
-              }
-              className="flex items-center gap-2 bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset to Default
-            </Button>
-          </div>
-        </div>
-      </Card>
-
       {/* Status Changes Alert */}
       {hasStatusChanges && (
         <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+          <AlertTriangle className="h-4 w-4 text-yellow-800" />
+          <AlertDescription className="text-yellow-600">
             You have unsaved changes to the status order. Don't forget to save
             your changes.
           </AlertDescription>
         </Alert>
       )}
-
       {/* Workflow Visual */}
       <Card className="bg-[var(--card)] border-[var(--border)] p-6">
         {sortedStatuses.length === 0 ? (
@@ -582,91 +441,155 @@ export default function WorkflowEditor({
             </p>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-4 overflow-x-auto">
-            {sortedStatuses.map((status, index) => (
-              <React.Fragment key={status.id}>
-                <div
-                  className={`flex-shrink-0 w-64 p-4 border-2 border-dashed rounded-lg cursor-move transition-all ${
-                    dragOverIndex === index
-                      ? "border-[var(--primary)] bg-[var(--primary)]/10"
-                      : "border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--accent)]"
-                  } ${
-                    draggedStatus?.id === status.id
-                      ? "opacity-50 rotate-1 scale-105"
-                      : ""
-                  }`}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, status)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, index)}
+          <div>
+            <div className="block mb-2 md:flex items-center gap-2 justify-between ">
+              <h3 className="text-md font-semibold text-[var(--foreground)]">
+                Visual Status Flow Editor
+              </h3>
+              <div className="flex gap-2">
+                <Tooltip
+                  content="Reset to Default"
+                  position="top"
+                  color="primary"
                 >
-                  {/* Status Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className="w-4 h-4 rounded-full border border-[var(--border)]"
-                        style={{ backgroundColor: status.color }}
-                      />
-                      <span className="font-medium text-[var(--foreground)] truncate">
-                        {status.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(status.category)}
-                      <span className="text-sm text-[var(--muted-foreground)]">
-                        #{status.position ?? status.order ?? index}{" "}
-                        {/* ✅ Show position or fallback to order/index */}
-                      </span>
-                      <GripVertical className="w-4 h-4 text-[var(--muted-foreground)]" />
-                    </div>
-                  </div>
-
-                  {/* Status Details */}
-                  <div className="space-y-2">
-                    <Badge
-                      variant="secondary"
-                      className={`text-xs rounded-full ${getCategoryColor(
-                        status.category
-                      )}`}
-                    >
-                      {status.category.replace("_", " ")}
-                    </Badge>
-
-                    <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)]">
-                      <span>{status.isDefault ? "Default" : "Custom"}</span>
-                      <div className="flex items-center space-x-1">
-                        <GripVertical className="w-3 h-3" />
-                        <span>Drag to reorder</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Arrow */}
-                {index < sortedStatuses.length - 1 && (
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-full min-h-[120px]">
-                    <ArrowRight className="w-6 h-6 text-[var(--muted-foreground)]" />
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setResetToDefaultConfirmation(true)}
+                    disabled={
+                      isUpdating ||
+                      isSavingStatuses ||
+                      !Array.isArray(workflow.statuses) ||
+                      workflow.statuses.length === 0
+                    }
+                    className="flex items-center gap-2 bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                {hasStatusChanges && (
+                  <Button
+                    onClick={handleSaveStatusOrder}
+                    disabled={isSavingStatuses || isUpdating}
+                    className="h-8 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90  transition-all duration-200 font-medium"
+                    variant="outline"
+                  >
+                    {isSavingStatuses ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Order
+                      </>
+                    )}
+                  </Button>
                 )}
-              </React.Fragment>
-            ))}
+              </div>
+            </div>
+            <p className="text-[var(--muted-foreground)] text-sm mb-4">
+              Drag and drop statuses to reorder them. The order defines the
+              typical flow of tasks through your workflow.
+            </p>
+            <div className="overflow-x-auto">
+              <div className="flex gap-4 pb-4 min-w-max">
+                {sortedStatuses.map((status, index) => {
+                  const safeCategory = (status.category ??
+                    "TODO") as StatusCategory;
+                  const safePosition =
+                    typeof status.position === "number" ? status.position : 0;
+                  const safeStatus: TaskStatus = {
+                    ...status,
+                    category: safeCategory,
+                    position: safePosition,
+                    isDefault: !!status.isDefault,
+                    workflowId: status.workflowId ?? "",
+                    createdAt: status.createdAt ?? "",
+                    updatedAt: status.updatedAt ?? "",
+                  };
+                  return (
+                    <React.Fragment key={status.id}>
+                      <div
+                        className={`flex-shrink-0 w-48 sm:w-56 md:w-64 p-4 border-2 border-dashed rounded-lg cursor-move transition-all ${
+                          dragOverIndex === index
+                            ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/50 hover:bg-[var(--accent)]"
+                        } ${
+                          draggedStatus?.id === status.id
+                            ? "opacity-50 rotate-1 scale-105"
+                            : ""
+                        }`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, safeStatus)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, index)}
+                      >
+                        {/* Status Header */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <div
+                              className="w-4 h-4 rounded-full border border-[var(--border)] flex-shrink-0"
+                              style={{ backgroundColor: status.color }}
+                            />
+                            <span className="font-medium text-[var(--foreground)] truncate text-sm sm:text-base">
+                              {status.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                            <span className="text-xs sm:text-sm text-[var(--muted-foreground)]">
+                              #{safePosition}
+                            </span>
+                            <GripVertical className="w-3 h-3 sm:w-4 sm:h-4 text-[var(--muted-foreground)]" />
+                          </div>
+                        </div>
+
+                        {/* Status Details */}
+                        <div className="space-y-2 pt-6">
+                          <div className="flex items-center justify-between text-xs text-[var(--muted-foreground)]">
+                            <span>
+                              {status.isDefault ? "Default" : "Custom"}
+                            </span>
+                            <div className="hidden sm:flex items-center space-x-1">
+                              <GripVertical className="w-3 h-3" />
+                              <span className="hidden md:inline">
+                                Drag to reorder
+                              </span>
+                              <span className="md:hidden">Drag</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Arrow */}
+                      {index < sortedStatuses.length - 1 && (
+                        <div className="flex-shrink-0 flex items-center justify-center w-6 sm:w-8 h-full min-h-[120px]">
+                          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-[var(--muted-foreground)]" />
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </Card>
 
       {/* Workflow Rules */}
       <Card className="bg-[var(--card)] border-[var(--border)] p-6">
-        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">
+        <h3 className="text-md font-semibold text-[var(--foreground)] mb-4">
           Workflow Rules
         </h3>
         <div className="space-y-4">
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+          <div className="p-4 bg-[var(--category-blue-10)] rounded-lg border border-[var(--category-blue-20)]">
+            <h4 className="font-medium text-[var(--category-blue)] mb-2">
               Transition Rules
             </h4>
-            <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+            <ul className="text-sm text-[var(--category-blue-light)] space-y-1">
               <li>• Tasks can move forward to any subsequent status</li>
               <li>• Tasks can move backward to previous statuses</li>
               <li>• Some transitions may require specific permissions</li>
@@ -676,11 +599,11 @@ export default function WorkflowEditor({
             </ul>
           </div>
 
-          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-            <h4 className="font-medium text-yellow-900 dark:text-yellow-100 mb-2">
+          <div className="p-4 bg-[var(--category-lime-10)] rounded-lg border border-[var(--category-lime-20)]">
+            <h4 className="font-medium text-[var(--category-lime)] mb-2">
               Status Requirements
             </h4>
-            <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
+            <ul className="text-sm text-[var(--category-lime-light)] space-y-1">
               <li>• At least one status must be marked as default</li>
               <li>
                 • Each workflow must have at least one status in each category
@@ -691,6 +614,16 @@ export default function WorkflowEditor({
           </div>
         </div>
       </Card>
+
+      <ConfirmationModal
+        isOpen={resetToDefaultConfirmation}
+        onClose={() => setResetToDefaultConfirmation(false)}
+        onConfirm={() => handleResetToDefault()}
+        title="Reset to default"
+        message="Are you sure you want to reset the workflow to default order? This will undo any custom ordering."
+        confirmText="Reset to default"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

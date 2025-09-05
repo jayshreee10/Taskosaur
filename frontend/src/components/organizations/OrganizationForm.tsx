@@ -1,10 +1,10 @@
-'use client';
+;
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Organization, CreateOrganizationDto } from '@/types';
-import { createOrganization, updateOrganization } from '@/utils/apiUtils';
 import { Button } from '@/components/ui';
+import { organizationApi } from '@/utils/api';
 
 interface OrganizationFormProps {
   organization?: Organization;
@@ -98,9 +98,9 @@ export default function OrganizationForm({
       let result: Organization;
       
       if (isEditing) {
-        result = await updateOrganization(organization.id, formData);
+        result = await organizationApi.updateOrganization(organization.id, formData);
       } else {
-        result = await createOrganization(formData);
+        result = await organizationApi.createOrganization(formData);
       }
 
       if (onSuccess) {
@@ -117,9 +117,9 @@ export default function OrganizationForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    <form onSubmit={handleSubmit} className="organizations-form">
+      <div className="organizations-form-field">
+        <label htmlFor="name" className="form-label-primary">
           Organization Name *
         </label>
         <input
@@ -128,17 +128,17 @@ export default function OrganizationForm({
           name="name"
           value={formData.name}
           onChange={handleNameChange}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="form-input-primary"
           placeholder="Enter organization name"
           required
         />
         {errors.name && (
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+          <p className="form-error-text">{errors.name}</p>
         )}
       </div>
 
-      <div>
-        <label htmlFor="slug" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <div className="organizations-form-field">
+        <label htmlFor="slug" className="form-label-primary">
           Organization Slug *
         </label>
         <input
@@ -147,20 +147,20 @@ export default function OrganizationForm({
           name="slug"
           value={formData.slug}
           onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="form-input-primary"
           placeholder="organization-slug"
           required
         />
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="organizations-form-slug-hint">
           This will be used in your organization URL. Only lowercase letters, numbers, and hyphens are allowed.
         </p>
         {errors.slug && (
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.slug}</p>
+          <p className="form-error-text">{errors.slug}</p>
         )}
       </div>
 
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <div className="organizations-form-field">
+        <label htmlFor="description" className="form-label-primary">
           Description
         </label>
         <textarea
@@ -169,13 +169,13 @@ export default function OrganizationForm({
           rows={3}
           value={formData.description}
           onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="form-textarea-primary"
           placeholder="Describe your organization..."
         />
       </div>
 
-      <div>
-        <label htmlFor="website" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <div className="organizations-form-field">
+        <label htmlFor="website" className="form-label-primary">
           Website
         </label>
         <input
@@ -184,21 +184,21 @@ export default function OrganizationForm({
           name="website"
           value={formData.website}
           onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="form-input-primary"
           placeholder="https://your-website.com"
         />
         {errors.website && (
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.website}</p>
+          <p className="form-error-text">{errors.website}</p>
         )}
       </div>
 
       {errors.submit && (
-        <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-4">
-          <p className="text-sm text-red-700 dark:text-red-400">{errors.submit}</p>
+        <div className="form-error-box">
+          <p className="form-error-box-text">{errors.submit}</p>
         </div>
       )}
 
-      <div className="flex justify-end space-x-3">
+      <div className="organizations-form-actions">
         {onCancel && (
           <Button
             type="button"
@@ -211,7 +211,7 @@ export default function OrganizationForm({
         )}
         <Button
           type="submit"
-          loading={isLoading}
+          
           disabled={isLoading}
         >
           {isEditing ? 'Update Organization' : 'Create Organization'}

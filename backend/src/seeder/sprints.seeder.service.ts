@@ -20,11 +20,12 @@ export class SprintsSeederService {
     const createdSprints: Sprint[] = [];
 
     // Create sprints only for projects that use Scrum workflow
-    const scrumProjects = projects.filter(project => 
-      project.name.includes('Web Application') || 
-      project.name.includes('Backend API') ||
-      project.name.includes('E-commerce Platform') ||
-      project.name.includes('Mobile App')
+    const scrumProjects = projects.filter(
+      (project) =>
+        project.name.includes('Web Application') ||
+        project.name.includes('Backend API') ||
+        project.name.includes('E-commerce Platform') ||
+        project.name.includes('Mobile App'),
     );
 
     for (const project of scrumProjects) {
@@ -51,9 +52,13 @@ export class SprintsSeederService {
           });
 
           createdSprints.push(sprint);
-          console.log(`   ✓ Created sprint: ${sprint.name} [${sprint.status}] in ${project.name}`);
+          console.log(
+            `   ✓ Created sprint: ${sprint.name} [${sprint.status}] in ${project.name}`,
+          );
         } catch (error) {
-          console.log(`   ⚠ Sprint ${sprintData.name} might already exist in ${project.name}, skipping...`);
+          console.log(
+            `   ⚠ Sprint ${sprintData.name} might already exist in ${project.name}, skipping...`,
+          );
           // Try to find existing sprint
           const existingSprint = await this.prisma.sprint.findFirst({
             where: {
@@ -68,7 +73,9 @@ export class SprintsSeederService {
       }
     }
 
-    console.log(`✅ Sprints seeding completed. Created/Found ${createdSprints.length} sprints.`);
+    console.log(
+      `✅ Sprints seeding completed. Created/Found ${createdSprints.length} sprints.`,
+    );
     return createdSprints;
   }
 
@@ -254,10 +261,7 @@ export class SprintsSeederService {
         },
         createdAt: true,
       },
-      orderBy: [
-        { project: { name: 'asc' } },
-        { startDate: 'desc' },
-      ],
+      orderBy: [{ project: { name: 'asc' } }, { startDate: 'desc' }],
     });
   }
 }

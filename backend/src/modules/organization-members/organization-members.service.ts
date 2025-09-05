@@ -5,7 +5,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { OrganizationMember, OrganizationRole } from '@prisma/client';
+import { OrganizationMember, Role as OrganizationRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateOrganizationMemberDto,
@@ -283,7 +283,7 @@ export class OrganizationMembersService {
 
     // Only organization owner or admins can update member roles
     const isOwner = member.organization.ownerId === requestUserId;
-    const isAdmin = requesterMember.role === OrganizationRole.ADMIN;
+    const isAdmin = requesterMember.role === OrganizationRole.OWNER;
 
     if (!isOwner && !isAdmin) {
       throw new ForbiddenException(
@@ -294,7 +294,7 @@ export class OrganizationMembersService {
     // Prevent demoting the organization owner
     if (
       member.organization.ownerId === member.userId &&
-      updateOrganizationMemberDto.role !== OrganizationRole.ADMIN
+      updateOrganizationMemberDto.role !== OrganizationRole.OWNER
     ) {
       throw new BadRequestException(
         'Cannot change the role of organization owner',
@@ -360,7 +360,7 @@ export class OrganizationMembersService {
     // Users can remove themselves, or admins/owners can remove others
     const isSelfRemoval = member.userId === requestUserId;
     const isOwner = member.organization.ownerId === requestUserId;
-    const isAdmin = requesterMember.role === OrganizationRole.ADMIN;
+    const isAdmin = requesterMember.role === OrganizationRole.OWNER;
 
     if (!isSelfRemoval && !isOwner && !isAdmin) {
       throw new ForbiddenException(

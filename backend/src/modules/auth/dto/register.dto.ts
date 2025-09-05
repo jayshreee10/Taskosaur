@@ -7,7 +7,7 @@ import {
   MinLength,
   IsEnum,
 } from 'class-validator';
-import { UserRole } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 export class RegisterDto {
   @ApiProperty({
@@ -55,11 +55,11 @@ export class RegisterDto {
 
   @ApiProperty({
     description: 'User role',
-    enum: UserRole,
-    default: UserRole.MEMBER,
+    enum: Role,
+    default: Role.MEMBER,
     required: false,
   })
   @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
+  @IsEnum(Role)
+  role?: Role;
 }

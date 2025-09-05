@@ -84,7 +84,7 @@ export class AutomationProcessor {
           executionTime,
           errorMessage: error.message,
           triggeredById,
-          createdBy: triggeredById || (rule?.createdBy) || '',
+          createdBy: triggeredById || rule?.createdBy || '',
         },
       });
 

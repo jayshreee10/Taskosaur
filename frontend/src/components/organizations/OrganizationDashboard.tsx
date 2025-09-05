@@ -1,9 +1,5 @@
-'use client';
-
 import { Organization, OrganizationStats, OrganizationActivity } from '@/types';
 import { StatCard } from '@/components/ui';
-// TODO: Fix UserAvatar import when avatar components are migrated
-// import UserAvatar from '@/components/ui/avatars/UserAvatar';
 import Image from 'next/image'
 
 interface OrganizationDashboardProps {

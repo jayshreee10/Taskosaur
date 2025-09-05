@@ -8,6 +8,7 @@ export interface ActivityLogConfig {
   description: string;
   includeOldValue?: boolean;
   includeNewValue?: boolean;
+  entityIdName?: string;
 }
 
 export const LogActivity = (config: ActivityLogConfig) =>

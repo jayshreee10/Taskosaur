@@ -16,10 +16,7 @@ import {
 export class LabelsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(
-    createLabelDto: CreateLabelDto,
-    userId: string,
-  ): Promise<Label> {
+  async create(createLabelDto: CreateLabelDto, userId: string): Promise<Label> {
     // Check if project exists
     const project = await this.prisma.project.findUnique({
       where: { id: createLabelDto.projectId },

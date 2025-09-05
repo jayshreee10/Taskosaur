@@ -1,81 +1,240 @@
-"use client";
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { toast } from "sonner";
 import { useTask } from '../../contexts/task-context';
-import { useGlobalFetchPrevention } from '@/hooks/useGlobalFetchPrevention';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import UserAvatar from '@/components/ui/avatars/UserAvatar';
 import {
   HiChatBubbleLeftRight,
-  HiPencilSquare,
-  HiTrash,
-  HiPlus,
-  HiExclamationTriangle
+  HiExclamationTriangle,
+  HiClock,
+  HiPencil,
+  HiTrash
 } from 'react-icons/hi2';
-
-interface Comment {
-  id: string;
-  content: string;
-  taskId: string;
-  authorId: string;
-  parentCommentId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  author?: {
-    id: string;
-    name: string;
-    avatar: string;
-  };
-}
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  username: string;
-  role: string;
-}
+import { TaskComment, User } from '@/types';
+import ActionButton from '../common/ActionButton';
+import ConfirmationModal from '../modals/ConfirmationModal';
 
 interface TaskCommentsProps {
   taskId: string;
-  onCommentAdded?: (comment: Comment) => void;
+  onCommentAdded?: (comment: TaskComment) => void;
   onCommentUpdated?: (commentId: string, content: string) => void;
   onCommentDeleted?: (commentId: string) => void;
+  onTaskRefetch?: () => void;
+  hasAccess?: boolean;
 }
+
+interface CommentWithAuthor extends TaskComment {
+  author: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatar?: string;
+  };
+}
+
+// Memoized comment item to prevent unnecessary re-renders
+const CommentItem = React.memo(({
+  comment,
+  currentUser,
+  onEdit,
+  onDelete,
+  formatTimestamp
+}: {
+  comment: CommentWithAuthor;
+  currentUser: User;
+  onEdit: (commentId: string, content: string) => void;
+  onDelete: (commentId: string) => void;
+  formatTimestamp: (createdAt: string, updatedAt: string) => { 
+    text: string; 
+    isEdited: boolean; 
+    fullDate: string 
+  };
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const timestamp = useMemo(() => 
+    formatTimestamp(comment.createdAt, comment.updatedAt), 
+    [comment.createdAt, comment.updatedAt, formatTimestamp]
+  );
+  
+  const canEdit = comment.authorId === currentUser.id;
+  const displayName = useMemo(() => {
+    if (comment.author?.firstName || comment.author?.lastName) {
+      return `${comment.author.firstName || ''} ${comment.author.lastName || ''}`.trim();
+    }
+    if (comment.author?.email) {
+      return comment.author.email.split('@')[0];
+    }
+    return `User ${comment.author?.id?.slice(0, 8) || 'Unknown'}`;
+  }, [comment.author]);
+
+  const avatarProps = useMemo(() => ({
+    firstName: comment.author?.firstName || '',
+    lastName: comment.author?.lastName || '',
+    avatar: comment.author?.avatar,
+  }), [comment.author]);
+
+  return (
+    <div 
+      className="group" 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="flex gap-2  items-start">
+        <div className="flex-shrink-0 mt-1">
+          <UserAvatar user={avatarProps} size="xs" />
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-1 pb-1">
+            <div className="flex-1">
+              <div className="rounded-xl inline-block">
+                <div className="flex items-start">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center ">
+                      <span className="text-xs font-medium text-[var(--foreground)]">
+                        {displayName}
+                      </span>
+                      {timestamp.isEdited && (
+                        <span className="text-[12px] text-[var(--muted-foreground)]">
+                          (edited)
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[13px] capitalize text-[var(--foreground)] leading-relaxed whitespace-pre-wrap break-words">
+                      {comment.content}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Meta info row */}
+              <div className="flex items-center gap-1 text-[12px] text-[var(--muted-foreground)]">
+                <HiClock className="size-2.5" />
+                <span 
+                  className="cursor-default"
+                  title={timestamp.fullDate}
+                >
+                  {timestamp.text}
+                </span>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            {canEdit && (
+              <div 
+                className={`flex items-center gap-1 transition-opacity ${
+                  isHovered ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <button
+                  onClick={() => onEdit(comment.id, comment.content)}
+                  className="p-1.5 text-[var(--muted-foreground)] cursor-pointer hover:text-[var(--foreground)] hover:bg-[var(--muted)]/30 rounded-full transition-colors"
+                  title="Edit comment"
+                >
+                  <HiPencil className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => onDelete(comment.id)}
+                  className="p-1.5 text-[var(--muted-foreground)] cursor-pointer hover:text-[var(--destructive)] hover:bg-[var(--muted)]/30 rounded-full transition-colors"
+                  title="Delete comment"
+                >
+                  <HiTrash className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+CommentItem.displayName = 'CommentItem';
+
+// Comment editing component
+const CommentEditForm = ({
+  comment,
+  onSave,
+  onCancel
+}: {
+  comment: CommentWithAuthor;
+  onSave: (commentId: string, content: string) => void;
+  onCancel: () => void;
+}) => {
+  const [editingContent, setEditingContent] = useState(comment.content);
+
+  return (
+    <div className="flex gap-2 py-2">
+      <div className="flex-shrink-0 mt-1">
+        <UserAvatar
+          user={{
+            firstName: comment.author?.firstName || '',
+            lastName: comment.author?.lastName || '',
+            avatar: comment.author?.avatar,
+          }}
+          size="xs"
+        />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <div className="space-y-2">
+          <Textarea
+            value={editingContent}
+            onChange={(e) => setEditingContent(e.target.value)}
+            rows={2}
+            className=" text-sm border-[var(--input)] bg-[var(--background)]"
+            placeholder="Edit your comment..."
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <ActionButton
+              variant="outline"
+              secondary
+              onClick={onCancel}
+              
+            >
+              Cancel
+            </ActionButton>
+            <ActionButton
+              primary
+              onClick={() => onSave(comment.id, editingContent)}
+              disabled={!editingContent.trim()}
+             
+            >
+              Save
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function TaskComments({
   taskId,
   onCommentAdded,
   onCommentUpdated,
   onCommentDeleted,
+  onTaskRefetch,
+  hasAccess = false
 }: TaskCommentsProps) {
   const { 
     getTaskComments, 
     createTaskComment, 
     updateTaskComment, 
     deleteTaskComment, 
-    loading, 
+    isLoading, 
     error 
   } = useTask();
 
-  // Global fetch prevention hook
-  const {
-    shouldPreventFetch,
-    markFetchStart,
-    markFetchComplete,
-    markFetchError,
-    getCachedData
-  } = useGlobalFetchPrevention();
-
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState("");
+  const [comments, setComments] = useState<CommentWithAuthor[]>([]);
+  const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loadingComments, setLoadingComments] = useState(true);
 
   // Get current user from localStorage
   useEffect(() => {
@@ -90,69 +249,91 @@ export default function TaskComments({
         console.error('Error parsing user from localStorage:', error);
       }
     };
-
     getUserFromStorage();
+  }, []);
+
+  // Format timestamp with smart logic for created vs updated
+  const formatTimestamp = useCallback((createdAt: string, updatedAt: string) => {
+    if (!createdAt) return { text: 'Unknown time', isEdited: false, fullDate: '' };
+    
+    try {
+      const created = new Date(createdAt);
+      const updated = new Date(updatedAt);
+      const now = new Date();
+      
+      // If created and updated are the same (within 1 second), show "commented"
+      const timeDiff = Math.abs(updated.getTime() - created.getTime());
+      const isOriginalComment = timeDiff < 1000;
+      
+      const timeToUse = isOriginalComment ? created : updated;
+      const action = isOriginalComment ? 'commented' : 'updated';
+      
+      // Calculate time difference
+      const diffInMs = now.getTime() - timeToUse.getTime();
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+      const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+      
+      let timeAgo;
+      if (diffInMinutes < 1) {
+        timeAgo = 'just now';
+      } else if (diffInMinutes < 60) {
+        timeAgo = `${diffInMinutes}m ago`;
+      } else if (diffInHours < 24) {
+        timeAgo = `${diffInHours}h ago`;
+      } else if (diffInDays < 7) {
+        timeAgo = `${diffInDays}d ago`;
+      } else {
+        timeAgo = timeToUse.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: timeToUse.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        });
+      }
+      
+      return {
+        text: `${action} ${timeAgo}`,
+        isEdited: !isOriginalComment,
+        fullDate: timeToUse.toLocaleString()
+      };
+    } catch {
+      return { text: 'Unknown time', isEdited: false, fullDate: '' };
+    }
   }, []);
 
   // Fetch comments when component mounts or taskId changes
   useEffect(() => {
     if (!taskId) return;
 
-    const fetchKey = `task-comments-${taskId}`;
-    
-    if (shouldPreventFetch(fetchKey)) {
-      const cachedData = getCachedData(fetchKey);
-      if (cachedData) {
-        setComments(cachedData);
-        return;
-      }
-    }
-
     const fetchComments = async () => {
-      markFetchStart(fetchKey);
-      
+      setLoadingComments(true);
       try {
         const taskComments = await getTaskComments(taskId);
-        // Transform the comments to include author display info
-        const transformedComments = taskComments.map((comment: any) => ({
-          ...comment,
-          author: {
-            id: comment.authorId,
-            name: `User ${comment.authorId.slice(0, 8)}`, // Fallback name since we don't have user lookup
-            avatar: comment.authorId.slice(0, 2).toUpperCase()
-          }
-        }));
-        setComments(transformedComments);
-        markFetchComplete(fetchKey, transformedComments);
+        setComments(taskComments || []);
       } catch (error) {
         console.error('Failed to fetch comments:', error);
-        markFetchError(fetchKey);
+        setComments([]);
+      } finally {
+        setLoadingComments(false);
       }
     };
 
     fetchComments();
   }, [taskId]);
 
-  // Refresh comments function for real-time updates
-  const refreshComments = async () => {
+  const refreshComments = useCallback(async () => {
     try {
       const taskComments = await getTaskComments(taskId);
-      const transformedComments = taskComments.map((comment: any) => ({
-        ...comment,
-        author: {
-          id: comment.authorId,
-          name: `User ${comment.authorId.slice(0, 8)}`,
-          avatar: comment.authorId.slice(0, 2).toUpperCase()
-        }
-      }));
-      setComments(transformedComments);
+      setComments(taskComments || []);
+      if (onTaskRefetch) {
+        await onTaskRefetch();
+      }
     } catch (error) {
       console.error('Failed to refresh comments:', error);
     }
-  };
+  }, [taskId, getTaskComments, onTaskRefetch]);
 
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddComment = useCallback(async () => {
     if (!newComment.trim() || isSubmitting || !currentUser) return;
 
     setIsSubmitting(true);
@@ -164,84 +345,136 @@ export default function TaskComments({
       };
 
       const createdComment = await createTaskComment(commentData);
-      
       await refreshComments();
-      setNewComment("");
-      
+      setNewComment('');
       onCommentAdded?.(createdComment);
     } catch (error) {
-      console.error("Failed to add comment:", error);
+      console.error('Failed to add comment:', error);
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [newComment, isSubmitting, currentUser, taskId, createTaskComment, refreshComments, onCommentAdded]);
 
-  const handleEditComment = (commentId: string, content: string) => {
+  const handleEditComment = useCallback((commentId: string) => {
     setEditingCommentId(commentId);
-    setEditingContent(content);
-  };
+  }, []);
 
-  const handleSaveEdit = async (commentId: string) => {
-    if (!editingContent.trim() || !currentUser) return;
+  const handleSaveEdit = useCallback(async (commentId: string, content: string) => {
+    if (!content.trim() || !currentUser) return;
 
     try {
-      const updatedComment = await updateTaskComment(commentId, currentUser.id, {
-        content: editingContent.trim()
+      await updateTaskComment(commentId, currentUser.id, {
+        content: content.trim()
       });
-
       await refreshComments();
-      
       setEditingCommentId(null);
-      setEditingContent("");
-      
-      onCommentUpdated?.(commentId, editingContent.trim());
+      onCommentUpdated?.(commentId, content.trim());
+      toast.success('Comment updated successfully');
     } catch (error) {
-      console.error("Failed to edit comment:", error);
+      toast.error('Failed to update comment');
+      console.error('Failed to edit comment:', error);
     }
-  };
+  }, [currentUser, updateTaskComment, refreshComments, onCommentUpdated]);
 
-  const handleDeleteComment = async (commentId: string) => {
-    if (!window.confirm("Are you sure you want to delete this comment? This action cannot be undone.")) {
-      return;
-    }
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
 
-    if (!currentUser) return;
+  const handleDeleteComment = useCallback((commentId: string) => {
+    setCommentToDelete(commentId);
+    setDeleteModalOpen(true);
+  }, []);
 
+  const confirmDeleteComment = useCallback(async () => {
+    if (!commentToDelete || !currentUser) return;
     try {
-      await deleteTaskComment(commentId, currentUser.id);
+      await deleteTaskComment(commentToDelete, currentUser.id);
       await refreshComments();
-      onCommentDeleted?.(commentId);
+      onCommentDeleted?.(commentToDelete);
     } catch (error) {
-      console.error("Failed to delete comment:", error);
+      console.error('Failed to delete comment:', error);
+    } finally {
+      setDeleteModalOpen(false);
+      setCommentToDelete(null);
     }
-  };
+  }, [commentToDelete, currentUser, deleteTaskComment, refreshComments, onCommentDeleted]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingCommentId(null);
-    setEditingContent("");
-  };
+  }, []);
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Just now';
-    
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-      
-      if (diffInHours < 1) return 'Just now';
-      if (diffInHours < 24) return `${diffInHours}h ago`;
-      if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-      
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-      });
-    } catch {
-      return 'Unknown date';
+  // Memoize comments list to prevent unnecessary re-renders
+  const commentsList = useMemo(() => {
+    if (loadingComments) {
+      return (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex gap-2 animate-pulse py-2">
+              <div className="w-8 h-8 bg-[var(--muted)] rounded-full flex-shrink-0 mt-1" />
+              <div className="flex-1 space-y-2">
+                <div className="bg-[var(--muted)]/30 rounded-xl p-3">
+                  <div className="h-3 bg-[var(--muted)] rounded w-1/4 mb-2" />
+                  <div className="h-4 bg-[var(--muted)] rounded w-3/4" />
+                </div>
+                <div className="h-2 bg-[var(--muted)] rounded w-16 ml-1" />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
     }
-  };
+
+    return (
+      <div className="space-y-0">
+        {comments.length > 0 ? (
+          comments.map((comment) => {
+            if (editingCommentId === comment.id) {
+              return (
+                <CommentEditForm
+                  key={comment.id}
+                  comment={comment}
+                  onSave={handleSaveEdit}
+                  onCancel={handleCancelEdit}
+                />
+              );
+            }
+            return (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                currentUser={currentUser!}
+                onEdit={handleEditComment}
+                onDelete={handleDeleteComment}
+                formatTimestamp={formatTimestamp}
+              />
+            );
+          })
+        ) : (
+          /* Empty State */
+          <div className="text-center py-6 bg-[var(--muted)]/10 rounded-lg border border-dashed border-[var(--border)]">
+            <div className="p-2 rounded-full  w-fit mx-auto mb-2">
+              <HiChatBubbleLeftRight className="w-5 h-5 text-[var(--muted-foreground)]" />
+            </div>
+            <h4 className="text-sm font-medium text-[var(--foreground)] mb-1">
+              No comments yet
+            </h4>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Be the first to share your thoughts!
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }, [
+    loadingComments, 
+    comments, 
+    editingCommentId, 
+    currentUser, 
+    handleSaveEdit, 
+    handleCancelEdit, 
+    handleEditComment, 
+    handleDeleteComment, 
+    formatTimestamp
+  ]);
 
   if (!currentUser) {
     return (
@@ -255,155 +488,80 @@ export default function TaskComments({
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-4">
-        <HiChatBubbleLeftRight className="w-5 h-5 text-[var(--primary)]" />
-        <h3 className="text-md font-semibold text-[var(--foreground)]">
-          Comments ({comments.length})
-        </h3>
-      </div>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-6 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm text-[var(--muted-foreground)]">Loading comments...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <Alert variant="destructive" className="bg-[var(--destructive)]/10 border-[var(--destructive)]/20 text-[var(--destructive)]">
-          <HiExclamationTriangle className="h-4 w-4" />
-          <AlertDescription>Error: {error}</AlertDescription>
-        </Alert>
-      )}
-      
-      {/* Comments List */}
+    <>
       <div className="space-y-4">
-        {comments.map((comment) => (
-          <div key={comment.id} className="flex gap-3">
-            <UserAvatar
-              user={{
-                firstName: comment.author?.name?.split(' ')[0] || 'User',
-                lastName: comment.author?.name?.split(' ')[1] || '',
-                avatar: comment.author?.avatar,
-              }}
-              size="sm"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="bg-[var(--muted)]/30 p-4 rounded-lg border border-[var(--border)]">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-medium text-[var(--foreground)]">
-                    {comment.author?.name || `User ${comment.authorId.slice(0, 8)}`}
-                  </h4>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    {formatDate(comment.createdAt)}
-                  </p>
-                </div>
-                {editingCommentId === comment.id ? (
-                  <div>
-                    <Textarea
-                      value={editingContent}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditingContent(e.target.value)}
-                      rows={3}
-                      className="mb-3 border-input bg-background text-[var(--foreground)] resize-none"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={handleCancelEdit}
-                        variant="outline"
-                        size="sm"
-                        disabled={loading}
-                        className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)]"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={() => handleSaveEdit(comment.id)}
-                        size="sm"
-                        disabled={loading || !editingContent.trim()}
-                        className="h-8 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)]"
-                      >
-                        {loading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--foreground)] leading-relaxed">
-                    {comment.content}
-                  </p>
-                )}
-              </div>
-              {editingCommentId !== comment.id && comment.authorId === currentUser.id && (
-                <div className="mt-2 flex items-center gap-3">
-                  <button
-                    onClick={() => handleEditComment(comment.id, comment.content)}
-                    className="text-xs text-[var(--muted-foreground)] hover:text-[var(--primary)] flex items-center gap-1 transition-colors"
-                    disabled={loading}
-                  >
-                    <HiPencilSquare className="w-3 h-3" />
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteComment(comment.id)}
-                    className="text-xs text-[var(--muted-foreground)] hover:text-[var(--destructive)] flex items-center gap-1 transition-colors"
-                    disabled={loading}
-                  >
-                    <HiTrash className="w-3 h-3" />
-                    Delete
-                  </button>
-                </div>
-              )}
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-start gap-2">
+            <div className="p-1 rounded-md ">
+              <HiChatBubbleLeftRight size={18} className="text-[var(--primary)]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">
+                Comments
+              </h3>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+              </p>
             </div>
           </div>
-        ))}
+        </div>
 
-        {/* Empty State */}
-        {!loading && comments.length === 0 && (
-          <div className="text-center py-8 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
-            <HiChatBubbleLeftRight className="w-8 h-8 mx-auto mb-3 text-[var(--muted-foreground)]" />
-            <p className="text-sm text-[var(--muted-foreground)]">No comments yet. Be the first to comment!</p>
+        {/* Comments List */}
+        {commentsList}
+
+        {/* Add Comment Form */}
+        {hasAccess && (
+          <div>
+            <div className="flex gap-2">
+              <div className="flex-shrink-0 mt-1">
+                <UserAvatar
+                  user={{
+                    firstName: currentUser.firstName || '',
+                    lastName: currentUser.lastName || '',
+                    avatar: currentUser.avatar,
+                  }}
+                  size="xs"
+                />
+              </div>
+              <div className="flex-1">
+                <div className="relative">
+                  <Textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={1}
+                    placeholder="Add a comment..."
+                    disabled={isSubmitting}
+                    className="text-sm border-[var(--input)] bg-[var(--background)] placeholder:text-[var(--muted-foreground)] rounded-xl px-3 py-2 pr-10 min-h-[38px] hide-arrows"
+                    style={{ lineHeight: '1.4' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAddComment();
+                      }
+                    }}
+                  />
+                  {/* If you want to add an explicit ActionButton for posting, add here. Otherwise, only Textarea is used. */}
+                </div>
+                <p className="text-[12px] text-[var(--muted-foreground)] mt-1 ml-1">
+                  Press Enter to post
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Add Comment Form */}
-      <div className="mt-6">
-        <form onSubmit={handleAddComment} className="flex gap-3">
-          <UserAvatar
-            user={{
-              firstName: currentUser.firstName || '',
-              lastName: currentUser.lastName || '',
-              avatar: currentUser.avatar,
-            }}
-            size="sm"
-          />
-          <div className="flex-1 min-w-0">
-            <Textarea
-              value={newComment}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewComment(e.target.value)}
-              rows={3}
-              placeholder="Add a comment..."
-              disabled={isSubmitting || loading}
-              className="mb-3 border-input bg-background text-[var(--foreground)] resize-none"
-            />
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                disabled={!newComment.trim() || isSubmitting || loading}
-                size="sm"
-                className="h-9 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] flex items-center gap-2"
-              >
-                <HiPlus className="w-4 h-4" />
-                {isSubmitting ? "Adding..." : "Comment"}
-              </Button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => { setDeleteModalOpen(false); setCommentToDelete(null); }}
+        onConfirm={confirmDeleteComment}
+        title="Delete Comment"
+        message="Are you sure you want to delete this comment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
+    </>
   );
 }

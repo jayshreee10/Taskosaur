@@ -9,8 +9,10 @@ import {
   Query,
   ParseUUIDPipe,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { WorkflowsService } from './workflows.service';
@@ -40,7 +42,6 @@ export class WorkflowsController {
     return this.workflowsService.findAllByOrganizationSlug(slug);
   }
 
-
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.workflowsService.findOne(id);
@@ -60,6 +61,31 @@ export class WorkflowsController {
     @CurrentUser() user: any,
   ) {
     return this.workflowsService.update(id, updateWorkflowDto, user.id);
+  }
+
+  @Patch(':id/set-default')
+  @ApiOperation({ summary: 'Make workflow default for organization' })
+  @ApiResponse({
+    status: 200,
+    description: 'Workflow successfully set as default',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Workflow not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Workflow does not belong to organization',
+  })
+  async makeDefault(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { organizationId: string; userId: string },
+  ) {
+    return this.workflowsService.makeWorkflowDefault(
+      id,
+      body.organizationId,
+      body.userId,
+    );
   }
 
   @Delete(':id')

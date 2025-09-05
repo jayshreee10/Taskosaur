@@ -16,7 +16,7 @@ export { Textarea } from './textarea';
 
 // Specialized Badge Components
 export { PriorityBadge, StatusBadge, TagBadge } from '@/components/badges';
-export type { Priority, TaskStatus } from '@/components/badges';
+export type { TaskStatus } from '@/components/badges';
 
 // Specialized Card Components
 export { StatCard, TaskCard, WorkspaceCard, QuickActionCard } from '@/components/cards';

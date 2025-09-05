@@ -46,7 +46,9 @@ export class LabelsSeederService {
           createdLabels.push(label);
           console.log(`   ✓ Created label: ${label.name} in ${project.name}`);
         } catch (error) {
-          console.log(`   ⚠ Label ${labelData.name} might already exist in ${project.name}, skipping...`);
+          console.log(
+            `   ⚠ Label ${labelData.name} might already exist in ${project.name}, skipping...`,
+          );
           // Try to find existing label
           const existingLabel = await this.prisma.label.findFirst({
             where: {
@@ -61,7 +63,9 @@ export class LabelsSeederService {
       }
     }
 
-    console.log(`✅ Labels seeding completed. Created/Found ${createdLabels.length} labels.`);
+    console.log(
+      `✅ Labels seeding completed. Created/Found ${createdLabels.length} labels.`,
+    );
     return createdLabels;
   }
 
@@ -96,7 +100,10 @@ export class LabelsSeederService {
     ];
 
     // Project-specific labels based on project type
-    if (project.name.includes('Web Application') || project.name.includes('Backend API')) {
+    if (
+      project.name.includes('Web Application') ||
+      project.name.includes('Backend API')
+    ) {
       return [
         ...commonLabels,
         {
@@ -208,7 +215,10 @@ export class LabelsSeederService {
           description: 'Paid advertising campaigns',
         },
       ];
-    } else if (project.name.includes('E-commerce') || project.name.includes('Mobile App')) {
+    } else if (
+      project.name.includes('E-commerce') ||
+      project.name.includes('Mobile App')
+    ) {
       return [
         ...commonLabels,
         {
@@ -271,7 +281,9 @@ export class LabelsSeederService {
     try {
       // Delete task label associations first
       const deletedTaskLabels = await this.prisma.taskLabel.deleteMany();
-      console.log(`   ✓ Deleted ${deletedTaskLabels.count} task label associations`);
+      console.log(
+        `   ✓ Deleted ${deletedTaskLabels.count} task label associations`,
+      );
 
       // Delete labels
       const deletedLabels = await this.prisma.label.deleteMany();
@@ -313,10 +325,7 @@ export class LabelsSeederService {
         },
         createdAt: true,
       },
-      orderBy: [
-        { project: { name: 'asc' } },
-        { name: 'asc' },
-      ],
+      orderBy: [{ project: { name: 'asc' } }, { name: 'asc' }],
     });
   }
 }

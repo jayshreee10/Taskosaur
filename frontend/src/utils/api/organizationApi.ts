@@ -1,188 +1,20 @@
 import api from "@/lib/api";
 import { authApi } from "./authApi";
+import {
+  ActivityFilters,
+  ActivityResponse,
+  CreateOrganizationData,
+  Organization,
+  OrganizationMember,
+  OrganizationResponse,
+  OrganizationRole,
+  OrganizationSettings,
+  OrganizationStats,
+  Workflow,
+} from "@/types";
 
-export interface OrganizationSettings {
-  allowInvites: boolean;
-  requireEmailVerification: boolean;
-  defaultRole: string;
-  features: {
-    timeTracking: boolean;
-    customFields: boolean;
-    automation: boolean;
-    integrations: boolean;
-  };
-}
-
-export interface CreateOrganizationData {
-  name: string;
-  slug?: string;
-  description?: string;
-  website?: string;
-  settings?: OrganizationSettings;
-}
-
-export interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  website?: string;
-  ownerId: string;
-  settings: OrganizationSettings;
-  createdAt: string;
-  updatedAt: string;
-  avatar: string;
-  _count: {
-    members: number;
-    workspaces: number;
-  };
-  userRole: OrganizationRole;
-  joinedAt?: string;
-  isOwner?: boolean;
-}
-export enum OrganizationRole {
-  ADMIN = "ADMIN",
-  MANAGER = "MANAGER",
-  MEMBER = "MEMBER",
-  VIEWER = "VIEWER",
-  OWNER = "OWNER",
-}
-export interface OrganizationResponse {
-  organizations?: Organization[];
-  data?: Organization[];
-  organization?: Organization | Organization[];
-}
-export interface OrganizationStats {
-  organizationId: string;
-  organizationName: string;
-  organizationSlug: string;
-  statistics: {
-    totalTasks: number;
-    openTasks: number;
-    completedTasks: number;
-    activeProjects: number;
-    totalActiveWorkspaces: number;
-  };
-  recentActivities: RecentActivity[];
-}
-export interface RecentActivity {
-  id: string;
-  type:
-    | "TASK_CREATED"
-    | "TASK_COMPLETED"
-    | "TASK_UPDATED"
-    | "PROJECT_CREATED"
-    | "MEMBER_ADDED"
-    | "WORKSPACE_CREATED";
-  description: string;
-  entityType: "Task" | "Project" | "Workspace" | "Member";
-  entityId: string;
-  createdAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-  };
-}
-
-export interface ActivityFilters {
-  limit?: number;
-  page?: number;
-  entityType?: "Task" | "Project" | "Workspace" | "Organization" | "User";
-  userId?: string;
-}
-
-export interface ActivityItem {
-  id: string;
-  entityType: string;
-  entityId: string;
-  action: string;
-  description: string;
-  userId: string;
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  metadata?: any;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ActivityResponse {
-  activities: ActivityItem[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
-export interface OrganizationMember {
-  id: string;
-  role: OrganizationRole;
-  joinedAt: Date;
-  userId: string;
-  organizationId: string;
-  createdBy?: string | null;
-  updatedBy?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  // other fields ...
-}
-export interface WorkflowStatus {
-  id: string;
-  name: string;
-  color?: string ;
-  position?: number | null;
-  category?: string;
-  isDefault?: boolean;
-  workflowId?: string;
-  createdAt?:string,
-  updatedAt?:string
-}
-
-export interface WorkflowTransition {
-  id: string;
-  name: string;
-  fromStatusId: string;
-  toStatusId: string;
-}
-
-export interface Workflow {
-  id: string;
-  name: string;
-  organizationId: string;
-  isDefault: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-
-  organization?: Organization;
-
-  statuses?: WorkflowStatus[];
-
-  transitions?: WorkflowTransition[];
-  createdBy?: User;
-  updatedBy?: User;
-  description?: string; // <-- add this line
-
-  _count?: {
-    statuses: number;
-    transitions: number;
-  };
-}
 export const organizationApi = {
-  getOrganizationsByUser: async (userId: string): Promise<Organization[]> => {
+  getUserOrganizations: async (userId: string): Promise<Organization[]> => {
     try {
       const response = await api.get<OrganizationResponse>(
         `/organization-members/user/${userId}/organizations`
@@ -222,8 +54,6 @@ export const organizationApi = {
         throw new Error("User not authenticated or user ID not found");
       }
 
-      console.log("Creating organization with data:", organizationData);
-
       // Generate slug from name if not provided
       const slug =
         organizationData.slug ||
@@ -238,7 +68,7 @@ export const organizationApi = {
       const defaultSettings: OrganizationSettings = {
         allowInvites: true,
         requireEmailVerification: false,
-        defaultRole: "MEMBER",
+        defaultRole: OrganizationRole.MEMBER,
         features: {
           timeTracking: true,
           customFields: true,
@@ -256,14 +86,11 @@ export const organizationApi = {
         settings: organizationData.settings || defaultSettings,
       };
 
-      console.log("Final organization data:", finalOrganizationData);
-
       const response = await api.post<Organization>(
         "/organizations",
         finalOrganizationData
       );
 
-      console.log("Organization created successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Create organization error:", error);
@@ -308,9 +135,7 @@ export const organizationApi = {
       throw error;
     }
   },
-   getOrganizationWorkFlows: async (
-    slug: string
-  ): Promise<Workflow[]> => {
+  getOrganizationWorkFlows: async (slug: string): Promise<Workflow[]> => {
     try {
       const response = await api.get<Workflow[]>(
         `/workflows/slug?slug=${encodeURIComponent(slug)}`
@@ -367,8 +192,6 @@ export const organizationApi = {
     organizationId: string
   ): Promise<OrganizationStats> => {
     try {
-      console.log("Fetching organization stats for:", organizationId);
-
       // Validate organizationId format
       const uuidRegex =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

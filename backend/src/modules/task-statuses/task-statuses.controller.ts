@@ -10,11 +10,14 @@ import {
   ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TaskStatusesService } from './task-statuses.service';
-import { CreateTaskStatusDto } from './dto/create-task-status.dto';
+import {
+  CreateTaskStatusDto,
+  CreateTaskStatusFromProjectDto,
+} from './dto/create-task-status.dto';
 import {
   UpdatePositionItemDto,
   UpdatePositionsDto,
@@ -35,18 +38,50 @@ export class TaskStatusesController {
   ) {
     return this.taskStatusesService.create(createTaskStatusDto, user.id);
   }
+  @Post('from-project')
+  createFromProject(
+    @Body() createTaskStatusDto: CreateTaskStatusFromProjectDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.taskStatusesService.createFromProject(
+      createTaskStatusDto,
+      user.id,
+    );
+  }
 
+  @ApiQuery({ name: 'workflowId', required: false, type: String })
+  @ApiQuery({ name: 'organizationId', required: false, type: String })
   @Get()
-  findAll(@Query('workflowId') workflowId?: string) {
-    return this.taskStatusesService.findAll(workflowId);
+  async findAll(
+    @Query('workflowId') workflowId?: string,
+    @Query('organizationId') organizationId?: string,
+  ) {
+    
+    if (workflowId) {
+      return this.taskStatusesService.findAll(workflowId);
+    }
+    if (organizationId) {
+      const defaultWorkflow = await this.taskStatusesService.findDefaultWorkflowByOrganizationId(organizationId);
+      if (defaultWorkflow) {
+        return this.taskStatusesService.findAll(defaultWorkflow.id);
+      } else {
+        return [];
+      }
+    }
+   
+    return this.taskStatusesService.findAll();
+  }
+  @Get('project')
+  findTaskStatusByProjectSlug(@Query('projectId') projectId: string) {
+    return this.taskStatusesService.findTaskStatusByProjectSlug(projectId);
   }
   @Patch('positions')
   updatePositions(
-    // ✅ This tells NestJS to expect an object with a 'statusUpdates' property.
+    
     @Body() updatePositionsDto: UpdatePositionsDto,
     @CurrentUser() user: any,
   ) {
-    // ✅ Then, extract the array from the DTO before passing it to your service.
+    
     return this.taskStatusesService.updatePositions(
       updatePositionsDto.statusUpdates,
       user.id,

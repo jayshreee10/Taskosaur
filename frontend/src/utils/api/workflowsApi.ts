@@ -1,85 +1,21 @@
 import api from "@/lib/api";
-import { Workflow } from "./organizationApi";
-
-export type WorkflowStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
-
-export interface WorkflowData {
-  name: string;
-  description?: string;
-  isDefault?: boolean;
-}
-
-
-
-export interface CreateWorkflowData extends WorkflowData {
-  organizationId: string;
-}
-
-export interface UpdateWorkflowData extends Partial<WorkflowData> {}
-
-export interface WorkflowStats {
-  totalStages: number;
-  totalProjects: number;
-  totalTasks: number;
-  activeProjects: number;
-  completedTasks: number;
-  utilizationRate: number;
-}
-
-export interface WorkflowStage {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  order: number;
-  workflowId: string;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WorkflowActivityResponse {
-  activities: ActivityLog[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
-
-export interface GetWorkflowActivityParams {
-  limit?: number;
-  page?: number;
-  entityType?: string;
-}
-
-export interface ActivityLog {
-  id: string;
-  action: string;
-  description: string;
-  entityType: string;
-  entityId: string;
-  metadata?: Record<string, any>;
-  createdAt: string;
-  updatedAt: string;
-  type: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-  };
-}
+import {
+  CreateWorkflowData,
+  GetWorkflowActivityParams,
+  UpdateWorkflowData,
+  Workflow,
+  WorkflowActivityResponse,
+  WorkflowStage,
+  WorkflowStats,
+} from "@/types";
 
 export const workflowsApi = {
   // Workflow CRUD operations
-  createWorkflow: async (workflowData: CreateWorkflowData): Promise<Workflow> => {
+  createWorkflow: async (
+    workflowData: CreateWorkflowData
+  ): Promise<Workflow> => {
     try {
-      console.log("Creating workflow with data:", workflowData);
       const response = await api.post<Workflow>("/workflows", workflowData);
-      console.log("Workflow created successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Create workflow error:", error);
@@ -89,7 +25,6 @@ export const workflowsApi = {
 
   getWorkflows: async (): Promise<Workflow[]> => {
     try {
-      console.log("Fetching all workflows");
       const response = await api.get<Workflow[]>("/workflows");
       return response.data;
     } catch (error) {
@@ -110,8 +45,6 @@ export const workflowsApi = {
           `Invalid organizationId format: ${organizationId}. Expected UUID format.`
         );
       }
-
-      console.log("Fetching workflows for organization:", organizationId);
       const response = await api.get<Workflow[]>(
         `/workflows?organizationId=${organizationId}`
       );
@@ -124,8 +57,9 @@ export const workflowsApi = {
 
   getWorkflowsByOrganizationSlug: async (slug: string): Promise<Workflow[]> => {
     try {
-      console.log("Fetching workflows by organization slug:", slug);
-      const response = await api.get<Workflow[]>(`/workflows/slug?slug=${slug}`);
+      const response = await api.get<Workflow[]>(
+        `/workflows/slug?slug=${slug}`
+      );
       return response.data;
     } catch (error) {
       console.error("Get workflows by organization slug error:", error);
@@ -135,7 +69,6 @@ export const workflowsApi = {
 
   getWorkflowById: async (workflowId: string): Promise<Workflow> => {
     try {
-      console.log("Fetching workflow by ID:", workflowId);
       const response = await api.get<Workflow>(`/workflows/${workflowId}`);
       return response.data;
     } catch (error) {
@@ -154,8 +87,6 @@ export const workflowsApi = {
           `Invalid organizationId format: ${organizationId}. Expected UUID format.`
         );
       }
-
-      console.log("Fetching default workflow for organization:", organizationId);
       const response = await api.get<Workflow>(
         `/workflows/organization/${organizationId}/default`
       );
@@ -171,12 +102,10 @@ export const workflowsApi = {
     workflowData: UpdateWorkflowData
   ): Promise<Workflow> => {
     try {
-      console.log("Updating workflow:", workflowId, "with data:", workflowData);
       const response = await api.patch<Workflow>(
         `/workflows/${workflowId}`,
         workflowData
       );
-      console.log("Workflow updated successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Update workflow error:", error);
@@ -188,7 +117,6 @@ export const workflowsApi = {
     workflowId: string
   ): Promise<{ success: boolean; message: string }> => {
     try {
-      console.log("Deleting workflow:", workflowId);
       const response = await api.delete(`/workflows/${workflowId}`);
 
       // Handle different response types
@@ -213,7 +141,6 @@ export const workflowsApi = {
   // Workflow stages operations
   getWorkflowStages: async (workflowId: string): Promise<WorkflowStage[]> => {
     try {
-      console.log("Fetching stages for workflow:", workflowId);
       const response = await api.get<WorkflowStage[]>(
         `/workflows/${workflowId}/stages`
       );
@@ -227,11 +154,9 @@ export const workflowsApi = {
   // Workflow stats
   getWorkflowStats: async (workflowId: string): Promise<WorkflowStats> => {
     try {
-      console.log("Fetching workflow stats:", workflowId);
       const response = await api.get<WorkflowStats>(
         `/workflows/${workflowId}/stats`
       );
-      console.log("Workflow stats fetched successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Get workflow stats error:", error);
@@ -245,7 +170,6 @@ export const workflowsApi = {
     params: GetWorkflowActivityParams = {}
   ): Promise<WorkflowActivityResponse> => {
     try {
-      console.log("Fetching workflow activity:", workflowId);
       const response = await api.get<WorkflowActivityResponse>(
         `/workflows/${workflowId}/activity`,
         { params }
@@ -272,15 +196,12 @@ export const workflowsApi = {
         );
       }
 
-      console.log("Searching workflows:", { organizationId, search });
-
       // URL encode the search parameter to handle spaces and special characters
       const encodedSearch = encodeURIComponent(search.trim());
       const response = await api.get<Workflow[]>(
         `/workflows/search?organizationId=${organizationId}&search=${encodedSearch}`
       );
 
-      console.log("Search results:", response.data);
       return response.data;
     } catch (error) {
       console.error("Search workflows error:", error);
@@ -304,11 +225,9 @@ export const workflowsApi = {
   // Workflow status operations
   activateWorkflow: async (workflowId: string): Promise<Workflow> => {
     try {
-      console.log("Activating workflow:", workflowId);
       const response = await api.patch<Workflow>(
         `/workflows/${workflowId}/activate`
       );
-      console.log("Workflow activated successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Activate workflow error:", error);
@@ -318,11 +237,9 @@ export const workflowsApi = {
 
   deactivateWorkflow: async (workflowId: string): Promise<Workflow> => {
     try {
-      console.log("Deactivating workflow:", workflowId);
       const response = await api.patch<Workflow>(
         `/workflows/${workflowId}/deactivate`
       );
-      console.log("Workflow deactivated successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Deactivate workflow error:", error);
@@ -332,11 +249,9 @@ export const workflowsApi = {
 
   archiveWorkflow: async (workflowId: string): Promise<Workflow> => {
     try {
-      console.log("Archiving workflow:", workflowId);
       const response = await api.patch<Workflow>(
         `/workflows/${workflowId}/archive`
       );
-      console.log("Workflow archived successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Archive workflow error:", error);
@@ -345,13 +260,19 @@ export const workflowsApi = {
   },
 
   // Set as default workflow
-  setAsDefaultWorkflow: async (workflowId: string): Promise<Workflow> => {
+  setAsDefaultWorkflow: async (
+    workflowId: string,
+    organizationId: string,
+    userId: string
+  ): Promise<Workflow> => {
     try {
-      console.log("Setting workflow as default:", workflowId);
       const response = await api.patch<Workflow>(
-        `/workflows/${workflowId}/set-default`
+        `/workflows/${workflowId}/set-default`,
+        {
+          organizationId,
+          userId,
+        }
       );
-      console.log("Workflow set as default successfully:", response.data);
       return response.data;
     } catch (error) {
       console.error("Set default workflow error:", error);

@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Sprint, SprintStatus } from '@prisma/client';
+``;
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { UpdateSprintDto } from './dto/update-sprint.dto';
@@ -19,7 +20,7 @@ export class SprintsService {
   ): Promise<Sprint> {
     // Check if project exists
     const project = await this.prisma.project.findUnique({
-      where: { id: createSprintDto.projectId },
+      where: { slug: createSprintDto.projectId },
       select: { id: true, name: true },
     });
 
@@ -46,6 +47,7 @@ export class SprintsService {
     return this.prisma.sprint.create({
       data: {
         ...createSprintDto,
+        projectId: project.id,
         createdBy: userId,
         updatedBy: userId,
       },
@@ -97,7 +99,10 @@ export class SprintsService {
   }
 
   async findAll(projectId?: string, status?: SprintStatus): Promise<Sprint[]> {
-    const whereClause: any = {};
+    const whereClause: any = {
+      archive: false,
+    };
+
     if (projectId) whereClause.projectId = projectId;
     if (status) whereClause.status = status;
 
@@ -127,6 +132,54 @@ export class SprintsService {
       orderBy: [
         { status: 'asc' }, // Active first, then planning, then completed
         { createdAt: 'desc' },
+      ],
+    });
+  }
+  async findAllByProjectSlug(
+    slug?: string,
+    status?: SprintStatus,
+  ): Promise<Sprint[]> {
+    const whereClause: any = {
+      archive: false,
+    };
+
+    console.log('Finding sprints for slug:', slug, 'and status:', status);
+    if (slug) {
+      whereClause.project = {
+        slug: slug,
+      };
+    }
+
+    if (status) {
+      whereClause.status = status;
+    }
+
+    return this.prisma.sprint.findMany({
+      where: whereClause,
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            workspace: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            tasks: true,
+          },
+        },
+      },
+      orderBy: [
+        { status: 'asc' }, // Custom sort logic: planning < active < completed
+        { createdAt: 'desc' }, // Recent sprints first
       ],
     });
   }
@@ -420,6 +473,19 @@ export class SprintsService {
     try {
       await this.prisma.sprint.delete({
         where: { id },
+      });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Sprint not found');
+      }
+      throw error;
+    }
+  }
+  async archiveSprint(id: string): Promise<void> {
+    try {
+      await this.prisma.sprint.update({
+        where: { id },
+        data: { archive: true },
       });
     } catch (error) {
       if (error.code === 'P2025') {

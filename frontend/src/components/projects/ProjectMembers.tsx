@@ -1,4 +1,4 @@
-"use client";
+;
 
 import MembersManager from "@/components/shared/MembersManager";
 
@@ -16,12 +16,14 @@ export default function ProjectMembers({
   className = "",
 }: ProjectMembersProps) {
   return (
-    <MembersManager
-      type="project"
-      entityId={projectId}
-      organizationId={organizationId}
-      workspaceId={workspaceId}
-      className={className}
-    />
+    <div className="projects-members-wrapper">
+      <MembersManager
+        type="project"
+        entityId={projectId}
+        organizationId={organizationId}
+        workspaceId={workspaceId}
+        className={className}
+      />
+    </div>
   );
 }

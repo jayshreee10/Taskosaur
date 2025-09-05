@@ -1,4 +1,4 @@
-'use client';
+;
 
 import React, { useState, useEffect } from 'react';
 
@@ -20,14 +20,10 @@ export default function SettingsLayout({
   onSectionChange 
 }: SettingsLayoutProps) {
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
-  const [mounted, setMounted] = useState(false);
+
+
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
 
     const getOrganizationData = () => {
       try {
@@ -73,7 +69,7 @@ export default function SettingsLayout({
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, [mounted]);
+  }, []);
 
   const settingsSections = [
     {
@@ -93,6 +89,12 @@ export default function SettingsLayout({
       title: 'Notifications',
       icon: '🔔',
       description: 'Email and push notification preferences'
+    },
+    {
+      id: 'ai-chat',
+      title: 'AI Chat',
+      icon: '🤖',
+      description: 'AI assistant configuration and settings'
     },
     {
       id: 'appearance',
@@ -139,35 +141,35 @@ export default function SettingsLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+    <div className="settings-layout-container settings-layout-container-dark">
+      <div className="settings-layout-wrapper">
+        <div className="settings-layout-header">
+          <h1 className="settings-layout-title settings-layout-title-dark">
             Settings
           </h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
+          <p className="settings-layout-subtitle settings-layout-subtitle-dark">
             Manage your account, organization, and preferences
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="settings-layout-grid">
           {/* Settings Navigation */}
-          <div className="lg:col-span-1">
-            <nav className="space-y-2">
+          <div className="settings-nav">
+            <nav className="settings-nav-list">
               {settingsSections.map((section) => (
                 <button
                   key={section.id}
                   onClick={() => onSectionChange(section.id)}
-                  className={`w-full flex items-start space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                  className={`settings-nav-item ${
                     activeSection === section.id
-                      ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-l-4 border-indigo-500'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'settings-nav-item-active settings-nav-item-active-dark'
+                      : 'settings-nav-item-inactive settings-nav-item-inactive-dark'
                   }`}
                 >
-                  <span className="text-lg flex-shrink-0">{section.icon}</span>
-                  <div>
-                    <div className="font-medium">{section.title}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <span className="settings-nav-item-icon">{section.icon}</span>
+                  <div className="settings-nav-item-content">
+                    <div className="settings-nav-item-title">{section.title}</div>
+                    <div className="settings-nav-item-description settings-nav-item-description-dark">
                       {section.description}
                     </div>
                   </div>
@@ -177,21 +179,21 @@ export default function SettingsLayout({
 
             {/* Organization Context */}
             {currentOrganization && (
-              <div className="mt-8 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+              <div className="settings-org-context settings-org-context-dark">
+                <h3 className="settings-org-context-title settings-org-context-title-dark">
                   Current Organization
                 </h3>
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
-                    <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                <div className="settings-org-context-content">
+                  <div className="settings-org-context-avatar settings-org-context-avatar-dark">
+                    <span className="settings-org-context-avatar-text settings-org-context-avatar-text-dark">
                       {currentOrganization.name.charAt(0)}
                     </span>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  <div className="settings-org-context-info">
+                    <div className="settings-org-context-name settings-org-context-name-dark">
                       {currentOrganization.name}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <div className="settings-org-context-plan settings-org-context-plan-dark">
                       {currentOrganization.plan} Plan
                     </div>
                   </div>
@@ -201,8 +203,8 @@ export default function SettingsLayout({
           </div>
 
           {/* Settings Content */}
-          <div className="lg:col-span-3">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="settings-content">
+            <div className="settings-content-card settings-content-card-dark">
               {children}
             </div>
           </div>

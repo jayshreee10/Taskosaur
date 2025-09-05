@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole, UserStatus, User } from '@prisma/client';
+import { Role, UserStatus, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class UsersSeederService {
         username: 'admin',
         firstName: 'Admin',
         lastName: 'User',
-        role: UserRole.SUPER_ADMIN,
+        role: Role.SUPER_ADMIN,
         status: UserStatus.ACTIVE,
         password: hashedPassword,
         emailVerified: true,
@@ -31,7 +31,7 @@ export class UsersSeederService {
         username: 'johndoe',
         firstName: 'John',
         lastName: 'Doe',
-        role: UserRole.MEMBER,
+        role: Role.MEMBER,
         status: UserStatus.ACTIVE,
         password: hashedPassword,
         emailVerified: true,
@@ -46,7 +46,7 @@ export class UsersSeederService {
         username: 'janesmith',
         firstName: 'Jane',
         lastName: 'Smith',
-        role: UserRole.MANAGER,
+        role: Role.MANAGER,
         status: UserStatus.ACTIVE,
         password: hashedPassword,
         emailVerified: true,
@@ -61,7 +61,7 @@ export class UsersSeederService {
         username: 'mikewilson',
         firstName: 'Mike',
         lastName: 'Wilson',
-        role: UserRole.MEMBER,
+        role: Role.MEMBER,
         status: UserStatus.ACTIVE,
         password: hashedPassword,
         emailVerified: true,
@@ -76,7 +76,7 @@ export class UsersSeederService {
         username: 'sarahjones',
         firstName: 'Sarah',
         lastName: 'Jones',
-        role: UserRole.MEMBER,
+        role: Role.MEMBER,
         status: UserStatus.ACTIVE,
         password: hashedPassword,
         emailVerified: true,
@@ -91,7 +91,7 @@ export class UsersSeederService {
         username: 'alexbrown',
         firstName: 'Alex',
         lastName: 'Brown',
-        role: UserRole.MEMBER,
+        role: Role.MEMBER,
         status: UserStatus.ACTIVE,
         password: hashedPassword,
         emailVerified: true,
@@ -106,7 +106,7 @@ export class UsersSeederService {
         username: 'emmadavis',
         firstName: 'Emma',
         lastName: 'Davis',
-        role: UserRole.VIEWER,
+        role: Role.VIEWER,
         status: UserStatus.ACTIVE,
         password: hashedPassword,
         emailVerified: true,
@@ -121,7 +121,7 @@ export class UsersSeederService {
         username: 'tomgarcia',
         firstName: 'Tom',
         lastName: 'Garcia',
-        role: UserRole.MEMBER,
+        role: Role.MEMBER,
         status: UserStatus.PENDING,
         password: hashedPassword,
         emailVerified: false,

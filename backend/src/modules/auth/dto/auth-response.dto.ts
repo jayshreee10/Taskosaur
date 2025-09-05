@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { IsNotEmpty, IsString } from 'class-validator';
 
 export class AuthResponseDto {
@@ -24,7 +24,7 @@ export class AuthResponseDto {
     firstName: string;
     lastName: string;
     username?: string;
-    role: UserRole;
+    role: Role;
     avatar?: string;
   };
 }
@@ -32,7 +32,7 @@ export class AuthResponseDto {
 export class RefreshTokenDto {
   @ApiProperty({
     description: 'Refresh token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   @IsString()
   @IsNotEmpty()

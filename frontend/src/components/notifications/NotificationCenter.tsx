@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import {
   HiCheckCircle,
@@ -11,13 +9,9 @@ import {
   HiDocumentText
 } from 'react-icons/hi2';
 import {
-  DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/ui/DropdownMenu";
 
 export interface Notification {
   id: string;
@@ -40,75 +34,11 @@ export interface Notification {
   };
 }
 
-interface NotificationCenterProps {
-  className?: string;
-}
+interface NotificationCenterProps {}
 
-const UserAvatar = ({ 
-  name, 
-  size = "sm" 
-}: { 
-  name: string;
-  size?: "xs" | "sm" | "md";
-}) => {
-  const sizes = {
-    xs: "h-6 w-6 text-xs",
-    sm: "h-8 w-8 text-sm",
-    md: "h-10 w-10 text-base"
-  };
-  
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
-  
-  return (
-    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-medium shadow-lg`}>
-      {getInitials(name)}
-    </div>
-  );
-};
 
-const Button = ({ 
-  children, 
-  variant = "primary", 
-  size = "sm",
-  className = "",
-  ...props 
-}: { 
-  children: React.ReactNode;
-  variant?: "primary" | "secondary" | "outline";
-  size?: "xs" | "sm" | "md";
-  className?: string;
-  [key: string]: any;
-}) => {
-  const variants = {
-    primary: "bg-amber-600 hover:bg-amber-700 text-white",
-    secondary: "bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300",
-    outline: "border border-stone-300 dark:border-stone-600 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"
-  };
-  
-  const sizes = {
-    xs: "px-2 py-1 text-xs",
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm"
-  };
-  
-  return (
-    <button 
-      className={`rounded-lg font-medium transition-colors ${variants[variant]} ${sizes[size]} ${className}`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-};
 
-export default function NotificationCenter({ className = "" }: NotificationCenterProps) {
+export default function NotificationCenter({}: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -232,6 +162,7 @@ export default function NotificationCenter({ className = "" }: NotificationCente
 
   useEffect(() => {
     loadNotifications();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadNotifications = async () => {
@@ -258,14 +189,6 @@ export default function NotificationCenter({ className = "" }: NotificationCente
     }
   };
 
-  const handleMarkAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(n => 
-        n.id === notificationId ? { ...n, read: true } : n
-      )
-    );
-  };
-
   const handleMarkAllAsRead = () => {
     setNotifications(prev => 
       prev.map(n => ({ ...n, read: true }))
@@ -278,25 +201,25 @@ export default function NotificationCenter({ className = "" }: NotificationCente
   };
 
   const getNotificationIcon = (type: Notification['type']) => {
-    const iconProps = { size: 16, className: "text-stone-400" };
+    const iconProps = { size: 16 };
     
     switch (type) {
       case 'task_assigned':
-        return <HiDocumentText {...iconProps} className="text-blue-500" />;
+        return <HiDocumentText {...iconProps} className="notifications-icon-task-assigned" />;
       case 'task_completed':
-        return <HiCheckCircle {...iconProps} className="text-green-500" />;
+        return <HiCheckCircle {...iconProps} className="notifications-icon-task-completed" />;
       case 'task_commented':
-        return <HiChatBubbleLeft {...iconProps} className="text-purple-500" />;
+        return <HiChatBubbleLeft {...iconProps} className="notifications-icon-task-commented" />;
       case 'mention':
-        return <HiUser {...iconProps} className="text-amber-500" />;
+        return <HiUser {...iconProps} className="notifications-icon-mention" />;
       case 'sprint_started':
-        return <HiRocketLaunch {...iconProps} className="text-indigo-500" />;
+        return <HiRocketLaunch {...iconProps} className="notifications-icon-sprint-started" />;
       case 'due_date':
-        return <HiClock {...iconProps} className="text-red-500" />;
+        return <HiClock {...iconProps} className="notifications-icon-due-date" />;
       case 'system':
-        return <HiCog {...iconProps} className="text-stone-500" />;
+        return <HiCog {...iconProps} className="notifications-icon-system" />;
       default:
-        return <HiDocumentText {...iconProps} />;
+        return <HiDocumentText {...iconProps} className="notifications-icon-default" />;
     }
   };
 
@@ -305,16 +228,16 @@ export default function NotificationCenter({ className = "" }: NotificationCente
   const unreadCount = unreadNotifications.length;
 
   return (
-    <DropdownMenuContent className="w-96 p-0 bg-[var(--background)] border-[var(--border)] shadow-lg backdrop-blur-sm max-h-[80vh]" align="end" sideOffset={8}>
+    <DropdownMenuContent className="notifications-dropdown-content" align="end" sideOffset={8}>
       {/* Header */}
-      <div className="px-5 py-4 bg-gradient-to-r from-[var(--primary)]/5 to-[var(--primary)]/10 border-b border-[var(--border)]/30">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-[var(--foreground)]">
+      <div className="notifications-header">
+        <div className="notifications-header-content">
+          <div className="notifications-header-title-group">
+            <h2 className="notifications-header-title">
               Notifications
             </h2>
             {unreadCount > 0 && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-[var(--destructive)] text-[var(--destructive-foreground)] min-w-[20px] h-5 justify-center">
+              <span className="notifications-unread-badge">
                 {unreadCount}
               </span>
             )}
@@ -322,7 +245,7 @@ export default function NotificationCenter({ className = "" }: NotificationCente
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
-              className="text-xs text-[var(--primary)] hover:text-[var(--primary)]/80 font-semibold transition-colors"
+              className="notifications-mark-all-button"
             >
               Mark all read
             </button>
@@ -331,56 +254,56 @@ export default function NotificationCenter({ className = "" }: NotificationCente
       </div>
 
       {/* Notifications List */}
-      <div className="flex-1 overflow-y-auto max-h-96">
+      <div className="notifications-list-container">
         {isLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-[var(--primary)]/20 border-t-[var(--primary)]"></div>
+          <div className="notifications-loading">
+            <div className="notifications-loading-spinner"></div>
           </div>
         ) : unreadNotifications.length === 0 ? (
-          <div className="text-center py-12 px-6">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-[var(--muted)] flex items-center justify-center">
+          <div className="notifications-empty-state">
+            <div className="notifications-empty-icon">
               <HiCheckCircle size={24} className="text-[var(--primary)]" />
             </div>
-            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-2">
+            <h3 className="notifications-empty-title">
               All caught up!
             </h3>
-            <p className="text-xs text-[var(--muted-foreground)]">
+            <p className="notifications-empty-message">
               You have no unread notifications.
             </p>
           </div>
         ) : (
-          <div className="p-2">
+          <div className="notifications-list">
             {unreadNotifications.map((notification) => (
               <DropdownMenuItem key={notification.id} asChild>
                 <div
-                  className="p-4 rounded-lg cursor-pointer transition-all duration-200 hover:bg-[var(--accent)]/50 mb-2 border bg-[var(--primary)]/5 border-[var(--primary)]/20"
+                  className="notifications-item"
                   onClick={() => handleNotificationClick(notification)}
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
+                  <div className="notifications-item-content">
+                    <div className="notifications-item-avatar-container">
                       {notification.actor ? (
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 flex items-center justify-center text-[var(--primary-foreground)] text-sm font-bold">
+                        <div className="notifications-item-avatar-user">
                           {notification.actor.name.charAt(0).toUpperCase()}
                         </div>
                       ) : (
-                        <div className="w-10 h-10 bg-[var(--muted)] rounded-lg flex items-center justify-center">
+                        <div className="notifications-item-avatar-system">
                           {getNotificationIcon(notification.type)}
                         </div>
                       )}
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-[var(--foreground)] leading-tight mb-1">
+                    <div className="notifications-item-details">
+                      <div className="notifications-item-header">
+                        <div className="notifications-item-text-content">
+                          <p className="notifications-item-title">
                             {notification.title}
                           </p>
-                          <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
+                          <p className="notifications-item-message">
                             {notification.message}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="w-2 h-2 bg-[var(--primary)] rounded-full"></div>
+                        <div className="notifications-item-indicators">
+                          <div className="notifications-unread-indicator"></div>
                         </div>
                       </div>
                       
@@ -394,11 +317,9 @@ export default function NotificationCenter({ className = "" }: NotificationCente
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-[var(--border)]/30">
-        <div className="flex justify-center">
-          <button 
-            className="px-3 py-1.5 bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-medium rounded-lg hover:bg-[var(--primary)]/90 transition-colors"
-          >
+      <div className="notifications-footer">
+        <div className="notifications-footer-content">
+          <button className="notifications-view-all-button">
             View All
           </button>
         </div>

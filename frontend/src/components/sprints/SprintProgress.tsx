@@ -1,7 +1,7 @@
-'use client';
+;
 
 import React, { useState, useEffect } from 'react';
-import { Task, Sprint, SprintStatus } from '@/types/tasks';
+import { Task, Sprint, SprintStatus } from '@/types';
 
 interface SprintProgressProps {
   selectedSprint?: string | null;
@@ -21,7 +21,7 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
       goal: 'Implement user authentication and basic security',
       startDate: '2024-01-15T00:00:00Z',
       endDate: '2024-01-29T00:00:00Z',
-      status: SprintStatus.ACTIVE,
+      status: "ACTIVE",
       projectId: 'project-1',
       createdAt: '2024-01-10T00:00:00Z',
       updatedAt: '2024-01-10T00:00:00Z'
@@ -32,7 +32,7 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
       goal: 'Build the main dashboard and navigation',
       startDate: '2024-01-30T00:00:00Z',
       endDate: '2024-02-13T00:00:00Z',
-      status: SprintStatus.PLANNED,
+      status: "PLANNING",
       projectId: 'project-1',
       createdAt: '2024-01-10T00:00:00Z',
       updatedAt: '2024-01-10T00:00:00Z'
@@ -48,7 +48,6 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
       type: 'STORY' as any,
       priority: 'HIGH' as any,
       taskNumber: 1,
-      key: 'PROJ-1',
       projectId: 'project-1',
       reporterId: 'user-1',
       reporter: {
@@ -78,7 +77,6 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
       type: 'STORY' as any,
       priority: 'MEDIUM' as any,
       taskNumber: 2,
-      key: 'PROJ-2',
       projectId: 'project-1',
       reporterId: 'user-1',
       reporter: {
@@ -153,8 +151,8 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
 
   const getTotalTimeSpent = () => {
     return tasks.reduce((total, task) => {
-      const timeSpent = task.timeEntries?.reduce((taskTotal, entry) => taskTotal + entry.timeSpent, 0) || 0;
-      return total + timeSpent;
+      // const timeSpent = task.timeEntries?.reduce((taskTotal, entry) => taskTotal + entry.timeSpent, 0) || 0;
+      return total + 0;
     }, 0);
   };
 
@@ -233,20 +231,20 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="sprints-progress-loading">
+        <div className="sprints-progress-loading-spinner"></div>
       </div>
     );
   }
 
   if (!currentSprint) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+      <div className="sprints-progress-empty">
+        <div className="sprints-progress-empty-content">
+          <h3 className="sprints-progress-empty-title sprints-progress-empty-title-dark">
             No Sprint Selected
           </h3>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="sprints-progress-empty-subtitle sprints-progress-empty-subtitle-dark">
             Please select a sprint from the dropdown above to view progress.
           </p>
         </div>
@@ -262,122 +260,120 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
   const sprintProgress = getSprintProgress();
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+    <div className="sprints-progress-container sprints-progress-container-dark">
+      <h3 className="sprints-progress-title sprints-progress-title-dark">
         Sprint Progress
       </h3>
 
       {/* Sprint Timeline */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+      <div className="sprints-progress-timeline">
+        <div className="sprints-progress-timeline-header">
+          <span className="sprints-progress-timeline-label sprints-progress-timeline-label-dark">
             Sprint Timeline
           </span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="sprints-progress-timeline-remaining sprints-progress-timeline-remaining-dark">
             {daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Sprint ended'}
           </span>
         </div>
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+        <div className="sprints-progress-bar-container sprints-progress-bar-container-dark">
           <div 
-            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+            className="sprints-progress-bar"
             style={{ width: `${Math.min(100, sprintProgress)}%` }}
           />
         </div>
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+        <div className="sprints-progress-timeline-dates sprints-progress-timeline-dates-dark">
           <span>{formatDate(currentSprint.startDate)}</span>
           <span>{formatDate(currentSprint.endDate)}</span>
         </div>
       </div>
 
       {/* Progress Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div className="sprints-progress-stats">
         {/* Story Points */}
-        <div className="text-center">
-          <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+        <div className="sprints-progress-stat">
+          <div className="sprints-progress-stat-value-indigo sprints-progress-stat-value-indigo-dark">
             {getCompletedStoryPoints()}/{getTotalStoryPoints()}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="sprints-progress-stat-label sprints-progress-stat-label-dark">
             Story Points
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
+          <div className="sprints-progress-bar-container sprints-progress-bar-container-dark">
             <div 
-              className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+              className="sprints-progress-stat-bar-indigo"
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="sprints-progress-stat-meta sprints-progress-stat-meta-dark">
             {Math.round(completionPercentage)}% complete
           </div>
         </div>
 
         {/* Time Tracking */}
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+        <div className="sprints-progress-stat">
+          <div className="sprints-progress-stat-value-green sprints-progress-stat-value-green-dark">
             {formatTime(getTotalTimeSpent())}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="sprints-progress-stat-label sprints-progress-stat-label-dark">
             Time Spent
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
+          <div className="sprints-progress-bar-container sprints-progress-bar-container-dark">
             <div 
-              className={`h-2 rounded-full transition-all duration-300 ${
-                timePercentage > 100 ? 'bg-red-500' : 'bg-green-500'
-              }`}
+              className={timePercentage > 100 ? 'sprints-progress-stat-bar-red' : 'sprints-progress-stat-bar-green'}
               style={{ width: `${Math.min(100, timePercentage)}%` }}
             />
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="sprints-progress-stat-meta sprints-progress-stat-meta-dark">
             {formatTime(getTotalOriginalEstimate())} estimated
           </div>
         </div>
 
         {/* Tasks */}
-        <div className="text-center">
-          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+        <div className="sprints-progress-stat">
+          <div className="sprints-progress-stat-value-purple sprints-progress-stat-value-purple-dark">
             {statusCounts.DONE}/{tasks.length}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="sprints-progress-stat-label sprints-progress-stat-label-dark">
             Tasks Complete
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
+          <div className="sprints-progress-bar-container sprints-progress-bar-container-dark">
             <div 
-              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+              className="sprints-progress-stat-bar-purple"
               style={{ width: `${tasks.length > 0 ? (statusCounts.DONE / tasks.length) * 100 : 0}%` }}
             />
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="sprints-progress-stat-meta sprints-progress-stat-meta-dark">
             {statusCounts.IN_PROGRESS} in progress
           </div>
         </div>
 
         {/* Velocity */}
-        <div className="text-center">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+        <div className="sprints-progress-stat">
+          <div className="sprints-progress-stat-value-orange sprints-progress-stat-value-orange-dark">
             {(currentSprint as any)?.velocity || 0}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="sprints-progress-stat-label sprints-progress-stat-label-dark">
             Velocity
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          <div className="sprints-progress-stat-meta sprints-progress-stat-meta-dark">
             Story points per day
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="sprints-progress-stat-meta sprints-progress-stat-meta-dark">
             Capacity: {(currentSprint as any)?.capacity || 0}h
           </div>
         </div>
       </div>
 
       {/* Burndown Chart Placeholder */}
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+      <div className="sprints-progress-burndown sprints-progress-burndown-dark">
+        <h4 className="sprints-progress-burndown-title sprints-progress-burndown-title-dark">
           Sprint Burndown
         </h4>
-        <div className="h-32 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-          <div className="text-center">
-            <svg className="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="sprints-progress-burndown-placeholder sprints-progress-burndown-placeholder-dark">
+          <div className="sprints-progress-burndown-content">
+            <svg className="sprints-progress-burndown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="sprints-progress-burndown-text sprints-progress-burndown-text-dark">
               Burndown chart will be implemented here
             </p>
           </div>
@@ -385,17 +381,17 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
       </div>
 
       {/* Quick Actions */}
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
-        <div className="flex justify-between items-center">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+      <div className="sprints-progress-actions sprints-progress-actions-dark">
+        <div className="sprints-progress-actions-header">
+          <h4 className="sprints-progress-actions-title sprints-progress-actions-title-dark">
             Quick Actions
           </h4>
-          <div className="flex space-x-2">
-            <button className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+          <div className="sprints-progress-actions-buttons">
+            <button className="sprints-progress-action-button sprints-progress-action-button-dark">
               View Sprint Report
             </button>
-            <span className="text-gray-300 dark:text-gray-600">|</span>
-            <button className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+            <span className="sprints-progress-actions-divider sprints-progress-actions-divider-dark">|</span>
+            <button className="sprints-progress-action-button sprints-progress-action-button-dark">
               Export Data
             </button>
           </div>

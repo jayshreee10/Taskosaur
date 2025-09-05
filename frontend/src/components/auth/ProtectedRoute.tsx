@@ -1,20 +1,20 @@
-"use client";
-
 import { useAuth } from "@/contexts/auth-context";
 import { TokenManager } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/router";
 import { useEffect, useState, useCallback } from "react";
+import AppProviders from "./AppProviders";
+import OrgProviders from "./OrgProvider";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   redirectTo?: string;
-  requireOrganization?: boolean;
+  publicRoutes?: string[];
 }
 
 export default function ProtectedRoute({
   children,
   redirectTo = "/login",
-  requireOrganization = false,
+  publicRoutes = ["/login", "/register", "/forgot-password", "/reset-password"],
 }: ProtectedRouteProps) {
   const {
     getCurrentUser,
@@ -23,75 +23,93 @@ export default function ProtectedRoute({
     checkOrganizationAndRedirect,
   } = useAuth();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasOrganization, setHasOrganization] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const checkAuthStatus = useCallback(async (): Promise<{ isAuth: boolean; redirectPath?: string }> => {
+  const isPublicRoute = publicRoutes.includes(router.pathname);
+
+  const checkAuthStatus = useCallback(async (): Promise<{
+    isAuth: boolean;
+    redirectPath?: string;
+    isOrg: boolean;
+  }> => {
     try {
-      // Check tokens first
       const accessToken = TokenManager.getAccessToken();
+      const currentOrgId = TokenManager.getCurrentOrgId();
       const currentUser = getCurrentUser();
       const contextAuth = contextIsAuthenticated;
       const isAuth = !!(accessToken && currentUser && contextAuth);
 
       if (!isAuth) {
-        return { isAuth: false, redirectPath: redirectTo };
+        if (isPublicRoute) {
+          return { isAuth: false, isOrg: false }; // No redirect needed
+        }
+        return { isAuth: false, redirectPath: redirectTo, isOrg: false };
       }
 
-      // Always check organization after auth
-      if (typeof checkOrganizationAndRedirect === 'function') {
-        const orgRedirect = await checkOrganizationAndRedirect();
-        if (orgRedirect === '/organization') {
-          return { isAuth: true, redirectPath: '/organization' };
+      if (isPublicRoute) {
+        if (typeof checkOrganizationAndRedirect === "function") {
+          const orgRedirect = await checkOrganizationAndRedirect();
+          if (!currentOrgId && orgRedirect === "/intro") {
+            return { isAuth: true, redirectPath: "/intro", isOrg: false };
+          }
+          if (!currentOrgId && orgRedirect === "/dashboard") {
+            return { isAuth: true, redirectPath: "/dashboard", isOrg: true };
+          }
         }
-        if (orgRedirect === '/dashboard') {
-          return { isAuth: true, redirectPath: '/dashboard' };
+        return { isAuth: true, redirectPath: "/dashboard", isOrg: true };
+      }
+
+      if (typeof checkOrganizationAndRedirect === "function") {
+        const orgRedirect = await checkOrganizationAndRedirect();
+        if (!currentOrgId && orgRedirect === "/intro") {
+          return { isAuth: true, redirectPath: "/intro", isOrg: false };
+        }
+        if (!currentOrgId && orgRedirect === "/dashboard") {
+          return { isAuth: true, redirectPath: "/dashboard", isOrg: true };
         }
       }
-      return { isAuth: true };
+
+      return { isAuth: true, isOrg: true };
     } catch (error) {
       console.error("Protected route auth check error:", error);
-      return { isAuth: false, redirectPath: redirectTo };
+      return { isAuth: false, redirectPath: redirectTo, isOrg: false };
     }
   }, [
     contextIsAuthenticated,
     getCurrentUser,
     redirectTo,
     checkOrganizationAndRedirect,
+    isPublicRoute,
   ]);
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
+    if (authLoading) return;
 
     const performAuthCheck = async () => {
-      try {
-        const { isAuth, redirectPath } = await checkAuthStatus();
-        setIsAuthenticated(isAuth);
+      const { isAuth, redirectPath, isOrg } = await checkAuthStatus();
+      setIsAuthenticated(isAuth);
+      setHasOrganization(isOrg);
+      setIsInitializing(false);
 
-        if (redirectPath) {
-          if (redirectPath === redirectTo) {
-            TokenManager.clearTokens();
-          }
-          router.push(redirectPath);
+      if (redirectPath && redirectPath !== router.pathname) {
+        setIsRedirecting(true);
+        if (!isAuth && redirectPath === redirectTo) {
+          TokenManager.clearTokens();
         }
-      } catch (error) {
-        console.error("Protected route check error:", error);
-        setIsAuthenticated(false);
-        TokenManager.clearTokens();
-        router.push(redirectTo);
-      } finally {
-        setIsLoading(false);
+        await router.replace(redirectPath);
+        setIsRedirecting(false);
       }
     };
 
-    // Add a small delay to ensure auth context is fully initialized
-    const timeoutId = setTimeout(performAuthCheck, 200);
-    return () => clearTimeout(timeoutId);
-  }, [authLoading, checkAuthStatus, redirectTo, router]);
+    performAuthCheck();
+    // no router in deps: replace is stable, avoids extra reruns
+    // eslint-disable-next-line
+  }, [authLoading, checkAuthStatus, redirectTo]);
 
-  if (isLoading || authLoading) {
+  if (authLoading || isInitializing || isRedirecting) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
         <div className="flex flex-col items-center space-y-4">
@@ -104,9 +122,17 @@ export default function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
+  if (isPublicRoute) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  if (isAuthenticated && hasOrganization) {
+    return <AppProviders>{children}</AppProviders>;
+  }
+
+  if (isAuthenticated && !hasOrganization) {
+    return <OrgProviders>{children}</OrgProviders>;
+  }
+
+  return null;
 }

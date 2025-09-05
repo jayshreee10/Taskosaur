@@ -126,7 +126,8 @@ export class CreateProjectDto {
   workspaceId: string;
 
   @ApiProperty({
-    description: 'ID of the workflow to use for this project (if not provided, organization default will be used)',
+    description:
+      'ID of the workflow to use for this project (if not provided, organization default will be used)',
     example: '123e4567-e89b-12d3-a456-426614174001',
     format: 'uuid',
     required: false,

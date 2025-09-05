@@ -4,3 +4,4 @@ export * from './organizationApi';
 export * from './projectApi';
 export * from './taskApi';
 export * from './workspaceApi';
+export * from './orgChartsApi';

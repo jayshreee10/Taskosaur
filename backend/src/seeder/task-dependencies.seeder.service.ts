@@ -20,13 +20,16 @@ export class TaskDependenciesSeederService {
     const createdDependencies: TaskDependency[] = [];
 
     // Group tasks by project to create logical dependencies
-    const tasksByProject = tasks.reduce((acc, task) => {
-      if (!acc[task.projectId]) {
-        acc[task.projectId] = [];
-      }
-      acc[task.projectId].push(task);
-      return acc;
-    }, {} as Record<string, Task[]>);
+    const tasksByProject = tasks.reduce(
+      (acc, task) => {
+        if (!acc[task.projectId]) {
+          acc[task.projectId] = [];
+        }
+        acc[task.projectId].push(task);
+        return acc;
+      },
+      {} as Record<string, Task[]>,
+    );
 
     // Create dependencies within each project
     for (const [projectId, projectTasks] of Object.entries(tasksByProject)) {
@@ -48,20 +51,30 @@ export class TaskDependenciesSeederService {
           });
 
           createdDependencies.push(dependency);
-          
+
           // Get task titles for logging
-          const dependentTask = projectTasks.find(t => t.id === dependencyData.dependentTaskId);
-          const blockingTask = projectTasks.find(t => t.id === dependencyData.blockingTaskId);
-          
-          console.log(`   ✓ Created dependency: "${dependentTask?.title}" ${dependencyData.type} "${blockingTask?.title}"`);
+          const dependentTask = projectTasks.find(
+            (t) => t.id === dependencyData.dependentTaskId,
+          );
+          const blockingTask = projectTasks.find(
+            (t) => t.id === dependencyData.blockingTaskId,
+          );
+
+          console.log(
+            `   ✓ Created dependency: "${dependentTask?.title}" ${dependencyData.type} "${blockingTask?.title}"`,
+          );
         } catch (error) {
           // Skip if dependency already exists or there's a constraint violation
-          console.log(`   ⚠ Dependency creation skipped (might already exist)`);
+          console.log(
+            `   ⚠ Dependency creation skipped (might already exist)`,
+          );
         }
       }
     }
 
-    console.log(`✅ Task dependencies seeding completed. Created ${createdDependencies.length} dependencies.`);
+    console.log(
+      `✅ Task dependencies seeding completed. Created ${createdDependencies.length} dependencies.`,
+    );
     return createdDependencies;
   }
 
@@ -73,7 +86,9 @@ export class TaskDependenciesSeederService {
     }> = [];
 
     // Sort tasks by creation date to establish logical order
-    const sortedTasks = [...tasks].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const sortedTasks = [...tasks].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    );
 
     // Create logical dependencies based on task types and names
     for (let i = 0; i < sortedTasks.length; i++) {
@@ -94,51 +109,92 @@ export class TaskDependenciesSeederService {
     }
 
     // Limit to reasonable number of dependencies (avoid over-complication)
-    return dependencies.slice(0, Math.min(dependencies.length, Math.floor(tasks.length / 2)));
+    return dependencies.slice(
+      0,
+      Math.min(dependencies.length, Math.floor(tasks.length / 2)),
+    );
   }
 
-  private shouldCreateDependency(dependentTask: Task, blockingTask: Task): boolean {
+  private shouldCreateDependency(
+    dependentTask: Task,
+    blockingTask: Task,
+  ): boolean {
     const dependent = dependentTask.title.toLowerCase();
     const blocking = blockingTask.title.toLowerCase();
 
     // Authentication/Setup dependencies
-    if (dependent.includes('authentication') || dependent.includes('login') || dependent.includes('auth')) {
-      if (blocking.includes('setup') || blocking.includes('environment') || blocking.includes('structure') || blocking.includes('foundation')) {
+    if (
+      dependent.includes('authentication') ||
+      dependent.includes('login') ||
+      dependent.includes('auth')
+    ) {
+      if (
+        blocking.includes('setup') ||
+        blocking.includes('environment') ||
+        blocking.includes('structure') ||
+        blocking.includes('foundation')
+      ) {
         return true;
       }
     }
 
     // UI depends on backend/API
-    if (dependent.includes('dashboard') || dependent.includes('ui') || dependent.includes('frontend')) {
-      if (blocking.includes('api') || blocking.includes('backend') || blocking.includes('authentication') || blocking.includes('database')) {
+    if (
+      dependent.includes('dashboard') ||
+      dependent.includes('ui') ||
+      dependent.includes('frontend')
+    ) {
+      if (
+        blocking.includes('api') ||
+        blocking.includes('backend') ||
+        blocking.includes('authentication') ||
+        blocking.includes('database')
+      ) {
         return true;
       }
     }
 
     // Testing depends on implementation
     if (dependent.includes('test') || dependent.includes('qa')) {
-      if (blocking.includes('implement') || blocking.includes('create') || blocking.includes('build')) {
+      if (
+        blocking.includes('implement') ||
+        blocking.includes('create') ||
+        blocking.includes('build')
+      ) {
         return true;
       }
     }
 
     // Design system dependencies
     if (dependent.includes('component') && !dependent.includes('button')) {
-      if (blocking.includes('button') || blocking.includes('color') || blocking.includes('typography') || blocking.includes('design system')) {
+      if (
+        blocking.includes('button') ||
+        blocking.includes('color') ||
+        blocking.includes('typography') ||
+        blocking.includes('design system')
+      ) {
         return true;
       }
     }
 
     // Deployment depends on implementation
     if (dependent.includes('deploy') || dependent.includes('release')) {
-      if (blocking.includes('implement') || blocking.includes('test') || blocking.includes('bug')) {
+      if (
+        blocking.includes('implement') ||
+        blocking.includes('test') ||
+        blocking.includes('bug')
+      ) {
         return true;
       }
     }
 
     // Database schema before CRUD operations
     if (dependent.includes('crud') || dependent.includes('management')) {
-      if (blocking.includes('schema') || blocking.includes('database') || blocking.includes('model')) {
+      if (
+        blocking.includes('schema') ||
+        blocking.includes('database') ||
+        blocking.includes('model')
+      ) {
         return true;
       }
     }
@@ -163,23 +219,30 @@ export class TaskDependenciesSeederService {
     return false;
   }
 
-  private getDependencyType(dependentTask: Task, blockingTask: Task): DependencyType {
+  private getDependencyType(
+    dependentTask: Task,
+    blockingTask: Task,
+  ): DependencyType {
     // Most dependencies in software development are BLOCKS (finish-to-start)
     // The blocking task must be completed before the dependent task can start
-    
+
     if (dependentTask.type === 'SUBTASK' && blockingTask.type === 'STORY') {
       return DependencyType.FINISH_START; // Story must finish before subtask starts
     }
 
     // For parallel work that needs coordination
-    if (dependentTask.title.toLowerCase().includes('integration') || 
-        blockingTask.title.toLowerCase().includes('api')) {
+    if (
+      dependentTask.title.toLowerCase().includes('integration') ||
+      blockingTask.title.toLowerCase().includes('api')
+    ) {
       return DependencyType.FINISH_START; // API must be ready before integration
     }
 
     // Testing usually starts when implementation finishes
-    if (dependentTask.title.toLowerCase().includes('test') ||
-        dependentTask.title.toLowerCase().includes('qa')) {
+    if (
+      dependentTask.title.toLowerCase().includes('test') ||
+      dependentTask.title.toLowerCase().includes('qa')
+    ) {
       return DependencyType.FINISH_START;
     }
 

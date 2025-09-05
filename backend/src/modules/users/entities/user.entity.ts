@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole, UserStatus } from '@prisma/client';
+import { Role, UserStatus } from '@prisma/client';
 
 export class User {
   @ApiProperty()
@@ -29,8 +29,8 @@ export class User {
   @ApiProperty({ default: 'en' })
   language: string;
 
-  @ApiProperty({ enum: UserRole, default: UserRole.MEMBER })
-  role: UserRole;
+  @ApiProperty({ enum: Role, default: Role.MEMBER })
+  role: Role;
 
   @ApiProperty({ enum: UserStatus, default: UserStatus.ACTIVE })
   status: UserStatus;

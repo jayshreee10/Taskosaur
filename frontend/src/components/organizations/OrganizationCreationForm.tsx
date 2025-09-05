@@ -1,10 +1,10 @@
-"use client"
+
 import { useOrganization } from "@/contexts/organization-context";
-import { Organization } from "@/utils/api";
 import { useState } from "react";
 import { Button, Card, CardContent, Input, Label, Textarea } from "../ui";
 import { HiExclamationTriangle } from "react-icons/hi2";
 import { HiPlus } from "react-icons/hi";
+import { Organization } from "@/types";
 
 const OrganizationCreationForm = ({ 
   onSuccess, 

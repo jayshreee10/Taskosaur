@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -9,9 +10,11 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { S3Service } from '../s3/s3.service';
+import { ChangePasswordDto } from '../auth/dto/change-password.dto';
 
 @Injectable()
 export class UsersService {
+  usersService: any;
   constructor(
     private prisma: PrismaService,
     private s3Service: S3Service,
@@ -67,6 +70,7 @@ export class UsersService {
         emailVerified: true,
         refreshToken: true,
         preferences: true,
+        onboardInfo: true,
         resetToken: true,
         resetTokenExpiry: true,
         createdAt: true,
@@ -102,10 +106,12 @@ export class UsersService {
         language: true,
         role: true,
         status: true,
+        password: true,
         lastLoginAt: true,
         emailVerified: true,
         refreshToken: true,
         preferences: true,
+        onboardInfo: true,
         resetToken: true,
         resetTokenExpiry: true,
         createdAt: true,
@@ -120,7 +126,22 @@ export class UsersService {
     if (user.avatar) {
       avatarUrl = await this.s3Service.getGetPresignedUrl(user.avatar);
     }
-    return { ...user, avatar: avatarUrl || null };
+    const { password, ...userWithoutPassword } = user;
+    return { ...userWithoutPassword, avatar: avatarUrl || null };
+  }
+
+
+  async getUserPassword(id: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        password: true,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user.password;
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -185,7 +206,7 @@ export class UsersService {
     }
 
     const { password, ...userWithoutPassword } = user;
-    return {...userWithoutPassword, avatar: avatarUrl };
+    return { ...userWithoutPassword, avatar: avatarUrl };
   }
 
   async remove(id: string): Promise<void> {
@@ -268,4 +289,49 @@ export class UsersService {
       },
     });
   }
+
+  async checkUsersExist(): Promise<boolean> {
+    const count = await this.prisma.user.count();
+    return count > 0;
+  }
+
+
+
+ async changePassword(
+  userId: string,
+  changePasswordDto: ChangePasswordDto,
+): Promise<{ success: boolean; message: string }> {
+  const userPassword = await this.getUserPassword(userId);
+  if (userPassword === null) {
+    throw new BadRequestException('User not found');
+  }
+
+  const isMatch = await bcrypt.compare(changePasswordDto.currentPassword, userPassword);
+  if (!isMatch) {
+    throw new BadRequestException('Current password is not correct');
+  }
+
+  
+  const isSamePassword = await bcrypt.compare(changePasswordDto.newPassword, userPassword);
+  if (isSamePassword) {
+    throw new BadRequestException('New password must be different from current password');
+  }
+
+  if (changePasswordDto.newPassword !== changePasswordDto.confirmPassword) {
+    throw new BadRequestException('New password and confirm password do not match');
+  }
+
+  if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(changePasswordDto.newPassword)) {
+    throw new BadRequestException(
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+    );
+  }
+
+  const saltRounds = 12;
+  const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, saltRounds);
+
+  await this.updatePassword(userId, hashedPassword);
+
+  return { success: true, message: 'Password changed successfully' };
+}
 }

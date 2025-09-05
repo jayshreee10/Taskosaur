@@ -1,6 +1,9 @@
-# Taskosaur
+# Taskosaur - Where AI Meets Action
+### The First Full-Featured AI Mode Open Source Project Management Tool
 
-> **An Open-Source, Self-Hostable Alternative to Jira, Monday.com, and Enterprise Project Management**
+> **"Stop Managing Projects. Start Talking to Them"**
+
+🚀 **World's First AI Mode Project Management Tool** - Taskosaur isn't just project management software, it's a complete **Project Manager Assistant** rolled into one. Our groundbreaking AI Mode allows you to accomplish almost all project management tasks through natural language conversation - a first in the industry.
 
 <!-- Badges will be added here -->
 ![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
@@ -9,22 +12,29 @@
 ![Next.js](https://img.shields.io/badge/nextjs-15.2.2-black.svg)
 ![PostgreSQL](https://img.shields.io/badge/postgresql-%3E%3D13-blue.svg)
 ![Redis](https://img.shields.io/badge/redis-%3E%3D6-red.svg)
+![AI](https://img.shields.io/badge/AI-Powered-purple.svg)
 
-**Take control of your project management.** Taskosaur aims to be a powerful, enterprise-grade project management platform that you can host on your own infrastructure. Built with modern technologies and designed to compete with commercial solutions, Taskosaur is working toward providing the features of Jira, Monday.com, and Asana without vendor lock-in, data privacy concerns, or subscription fees.
+**Transform how you manage projects with revolutionary AI Mode.** Taskosaur is the world's first open source project management platform with full AI Mode integration - a conversational AI assistant that doesn't just help, it **acts as your complete Project Manager Assistant**. Unlike traditional PM tools where you navigate through complex menus and forms, Taskosaur's AI Mode lets you accomplish virtually all project management tasks through natural conversation - simply tell the AI what you need, and watch it execute complex workflows in real-time.
 
 ## Why Choose Taskosaur?
 
-🏠 **Self-Hosted & Private** - Your data stays on your servers, under your control  
-💰 **Cost-Effective** - No per-seat pricing or monthly subscriptions  
-🔧 **Fully Customizable** - Modify and extend the platform to fit your exact needs  
-🚀 **Modern Tech Stack** - Built with TypeScript, NestJS, Next.js, and PostgreSQL  
-📱 **Enterprise Features** - Working toward advanced workflows, automation, analytics, and integrations  
-🌍 **Open Source** - Transparent, community-driven development
+🏆 **World's First AI Mode PM Tool** - Revolutionary AI Mode that executes complex project management workflows through conversation  
+🤖 **Complete Project Manager Assistant** - Not just AI help, but a full PM assistant that handles tasks from creation to completion  
+💬 **Natural Language Everything** - "Create sprint with high-priority bugs from last week" - and it happens automatically  
+🎯 **Zero Learning Curve** - If you can chat, you can manage entire projects  
+🏠 **Self-Hosted & Private** - Your data, AI conversations, and project insights stay completely private  
+💰 **No AI Subscription Fees** - Use your own LLM key, no expensive monthly AI charges  
+🔧 **Intelligent Automation** - AI that learns your workflows and proactively suggests optimizations  
+🚀 **Advanced AI Capabilities** - Browser automation, intelligent task routing, predictive analytics  
+📱 **Enterprise Ready** - Full-featured PM with AI superpowers, not limitations  
+🌍 **Open Source Revolution** - First open source tool to crack the AI PM code
 
 ## Table of Contents
 
 - [Why Choose Taskosaur?](#why-choose-taskosaur)
+- [🚀 AI Mode Setup](#-ai-mode-setup)
 - [Features](#features)
+  - [🤖 Revolutionary AI Mode Capabilities](#-revolutionary-ai-mode-capabilities)
 - [Quick Start](#quick-start)
 - [Development](#development)
 - [Project Structure](#project-structure)
@@ -37,9 +47,83 @@
 - [Acknowledgments](#acknowledgments)
 - [Support](#support)
 
+## 🚀 AI Mode Setup
+
+**Unlock the world's first AI Mode for project management!**
+
+### Enable AI Mode in 3 Simple Steps:
+
+1. **Navigate to Organization Settings**
+   ```
+   Go to Settings → Organization Settings → AI Assistant Settings
+   ```
+
+2. **Add Your LLM API Key**
+   - Toggle "Enable AI Chat" to ON
+   - Add your API key from any compatible provider:
+     - **OpenRouter** (100+ models, free options): `https://openrouter.ai/api/v1`
+     - **OpenAI** (GPT models): `https://api.openai.com/v1` 
+     - **Anthropic** (Claude models): `https://api.anthropic.com/v1`
+     - **Local AI** (Ollama, etc.): Your local endpoint
+
+3. **Start Managing with AI**
+   - Open the AI chat panel (sparkles icon)
+   - Type: *"Create a new project called Website Redesign with 5 tasks"*
+   - Watch Taskosaur execute complex workflows automatically!
+
+### What Makes Taskosaur's AI Mode Revolutionary?
+
+Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually performs actions**:
+
+- **Direct Browser Automation** - AI navigates your interface and clicks buttons
+- **Complex Workflow Execution** - Multi-step operations handled seamlessly  
+- **Context-Aware Actions** - Understands your current project/workspace context
+- **Natural Language Interface** - No commands to memorize, just speak naturally
+
+**Example AI Mode Commands:**
+```
+"Set up a new marketing workspace with Q1 campaign project"
+"Move all high-priority bugs to in-progress and assign to John"
+"Create a sprint with tasks from last week's backlog"
+"Generate a report of Sarah's completed tasks this month"
+"Set up automated workflow: when task is marked done, create review subtask"
+```
+
 ## Features
 
 *Taskosaur is actively under development. The following features represent our planned capabilities, with many already implemented and others in progress.*
+
+### 🤖 Revolutionary AI Mode Capabilities
+
+**The World's First AI Project Manager Assistant That Actually Works**
+
+🎯 **Complete Workflow Automation**
+- **Browser-Based Task Execution**: AI doesn't just suggest - it navigates your interface, fills forms, and completes tasks
+- **Multi-Step Workflow Processing**: "Create workspace → Add team → Set up projects → Generate initial tasks" - all in one command
+- **Intelligent Context Understanding**: AI knows your current workspace, project, and team context automatically
+- **Proactive Project Management**: AI identifies bottlenecks, suggests improvements, and flags potential issues
+
+🧠 **Advanced Natural Language Processing**  
+- **Intent Recognition**: Understands complex project management requests in natural language
+- **Command Parsing**: Extracts specific actions, parameters, and context from conversational inputs
+- **Smart Parameter Inference**: Fills in missing details based on current context and project history
+
+⚡ **Real-Time Action Execution**
+- **Live Browser Automation**: Watch AI click buttons, fill forms, and navigate interfaces in real-time
+- **Bulk Operations**: Process hundreds of tasks, assignments, or updates with single commands
+- **Cross-Platform Integration**: AI works with your existing tools and workflows seamlessly
+
+🚀 **Intelligent Project Workflows**
+- **Automated Sprint Planning**: AI analyzes task complexity, team capacity, and historical data
+- **Smart Task Distribution**: Optimal task assignment based on team skills and current workload
+- **Predictive Analytics**: Forecast project completion, identify risks, and suggest mitigation strategies
+
+**Real AI Mode Examples:**
+- "Set up Q1 marketing campaign: create workspace, add team, set up 3 projects with standard templates"
+- "Analyze all overdue tasks and reschedule based on team capacity and priorities"  
+- "Create automated workflow: high-priority bugs → assign to senior dev → notify team lead"
+- "Generate sprint retrospective with team velocity analysis and improvement suggestions"
+- "Migrate all design tasks from old project to new workspace with updated assignments"
 
 ### Organization Management
 - **Multi-tenant Architecture**: Planned support for multiple organizations with isolated data
@@ -119,7 +203,7 @@
    
    # Setup database
    npm run db:migrate
-   npm run db:seed
+   npm run db:seed core
    ```
    
 3. **Manual Setup (Alternative)**
@@ -188,7 +272,7 @@
    
    # Setup database
    npm run db:migrate         # Run database migrations
-   npm run db:seed            # Seed the database with core data
+   npm run db:seed core            # Seed the database with core data
    ```
 
 4. **Start the Application**
@@ -220,7 +304,7 @@ npm run start:dev         # Start both backend and frontend in development
 
 # Database Operations
 npm run db:migrate           # Run database migrations
-npm run db:seed              # Seed database with core data  
+npm run db:seed core         # Seed database with core data  
 npm run db:reset             # Reset database (deletes all data!)
 npm run db:generate          # Generate Prisma client
 ```
@@ -286,89 +370,6 @@ taskosaur/
 │   └── public/            # Static assets
 └── README.md
 ```
-
-## Development Roadmap
-
-### Current Status
-- Core project management features (in development)
-- Basic task management with multiple views (in progress)
-- User authentication and authorization
-- Real-time updates via WebSocket (in development)
-- Basic automation rules (planned)
-- File attachments and comments (in development)
-
-### Phase 1: Core Enhancements (Q2 2025)
-- [ ] **Advanced Search & Filtering**
-  - Global search with advanced filters
-  - Saved search queries
-  - Search within comments and attachments
-  
-- [ ] **Enhanced Notifications**
-  - In-app notification center
-  - Email notification templates
-  - Slack/Discord integrations
-  
-- [ ] **Improved Analytics**
-  - Advanced reporting dashboards
-  - Export reports to PDF/Excel
-  - Custom chart builders
-
-### Phase 2: Collaboration Features (Q3 2025)
-- [ ] **Advanced Commenting System**
-  - Rich text editor with markdown support
-  - Comment reactions and threading
-  - @mention improvements with team suggestions
-  
-- [ ] **Real-time Collaboration**
-  - Live cursor tracking in task editing
-  - Collaborative document editing
-  - Screen sharing integration
-  
-- [ ] **Mobile Application**
-  - React Native mobile app
-  - Offline capability
-  - Push notifications
-
-### Phase 3: Enterprise Features (Q4 2025)
-- [ ] **Advanced Security**
-  - Two-factor authentication (2FA)
-  - Single Sign-On (SSO) integration
-  - Advanced audit logging
-  
-- [ ] **Integrations & API**
-  - REST API improvements
-  - GraphQL API
-  - GitHub/GitLab integration
-  - Jira import/export tools
-  
-- [ ] **Scalability & Performance**
-  - Database query optimization
-  - Caching improvements
-  - CDN integration for file uploads
-
-### Phase 4: AI & Advanced Features (2026)
-- [ ] **AI-Powered Features**
-  - Automatic task prioritization
-  - Smart deadline predictions
-  - Natural language task creation
-  
-- [ ] **Advanced Project Management**
-  - Resource management and capacity planning
-  - Advanced dependency management
-  - Portfolio management for multiple projects
-  
-- [ ] **Custom Plugins System**
-  - Plugin architecture
-  - Custom field types
-  - Third-party integration marketplace
-
-### Long-term Vision
-- **Open-Source Alternative**: Provide a viable open-source option alongside Jira, Monday.com, Asana, and other enterprise PM tools
-- **Data Sovereignty**: Give organizations complete control over their project data and infrastructure
-- **Zero Vendor Lock-in**: Enable seamless migration and customization without proprietary constraints
-- **Community-Driven Innovation**: Build features driven by real user needs, not subscription revenue
-- **Enterprise Without the Enterprise Tax**: Deliver enterprise-grade functionality without per-seat pricing
-- **Developer-First Approach**: Create the most developer-friendly and extensible project management platform
 
 ## Deployment
 
@@ -446,6 +447,26 @@ The API documentation is automatically generated using Swagger and is available 
 
 ## FAQ
 
+### AI & Features Questions
+
+**Q: How does Taskosaur's AI Mode work?**
+A: Unlike basic AI chatbots, Taskosaur's AI Mode is a complete Project Manager Assistant. It uses advanced browser automation to actually perform actions - navigating interfaces, filling forms, creating tasks, updating statuses, and executing complex workflows. It combines natural language understanding with real automation capabilities to act as your personal project manager.
+
+**Q: What makes this different from other AI project management tools?**
+A: Taskosaur is the world's first **AI Mode** project management tool. While other tools offer AI chat for suggestions, Taskosaur's AI actually executes tasks, automates workflows, and manages projects end-to-end through natural conversation. It's the difference between AI advice and AI action.
+
+**Q: How do I enable AI Mode?**
+A: Go to Organization Settings → AI Assistant Settings, toggle "Enable AI Chat" to ON, and add your LLM API key from any compatible provider (OpenRouter, OpenAI, Anthropic, or local AI). The AI chat panel (sparkles icon) will appear, ready to manage your projects conversationally.
+
+**Q: What can I accomplish with AI Mode?**
+A: Virtually everything! Set up complete project hierarchies, automate task assignments, bulk update hundreds of items, create complex workflows, generate reports, analyze team performance, migrate data between projects - all through natural language commands.
+
+**Q: Does the AI require internet connection?**
+A: Taskosaur supports both cloud AI providers (OpenRouter, OpenAI, Anthropic) and local AI models (Ollama, etc.). For complete privacy, run open-source models locally. The AI Mode automation works entirely within your browser.
+
+**Q: Is my data secure with AI Mode?**
+A: Absolutely. All AI interactions happen within your self-hosted Taskosaur instance. Your project data, conversations, and API keys stay completely private. The AI only sees what you choose to share through the chat interface.
+
 ### General Questions
 
 **Q: Is Taskosaur free to use?**
@@ -455,7 +476,7 @@ A: Yes! Taskosaur is available under the Business Source License and free for no
 A: Yes, you can use Taskosaur for production purposes as long as you don't offer it to third parties as a competitive hosting service or embedded product. Internal use within your organization is permitted. After 4 years, it becomes MPL 2.0 licensed.
 
 **Q: How does Taskosaur compare to Jira/Monday.com/Asana?**
-A: Taskosaur is working toward providing equivalent functionality to these enterprise platforms with key advantages: complete data ownership, no subscription fees, full source code access for customization, modern tech stack, and the ability to host on your own infrastructure. Our goal is to offer enterprise features without vendor lock-in.
+A: Taskosaur provides equivalent core functionality but with a revolutionary advantage: the world's first AI Mode that actually executes project management tasks through conversation. While traditional tools require manual navigation and complex workflows, Taskosaur's AI Mode handles everything from project setup to team coordination through natural language. Plus, you get complete data ownership, no subscription fees, full source code access, and self-hosting capability. It's like having Jira's power with an expert Project Manager Assistant built-in.
 
 ### Technical Questions
 

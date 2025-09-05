@@ -6,6 +6,7 @@ import { join } from 'path';
 import * as express from 'express';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import * as fs from 'fs';
+import { createStaticRoutingMiddleware, findPublicDir } from './middleware/static-routing.middleware';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -13,9 +14,6 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const appConfig = configService.get('app');
-
-  // Set global prefix
-  app.setGlobalPrefix('api');
 
   // Enable CORS
   app.enableCors({
@@ -28,6 +26,8 @@ async function bootstrap() {
           'http://0.0.0.0:4000',
           'http://127.0.0.1:3000',
           'http://localhost:8080',
+          'http://0.0.0.0:9101',
+          'http://localhost:9101',
         ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
@@ -54,8 +54,32 @@ async function bootstrap() {
   const port = appConfig.port;
   const host = appConfig.host || '0.0.0.0';
 
-  // Serve static files from the docs directory
-  app.use('/docs', express.static(join(__dirname, '..', 'docs')));
+  // Find and serve static files from the docs directory
+  const findDocsDir = () => {
+    let docsPath = join(__dirname, 'docs');
+    if (fs.existsSync(docsPath)) {
+      return docsPath;
+    }
+
+    docsPath = join(__dirname, '..', 'docs');
+    if (fs.existsSync(docsPath)) {
+      return docsPath;
+    }
+
+    throw new Error(`Could not find 'docs' directory. Searched in:
+- ${join(__dirname, 'docs')}
+- ${join(__dirname, '..', 'docs')}`);
+  };
+
+  const docsDir = findDocsDir();
+  app.use('/docs', express.static(docsDir));
+
+  // Serve static files from public directory (JS, CSS, images, etc.)
+  const publicDir = findPublicDir();
+  app.use(express.static(publicDir));
+
+  // Serve Next.js static HTML files and handle dynamic routing
+  app.use(createStaticRoutingMiddleware(publicDir));
 
   // Configure Swagger documentation
   const swaggerConfig = appConfig.swagger;

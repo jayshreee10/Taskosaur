@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Workflow, StatusCategory } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -18,7 +19,6 @@ export class WorkflowsService {
     userId: string,
   ): Promise<Workflow> {
     return this.prisma.$transaction(async (tx) => {
-      
       if (createWorkflowDto.isDefault) {
         await tx.workflow.updateMany({
           where: {
@@ -94,6 +94,7 @@ export class WorkflowsService {
             slug: true,
           },
         },
+        statuses: true, // include all workflow statuses
         _count: {
           select: {
             statuses: true,
@@ -297,5 +298,60 @@ export class WorkflowsService {
         },
       },
     });
+  }
+  async makeWorkflowDefault(
+    workflowId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<Workflow> {
+    try {
+      const updatedWorkflow = await this.prisma.$transaction(async (prisma) => {
+        const workflow = await prisma.workflow.findUnique({
+          where: { id: workflowId },
+          include: { organization: true },
+        });
+
+        if (!workflow) {
+          throw new NotFoundException('Workflow not found');
+        }
+
+        if (workflow.organizationId !== organizationId) {
+          throw new BadRequestException(
+            'Workflow does not belong to this organization',
+          );
+        }
+
+        // unset any existing default
+        await prisma.workflow.updateMany({
+          where: {
+            organizationId: organizationId,
+            isDefault: true,
+          },
+          data: {
+            isDefault: false,
+            updatedBy: userId,
+            updatedAt: new Date(),
+          },
+        });
+
+        // set new default and return it
+        return prisma.workflow.update({
+          where: { id: workflowId },
+          data: {
+            isDefault: true,
+            updatedBy: userId,
+            updatedAt: new Date(),
+          },
+          include: { organization: true },
+        });
+      });
+
+      return updatedWorkflow;
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Workflow not found');
+      }
+      throw error;
+    }
   }
 }

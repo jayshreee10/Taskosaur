@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* ================================
+   Core Theme & Base Styles
+   ================================ */
+@import "../styles/common/theme.css";
+@import "../styles/common/typography.css";
+/* @import "../styles/common/browser.css"; */
+
+/* ================================
+   Component-Specific Styles
+   ================================ */
+@import "../styles/components/ui.css";
+@import "../styles/components/cards.css";
+@import "../styles/components/badges.css";
+@import "../styles/components/buttons.css";
+@import "../styles/components/layout.css";
+@import "../styles/components/tables.css";
+@import "../styles/components/modals.css";
+@import "../styles/components/login.css";
+@import "../styles/components/signup.css";
+@import "../styles/components/dashboard.css";
+@import "../styles/components/tasks.css";
+@import "../styles/components/project-detail.css";
+@import "../styles/components/activity.css";
+@import "../styles/components/analytics.css";
+@import "../styles/components/header.css";
+@import "../styles/components/kanban.css";
+@import "../styles/components/notifications.css";
+@import "../styles/components/organizations.css";
+@import "../styles/components/projects.css";
+@import "../styles/components/settings.css";
+@import "../styles/components/setup.css";
+@import "../styles/components/shared.css";
+@import "../styles/components/sprints.css";
+@import "../styles/layouts/resizable-sidebar.css";
+@import "../styles/layouts/sidebar.css";
+
+/* ================================
+   Common Semantic Styles
+   ================================ */
+@import "../styles/common/components.css";
+@import "../styles/common/forms.css";
+@import "../styles/common/indicators.css";
+@import "../styles/common/states.css";
+@import "../styles/common/utilities.css";
+@import "../styles/common/animations.css";
+@import "../styles/common/gantt.css";
+
+

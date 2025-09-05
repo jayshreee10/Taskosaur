@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  ProjectRole,
+  Role as ProjectRole,
   ProjectStatus,
   ProjectPriority,
   Project,
 } from '@prisma/client';
 import slugify from 'slugify';
+import { DEFAULT_SPRINT } from '../constants/defaultWorkflow';
 
 @Injectable()
 export class ProjectsSeederService {
@@ -30,10 +31,14 @@ export class ProjectsSeederService {
       const projectsData = this.getProjectsDataForWorkspace(workspace);
 
       // Get the organization's default workflow for this workspace
-      const defaultWorkflow = await this.getDefaultWorkflowForWorkspace(workspace.id);
-      
+      const defaultWorkflow = await this.getDefaultWorkflowForWorkspace(
+        workspace.id,
+      );
+
       if (!defaultWorkflow) {
-        console.log(`   ⚠ No default workflow found for workspace ${workspace.name}, skipping projects...`);
+        console.log(
+          `   ⚠ No default workflow found for workspace ${workspace.name}, skipping projects...`,
+        );
         continue;
       }
 
@@ -55,6 +60,16 @@ export class ProjectsSeederService {
               slug: slugify(projectData.name, { lower: true, strict: true }),
               createdBy: creatorUser.id,
               updatedBy: creatorUser.id,
+              sprints: {
+                create: {
+                  name: DEFAULT_SPRINT.name,
+                  goal: DEFAULT_SPRINT.goal,
+                  status: DEFAULT_SPRINT.status,
+                  isDefault: DEFAULT_SPRINT.isDefault,
+                  createdBy: creatorUser.id,
+                  updatedBy: creatorUser.id,
+                },
+              },
             },
             include: {
               workflow: {
@@ -110,9 +125,9 @@ export class ProjectsSeederService {
     }
 
     return await this.prisma.workflow.findFirst({
-      where: { 
-        organizationId: workspace.organizationId, 
-        isDefault: true 
+      where: {
+        organizationId: workspace.organizationId,
+        isDefault: true,
       },
       select: {
         id: true,
@@ -365,13 +380,13 @@ export class ProjectsSeederService {
     });
 
     const memberRoles = [
-      ProjectRole.ADMIN, // First user
+      ProjectRole.OWNER, // First user
       ProjectRole.MANAGER, // Second user
-      ProjectRole.DEVELOPER, // Third user
-      ProjectRole.DEVELOPER, // Fourth user
-      ProjectRole.DEVELOPER, // Fifth user
+      ProjectRole.MEMBER, // Third user
+      ProjectRole.MEMBER, // Fourth user
+      ProjectRole.MEMBER, // Fifth user
       ProjectRole.VIEWER, // Sixth user
-      ProjectRole.DEVELOPER, // Seventh user (if exists)
+      ProjectRole.MEMBER, // Seventh user (if exists)
     ];
 
     // Add workspace members to project (limit to avoid too many members)
@@ -437,7 +452,8 @@ export class ProjectsSeederService {
             },
           },
         },
-        workflow: { // Add workflow information
+        workflow: {
+          // Add workflow information
           select: {
             id: true,
             name: true,

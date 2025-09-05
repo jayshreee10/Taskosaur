@@ -1,4 +1,4 @@
-'use client';
+;
 
 import { useState } from 'react';
 import { Task, TaskType, TaskPriority } from '@/types/tasks';
@@ -53,15 +53,15 @@ export default function TaskCard({ task, allTasks = [], onDragStart, onDragEnd, 
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
-      case TaskPriority.HIGHEST:
+      case "HIGHEST":
         return 'text-red-600 bg-red-100 dark:bg-red-900/20';
-      case TaskPriority.HIGH:
+      case "HIGH":
         return 'text-orange-600 bg-orange-100 dark:bg-orange-900/20';
-      case TaskPriority.MEDIUM:
+      case "MEDIUM":
         return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20';
-      case TaskPriority.LOW:
+      case "LOW":
         return 'text-green-600 bg-green-100 dark:bg-green-900/20';
-      case TaskPriority.LOWEST:
+      case "LOWEST":
         return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
       default:
         return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
@@ -70,15 +70,15 @@ export default function TaskCard({ task, allTasks = [], onDragStart, onDragEnd, 
 
   const getPriorityIcon = (priority: TaskPriority) => {
     switch (priority) {
-      case TaskPriority.HIGHEST:
+      case "HIGHEST":
         return '🔴';
-      case TaskPriority.HIGH:
+      case "HIGH":
         return '🟠';
-      case TaskPriority.MEDIUM:
+      case "MEDIUM":
         return '🟡';
-      case TaskPriority.LOW:
+      case "LOW":
         return '🟢';
-      case TaskPriority.LOWEST:
+      case "LOWEST":
         return '⚪';
       default:
         return '⚪';
@@ -130,9 +130,6 @@ export default function TaskCard({ task, allTasks = [], onDragStart, onDragEnd, 
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-2">
             {getTypeIcon(task.type)}
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-              {task.key}
-            </span>
           </div>
           <div className="flex items-center space-x-1">
             <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
@@ -158,7 +155,7 @@ export default function TaskCard({ task, allTasks = [], onDragStart, onDragEnd, 
         </h4>
 
         {/* Labels */}
-        {task.labels && task.labels.length > 0 && (
+        {/* {task.labels && task.labels.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
             {task.labels.map(label => (
               <span 
@@ -173,7 +170,7 @@ export default function TaskCard({ task, allTasks = [], onDragStart, onDragEnd, 
               </span>
             ))}
           </div>
-        )}
+        )} */}
 
         {/* Description Preview */}
         {task.description && (

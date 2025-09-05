@@ -326,129 +326,133 @@ export class NotificationsService {
     };
   }
   // src/modules/notifications/notifications.service.ts
-async getNotificationsByUserAndOrganization(
-  userId: string,
-  organizationId: string,
-  filters: {
-    isRead?: boolean;
-    type?: NotificationType;
-    priority?: NotificationPriority;
-    startDate?: Date;
-    endDate?: Date;
-  } = {},
-  page: number = 1,
-  limit: number = 20
-): Promise<{
-  notifications: any[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-  summary: {
-    total: number;
-    unread: number;
-    byType: Record<string, number>;
-    byPriority: Record<string, number>;
-  };
-}> {
-  // Build where clause for user and organization
-  const whereClause: any = {
-    userId: userId,
-    organizationId: organizationId,
-  };
+  async getNotificationsByUserAndOrganization(
+    userId: string,
+    organizationId: string,
+    filters: {
+      isRead?: boolean;
+      type?: NotificationType;
+      priority?: NotificationPriority;
+      startDate?: Date;
+      endDate?: Date;
+    } = {},
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    notifications: any[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+    summary: {
+      total: number;
+      unread: number;
+      byType: Record<string, number>;
+      byPriority: Record<string, number>;
+    };
+  }> {
+    // Build where clause for user and organization
+    const whereClause: any = {
+      userId: userId,
+      organizationId: organizationId,
+    };
 
-  // Apply additional filters
-  if (filters.isRead !== undefined) {
-    whereClause.isRead = filters.isRead;
-  }
-
-  if (filters.type) {
-    whereClause.type = filters.type;
-  }
-
-  if (filters.priority) {
-    whereClause.priority = filters.priority;
-  }
-
-  if (filters.startDate || filters.endDate) {
-    whereClause.createdAt = {};
-    if (filters.startDate) {
-      whereClause.createdAt.gte = filters.startDate;
+    // Apply additional filters
+    if (filters.isRead !== undefined) {
+      whereClause.isRead = filters.isRead;
     }
-    if (filters.endDate) {
-      whereClause.createdAt.lte = filters.endDate;
-    }
-  }
 
-  // Get paginated notifications and total count
-  const [notifications, totalCount] = await Promise.all([
-    this.prisma.notification.findMany({
-      where: whereClause,
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            avatar: true,
+    if (filters.type) {
+      whereClause.type = filters.type;
+    }
+
+    if (filters.priority) {
+      whereClause.priority = filters.priority;
+    }
+
+    if (filters.startDate || filters.endDate) {
+      whereClause.createdAt = {};
+      if (filters.startDate) {
+        whereClause.createdAt.gte = filters.startDate;
+      }
+      if (filters.endDate) {
+        whereClause.createdAt.lte = filters.endDate;
+      }
+    }
+
+    // Get paginated notifications and total count
+    const [notifications, totalCount] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: whereClause,
+        include: {
+          createdByUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+            },
           },
         },
+        orderBy: [
+          { isRead: 'asc' }, // Unread first
+          { createdAt: 'desc' }, // Then by newest
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notification.count({ where: whereClause }),
+    ]);
+
+    // Get summary statistics
+    const [unreadCount, typeStats, priorityStats] = await Promise.all([
+      this.prisma.notification.count({
+        where: { ...whereClause, isRead: false },
+      }),
+      this.prisma.notification.groupBy({
+        by: ['type'],
+        where: whereClause,
+        _count: { type: true },
+      }),
+      this.prisma.notification.groupBy({
+        by: ['priority'],
+        where: whereClause,
+        _count: { priority: true },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      notifications,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
       },
-      orderBy: [
-        { isRead: 'asc' }, // Unread first
-        { createdAt: 'desc' }, // Then by newest
-      ],
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    this.prisma.notification.count({ where: whereClause }),
-  ]);
-
-  // Get summary statistics
-  const [unreadCount, typeStats, priorityStats] = await Promise.all([
-    this.prisma.notification.count({
-      where: { ...whereClause, isRead: false },
-    }),
-    this.prisma.notification.groupBy({
-      by: ['type'],
-      where: whereClause,
-      _count: { type: true },
-    }),
-    this.prisma.notification.groupBy({
-      by: ['priority'],
-      where: whereClause,
-      _count: { priority: true },
-    }),
-  ]);
-
-  const totalPages = Math.ceil(totalCount / limit);
-
-  return {
-    notifications,
-    pagination: {
-      currentPage: page,
-      totalPages,
-      totalCount,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1,
-    },
-    summary: {
-      total: totalCount,
-      unread: unreadCount,
-      byType: typeStats.reduce((acc, stat) => {
-        acc[stat.type] = stat._count.type;
-        return acc;
-      }, {} as Record<string, number>),
-      byPriority: priorityStats.reduce((acc, stat) => {
-        acc[stat.priority] = stat._count.priority;
-        return acc;
-      }, {} as Record<string, number>),
-    },
-  };
-}
-
-  
+      summary: {
+        total: totalCount,
+        unread: unreadCount,
+        byType: typeStats.reduce(
+          (acc, stat) => {
+            acc[stat.type] = stat._count.type;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
+        byPriority: priorityStats.reduce(
+          (acc, stat) => {
+            acc[stat.priority] = stat._count.priority;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
+      },
+    };
+  }
 }

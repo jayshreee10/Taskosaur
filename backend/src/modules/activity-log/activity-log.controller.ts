@@ -8,7 +8,12 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ActivityLogService } from './activity-log.service';
 
@@ -17,17 +22,37 @@ import { ActivityLogService } from './activity-log.service';
 @UseGuards(JwtAuthGuard)
 @Controller('activity-logs')
 export class ActivityLogController {
-  constructor(private readonly activityLogService: ActivityLogService) {}
+  constructor(private readonly activityLogService: ActivityLogService) { }
 
   @Get('organization/:organizationId/recent')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get recent activity for organization',
-    description: 'Retrieves paginated recent activities for a specific organization'
+    description:
+      'Retrieves paginated recent activities for a specific organization',
   })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of activities per page (max 50)', example: 10 })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number (starts from 1)', example: 1 })
-  @ApiQuery({ name: 'entityType', required: false, description: 'Filter by entity type (Task, Project, Workspace)', example: 'Task' })
-  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user who performed the activity' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of activities per page (max 50)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (starts from 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'entityType',
+    required: false,
+    description: 'Filter by entity type (Task, Project, Workspace)',
+    example: 'Task',
+  })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'Filter by user who performed the activity',
+  })
   async getOrganizationRecentActivity(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Query('limit') limit: string = '10',
@@ -38,45 +63,53 @@ export class ActivityLogController {
     // Validate and sanitize query parameters
     const limitNum = parseInt(limit, 10);
     const pageNum = parseInt(page, 10);
-    
+
     if (isNaN(limitNum) || limitNum < 1) {
       throw new BadRequestException('Limit must be a positive number');
     }
-    
+
     if (isNaN(pageNum) || pageNum < 1) {
       throw new BadRequestException('Page must be a positive number');
     }
-    
+
     const validatedLimit = Math.min(Math.max(1, limitNum), 50); // Max 50 items per page
     const validatedPage = Math.max(1, pageNum);
-    
+
     // Build filters object
     const filters: any = {};
     if (entityType) {
       // Validate entityType if needed
-      const validEntityTypes = ['Task', 'Project', 'Workspace', 'Organization', 'User'];
+      const validEntityTypes = [
+        'Task',
+        'Project',
+        'Workspace',
+        'Organization',
+        'User',
+      ];
       if (!validEntityTypes.includes(entityType)) {
-        throw new BadRequestException(`Invalid entity type. Must be one of: ${validEntityTypes.join(', ')}`);
+        throw new BadRequestException(
+          `Invalid entity type. Must be one of: ${validEntityTypes.join(', ')}`,
+        );
       }
       filters.entityType = entityType;
     }
-    
+
     if (userId) {
       filters.userId = userId;
     }
-    
+
     return this.activityLogService.getRecentActivityByOrganizationComprehensive(
       organizationId,
       validatedLimit,
       validatedPage,
-      filters
+      filters,
     );
   }
 
   @Get('organization/:organizationId/stats')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get activity statistics for organization',
-    description: 'Get activity counts by type, user, and date range'
+    description: 'Get activity counts by type, user, and date range',
   })
   async getOrganizationActivityStats(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
@@ -84,35 +117,34 @@ export class ActivityLogController {
   ) {
     const daysNum = parseInt(days, 10) || 30;
     const validatedDays = Math.min(Math.max(1, daysNum), 365); // Max 1 year
-    
+
     return this.activityLogService.getOrganizationActivityStats(
       organizationId,
-      validatedDays
+      validatedDays,
     );
   }
 
-  @Get('user/:userId/recent')
-  @ApiOperation({ 
-    summary: 'Get recent activity by user',
-    description: 'Get activities performed by a specific user'
+  @Get('task/:taskId/activities')
+  @ApiOperation({
+    summary: 'Get task activities',
+    description: 'Get activity logs for a specific task with pagination',
   })
-  async getUserRecentActivity(
-    @Param('userId', ParseUUIDPipe) userId: string,
-    @Query('limit') limit: string = '10',
+  async getTaskActivities(
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @Query('limit') limit: string = '50',
     @Query('page') page: string = '1',
-    @Query('organizationId') organizationId?: string,
   ) {
-    const limitNum = parseInt(limit, 10) || 10;
+    const limitNum = parseInt(limit, 10) || 50;
     const pageNum = parseInt(page, 10) || 1;
-    
+
     const validatedLimit = Math.min(Math.max(1, limitNum), 50);
     const validatedPage = Math.max(1, pageNum);
-    
-    return this.activityLogService.getUserRecentActivity(
-      userId,
-      validatedLimit,
+
+    return this.activityLogService.getTaskActivities(
+      taskId,
       validatedPage,
-      organizationId
+      validatedLimit,
     );
   }
+
 }

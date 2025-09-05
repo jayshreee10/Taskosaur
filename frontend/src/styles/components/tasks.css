@@ -1031,3 +1031,60 @@
 [data-theme="dark"] .task-detail-error-message {
   color: var(--red-400);
 }
+
+
+.wmde-markdown {
+  background: var(--background) !important;
+}
+
+
+/* Hide up/down arrows in textarea (for Chrome, Edge, Safari) */
+.hide-arrows::-webkit-resizer,
+.hide-arrows::-webkit-scrollbar-corner {
+  display: none !important;
+}
+.hide-arrows::-webkit-inner-spin-button,
+.hide-arrows::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+  display: none !important;
+}
+/* Hide arrows for Firefox */
+.hide-arrows {
+  scrollbar-width: thin;
+}
+
+
+.task-md-editor {
+  background: var(--background) !important;
+}
+
+/* Toolbar */
+.task-md-editor .w-md-editor-toolbar {
+  background: var(--background) !important;
+ 
+  border-bottom: 1px solid var(--border);
+}
+
+.task-md-editor .w-md-editor-toolbar ul li button,
+.task-md-editor .w-md-editor-toolbar ul li svg {
+  color: var(--foreground) !important;
+  fill: var(--foreground) !important;
+}
+
+.task-md-editor .w-md-editor-preview .wmde-markdown,
+.task-md-editor .w-md-editor-preview .wmde-markdown-color,
+.task-md-editor .w-md-editor-preview .wmde-markdown p,
+.task-md-editor .w-md-editor-preview .wmde-markdown h1,
+.task-md-editor .w-md-editor-preview .wmde-markdown h2,
+.task-md-editor .w-md-editor-preview .wmde-markdown h3,
+.task-md-editor .w-md-editor-preview .wmde-markdown h4,
+.task-md-editor .w-md-editor-preview .wmde-markdown h5,
+.task-md-editor .w-md-editor-preview .wmde-markdown h6,
+.task-md-editor .w-md-editor-preview .wmde-markdown span {
+  color: var(--foreground) !important;
+  fill: var(--foreground) !important;
+  font-size: 14px !important;
+}
+
+

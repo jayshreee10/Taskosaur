@@ -1,5 +1,5 @@
 // app/providers.tsx or similar
-"use client"
+
 
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider } from "next-themes"

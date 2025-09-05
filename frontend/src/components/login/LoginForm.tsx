@@ -1,7 +1,7 @@
-"use client";
+;
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/router';
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/auth-context";
@@ -13,14 +13,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Eye,
   EyeOff,
-  AlertCircle,
-  CheckCircle2,
+  
   Loader2,
   Mail,
   Lock,
   ArrowRight,
 } from "lucide-react";
-import { ModeToggle } from "../layout/ModeToggle";
 
 interface FormData {
   email: string;
@@ -62,6 +60,7 @@ export function LoginForm() {
       router.push("/dashboard");
     } catch (err) {
       setError("Invalid email or password. Please try again.");
+      console.error(err)
     } finally {
       setIsLoading(false);
     }
@@ -72,21 +71,21 @@ export function LoginForm() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="w-full space-y-6"
+      className="login-form-container"
     >
       {/* Header */}
-      <div className="text-center space-y-4">
+      <div className="login-form-header">
         {/* Mobile Logo */}
-        <div className="absolute top-0 right-0 z-10">
+        {/* <div className="login-form-mode-toggle">
           <ModeToggle />
-        </div>
+        </div> */}
 
-        <div className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tight">
+        <div className="login-form-header-content">
+          <h1 className="login-form-title">
             Welcome back
           </h1>
-          <p className="text-[var(--muted-foreground)] text-sm sm:text-base lg:text-lg leading-relaxed max-w-sm mx-auto">
-            Sign in to continue your productive journey
+          <p className="login-form-subtitle">
+            Login to continue your productive journey
           </p>
         </div>
       </div>
@@ -99,32 +98,32 @@ export function LoginForm() {
         >
           <Alert
             variant="destructive"
-            className="border-[var(--destructive)]/30 bg-[var(--destructive)]/5 backdrop-blur-sm"
+            className="login-error-alert"
           >
             <AlertDescription className="font-medium">
-              <span className="block font-semibold text-sm">
+              <span className="login-error-title">
                 Authentication Failed
               </span>
-              <span className="text-xs opacity-90 mt-1">{error}</span>
+              <span className="login-error-message">{error}</span>
             </AlertDescription>
           </Alert>
         </motion.div>
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="login-form">
         {/* Email Field */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="space-y-2"
+          className="login-field-container"
         >
           <Label
             htmlFor="email"
-            className="text-sm font-semibold text-[var(--foreground)] flex items-center space-x-2"
+            className="login-field-label"
           >
-            <Mail className="w-4 h-4" />
+            <Mail className="login-field-icon" />
             <span>Email Address</span>
           </Label>
           <Input
@@ -136,7 +135,7 @@ export function LoginForm() {
             value={formData.email}
             onChange={handleChange}
             placeholder="Enter your email address"
-            className="h-11 sm:h-12 px-4 bg-[var(--card)] border-[var(--border)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent transition-all duration-200 rounded-xl shadow-sm hover:shadow-md"
+            className="login-input"
           />
         </motion.div>
 
@@ -145,16 +144,16 @@ export function LoginForm() {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="space-y-2"
+          className="login-field-container"
         >
           <Label
             htmlFor="password"
-            className="text-sm font-semibold text-[var(--foreground)] flex items-center space-x-2"
+            className="login-field-label"
           >
-            <Lock className="w-4 h-4" />
+            <Lock className="login-field-icon" />
             <span>Password</span>
           </Label>
-          <div className="relative">
+          <div className="login-password-container">
             <Input
               id="password"
               name="password"
@@ -164,14 +163,14 @@ export function LoginForm() {
               value={formData.password}
               onChange={handleChange}
               placeholder="Enter your password"
-              className="h-11 sm:h-12 pl-4 pr-12 bg-[var(--card)] border-[var(--border)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent transition-all duration-200 rounded-xl shadow-sm hover:shadow-md"
+              className="login-password-input"
             />
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-[var(--muted)]/50 rounded-lg"
+              className="login-password-toggle"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -188,9 +187,9 @@ export function LoginForm() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex items-center justify-between flex-wrap gap-2"
+          className="login-options-row"
         >
-          <div className="flex items-center space-x-3">
+          <div className="login-remember-me-container">
             <Checkbox
               id="rememberMe"
               name="rememberMe"
@@ -201,18 +200,18 @@ export function LoginForm() {
                   rememberMe: Boolean(checked),
                 }))
               }
-              className="rounded-md"
+              className="login-remember-me-checkbox"
             />
             <Label
               htmlFor="rememberMe"
-              className="text-sm text-[var(--muted-foreground)] cursor-pointer hover:text-[var(--foreground)] transition-colors"
+              className="login-remember-me-label"
             >
               Remember me
             </Label>
           </div>
           <Link
             href="/forgot-password"
-            className="text-sm font-medium text-[var(--primary)] hover:text-[var(--primary)]/80 transition-colors duration-200 hover:underline"
+            className="login-forgot-password-link"
           >
             Forgot password?
           </Link>
@@ -227,17 +226,17 @@ export function LoginForm() {
           <Button
             type="submit"
             disabled={isLoading}
-            className="w-full h-11 sm:h-12 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] font-semibold shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl group"
+            className="login-submit-button"
           >
             {isLoading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing you in...
+                <Loader2 className="login-loading-spinner" />
+                Logiing you in...
               </>
             ) : (
               <>
-                Sign In
-                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+                Log In
+                <ArrowRight className="login-button-arrow" />
               </>
             )}
           </Button>
@@ -249,13 +248,13 @@ export function LoginForm() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.5 }}
-        className="relative"
+        className="login-divider-container"
       >
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-[var(--border)]" />
+        <div className="login-divider-line">
+          <div className="login-divider-border" />
         </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-[var(--background)] text-[var(--muted-foreground)] font-medium">
+        <div className="login-divider-text-container">
+          <span className="login-divider-text">
             New to Taskosaur?
           </span>
         </div>
@@ -267,13 +266,13 @@ export function LoginForm() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.6 }}
       >
-        <Link href="/signup">
+        <Link href="/register">
           <Button
             variant="outline"
-            className="w-full h-11 sm:h-12 border-[var(--border)] hover:bg-[var(--accent)] hover:border-[var(--accent)]/50 font-semibold rounded-xl transition-all duration-200 group"
+            className="login-signup-button"
           >
             Create New Account
-            <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+            <ArrowRight className="login-button-arrow" />
           </Button>
         </Link>
       </motion.div>
@@ -283,20 +282,20 @@ export function LoginForm() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.7 }}
-        className="text-center"
+        className="login-footer"
       >
-        <p className="text-xs text-[var(--muted-foreground)] leading-relaxed max-w-xs mx-auto">
+        <p className="login-footer-text">
           By signing in, you agree to our{" "}
           <Link
             href="/terms"
-            className="text-[var(--primary)] hover:text-[var(--primary)]/80 hover:underline font-medium"
+            className="login-footer-link"
           >
             Terms of Service
           </Link>{" "}
           and{" "}
           <Link
             href="/privacy"
-            className="text-[var(--primary)] hover:text-[var(--primary)]/80 hover:underline font-medium"
+            className="login-footer-link"
           >
             Privacy Policy
           </Link>

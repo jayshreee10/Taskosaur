@@ -54,7 +54,10 @@ const TokenManager = {
     if (typeof window === "undefined") return null;
     return Cookies.get("refresh_token") || null;
   },
-
+  getCurrentOrgId: (): string | null => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("currentOrganizationId");
+  },
   setRefreshToken: (token: string): void => {
     if (typeof window !== "undefined") {
       Cookies.set("refresh_token", token, {
@@ -138,7 +141,7 @@ api.interceptors.response.use(
         const refresh_token = TokenManager.getRefreshToken();
 
         if (!refresh_token) {
-          throw new ApiAuthError("No refresh token available", 401);
+          return new ApiAuthError("No refresh token available", 401);
         }
 
         // Create refresh request
@@ -154,7 +157,6 @@ api.interceptors.response.use(
             withCredentials: true, // Include cookies if needed for other purposes
           }
         );
-        console.log("Token refresh successful:", refreshResponse.data);
 
         const { access_token, refresh_token: newRefreshToken } =
           refreshResponse.data;
@@ -175,11 +177,22 @@ api.interceptors.response.use(
         console.error("Token refresh failed:", refreshError);
         TokenManager.clearTokens();
 
-        // if (typeof window !== "undefined") {
-        //   window.location.href = "/login";
-        // }
+        if (typeof window !== "undefined") {
+          const currentPath = window.location.pathname;
+          if (
+            currentPath === "/login/" ||
+            currentPath === "/forgot-password/" ||
+            currentPath === "/reset-password/"
+          ) {
+            return;
+          }
 
-        return Promise.reject(new ApiAuthError("Authentication failed", 401));
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+        }
+
+        return ;
       }
     }
 

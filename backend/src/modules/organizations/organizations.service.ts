@@ -11,24 +11,26 @@ import {
   DEFAULT_WORKFLOW,
   DEFAULT_TASK_STATUSES,
   DEFAULT_STATUS_TRANSITIONS,
+  DEFAULT_WORKSPACE,
+  DEFAULT_PROJECT,
+  DEFAULT_SPRINT,
+  DEFAULT_TASKS,
 } from '../../constants/defaultWorkflow';
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(
     createOrganizationDto: CreateOrganizationDto,
     userId: string,
   ): Promise<Organization> {
     try {
-      // First create the organization with workflow and statuses
       const organization = await this.prisma.organization.create({
         data: {
           ...createOrganizationDto,
           createdBy: userId,
           updatedBy: userId,
-          // Create default workflow with task statuses
           workflows: {
             create: {
               name: DEFAULT_WORKFLOW.name,
@@ -51,50 +53,27 @@ export class OrganizationsService {
           },
         },
         include: {
-          owner: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              avatar: true,
-            },
-          },
-          createdByUser: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-          updatedByUser: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
           workflows: {
             where: { isDefault: true },
-            include: {
-              statuses: {
-                orderBy: { position: 'asc' },
-              },
-            },
-          },
-          _count: {
-            select: {
-              members: true,
-              workspaces: true,
-            },
+            include: { statuses: true },
           },
         },
       });
 
+      // Add org member as OWNER
+      await this.prisma.organizationMember.create({
+        data: {
+          userId,
+          organizationId: organization.id,
+          role: 'OWNER',
+          createdBy: userId,
+          updatedBy: userId,
+        },
+      });
+
+      // Create default status transitions
       const defaultWorkflow = organization.workflows[0];
-      if (defaultWorkflow?.statuses && defaultWorkflow.statuses.length > 0) {
+      if (defaultWorkflow) {
         await this.createDefaultStatusTransitions(
           defaultWorkflow.id,
           defaultWorkflow.statuses,
@@ -102,16 +81,100 @@ export class OrganizationsService {
         );
       }
 
+      // Step 2: Create default workspace
+      const workspace = await this.prisma.workspace.create({
+        data: {
+          name: DEFAULT_WORKSPACE.name,
+          description: DEFAULT_WORKSPACE.description,
+          slug: `default-workspace-${organization.id}`,
+          organizationId: organization.id,
+          createdBy: userId,
+          updatedBy: userId,
+          members: {
+            create: {
+              userId,
+              role: 'OWNER',
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          },
+        },
+      });
+
+      // Step 3: Create default project inside workspace
+      const project = await this.prisma.project.create({
+        data: {
+          name: DEFAULT_PROJECT.name,
+          description: DEFAULT_PROJECT.description,
+          slug: `default-project-${workspace.id}`,
+          workspaceId: workspace.id,
+          workflowId: defaultWorkflow.id,
+          createdBy: userId,
+          updatedBy: userId,
+          color: DEFAULT_PROJECT.color,
+          sprints: {
+            create: {
+              name: DEFAULT_SPRINT.name,
+              goal: DEFAULT_SPRINT.goal,
+              status: DEFAULT_SPRINT.status,
+              isDefault: DEFAULT_SPRINT.isDefault,
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          },
+          members: {
+            create: {
+              userId,
+              role: 'MANAGER',
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          },
+        },
+        include: {
+          sprints: true,
+          workflow: {
+            include: {
+              statuses: {
+                orderBy: { position: 'asc' },
+              },
+            },
+          },
+        },
+      });
+
+      const defaultSprint = project.sprints.find((s) => s.isDefault);
+      if (!project.workflow || project.workflow.statuses.length === 0) {
+        throw new NotFoundException('Default workflow or statuses not found for the project');
+      }
+      const workflowStatuses = project.workflow.statuses;
+      await this.prisma.task.createMany({
+        data: DEFAULT_TASKS.map((task, index) => {
+          const status = workflowStatuses.find((s) => s.name === task.status)
+            ?? workflowStatuses[0];
+          return {
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            statusId: status.id,
+            projectId: project.id,
+            sprintId: defaultSprint?.id || null,
+            taskNumber: index + 1,
+            slug: `${project.slug}-${index + 1}`,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+        }),
+      });
       return organization;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(
-          'Organization with this slug already exists',
-        );
+        throw new ConflictException('Organization with this slug already exists');
       }
       throw error;
     }
   }
+
   private async createDefaultStatusTransitions(
     workflowId: string,
     statuses: any[],
@@ -143,6 +206,7 @@ export class OrganizationsService {
   // ... rest of your methods remain the same
   async findAll(): Promise<Organization[]> {
     return this.prisma.organization.findMany({
+      where: { archive: false },
       include: {
         owner: {
           select: {
@@ -343,12 +407,12 @@ export class OrganizationsService {
     }
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string): Promise<Organization> {
     try {
-      await this.prisma.organization.delete({
+      return await this.prisma.organization.delete({
         where: { id },
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === 'P2025') {
         throw new NotFoundException('Organization not found');
       }
@@ -486,5 +550,19 @@ export class OrganizationsService {
         },
       },
     });
+  }
+
+  async archiveOrganization(id: string): Promise<void> {
+    try {
+      await this.prisma.organization.update({
+        where: { id },
+        data: { archive: true },
+      });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Organization not found');
+      }
+      throw error;
+    }
   }
 }

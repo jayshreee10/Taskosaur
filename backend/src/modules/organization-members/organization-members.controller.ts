@@ -20,6 +20,7 @@ import {
   InviteOrganizationMemberDto,
 } from './dto/create-organization-member.dto';
 import { UpdateOrganizationMemberDto } from './dto/update-organization-member.dto';
+import { Scope } from 'src/common/decorator/scope.decorator';
 
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
@@ -27,7 +28,7 @@ import { UpdateOrganizationMemberDto } from './dto/update-organization-member.dt
 export class OrganizationMembersController {
   constructor(
     private readonly organizationMembersService: OrganizationMembersService,
-  ) {}
+  ) { }
 
   @Post()
   create(@Body() createOrganizationMemberDto: CreateOrganizationMemberDto) {
@@ -53,6 +54,7 @@ export class OrganizationMembersController {
   }
 
   @Get('user/:userId/organizations')
+  @Scope('ORGANIZATION', 'id')
   getUserOrganizations(@Param('userId', ParseUUIDPipe) userId: string) {
     return this.organizationMembersService.getUserOrganizations(userId);
   }
@@ -81,6 +83,7 @@ export class OrganizationMembersController {
   }
 
   @Patch(':id')
+  @Scope('ORGANIZATION', 'id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateOrganizationMemberDto: UpdateOrganizationMemberDto,
@@ -96,6 +99,7 @@ export class OrganizationMembersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Scope('ORGANIZATION', 'id')
   remove(
     @Param('id', ParseUUIDPipe) id: string,
     // TODO: Get requestUserId from JWT token when authentication is implemented

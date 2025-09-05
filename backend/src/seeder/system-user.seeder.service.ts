@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole, UserStatus, User } from '@prisma/client';
+import { Role, UserStatus, User } from '@prisma/client';
 
 export const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -17,7 +17,7 @@ export class SystemUserSeederService {
       username: 'system',
       firstName: 'System',
       lastName: 'User',
-      role: UserRole.SUPER_ADMIN,
+      role: Role.SUPER_ADMIN,
       status: UserStatus.INACTIVE, // Cannot be used for authentication
       password: null, // No password - cannot authenticate
       emailVerified: false,
@@ -41,26 +41,33 @@ export class SystemUserSeederService {
       const systemUser = await this.prisma.user.create({
         data: systemUserData,
       });
-      
-      console.log(`   ✓ Created system user: ${systemUser.email} (ID: ${systemUser.id})`);
-      console.log('   ⚠️  System user is INACTIVE and cannot be used for authentication');
-      
+
+      console.log(
+        `   ✓ Created system user: ${systemUser.email} (ID: ${systemUser.id})`,
+      );
+      console.log(
+        '   ⚠️  System user is INACTIVE and cannot be used for authentication',
+      );
+
       return systemUser;
     } catch (error) {
       // If user already exists, try to find and return it
-      if (error.code === 'P2002') { // Unique constraint violation
-        console.log('   ⚠ System user already exists, fetching existing user...');
-        
+      if (error.code === 'P2002') {
+        // Unique constraint violation
+        console.log(
+          '   ⚠ System user already exists, fetching existing user...',
+        );
+
         const existingUser = await this.prisma.user.findUnique({
           where: { id: SYSTEM_USER_ID },
         });
-        
+
         if (existingUser) {
           console.log(`   ✓ Found existing system user: ${existingUser.email}`);
           return existingUser;
         }
       }
-      
+
       console.error('❌ Error creating system user:', error);
       throw error;
     }
@@ -73,10 +80,11 @@ export class SystemUserSeederService {
       const deletedUser = await this.prisma.user.delete({
         where: { id: SYSTEM_USER_ID },
       });
-      
+
       console.log(`✅ Deleted system user: ${deletedUser.email}`);
     } catch (error) {
-      if (error.code === 'P2025') { // Record not found
+      if (error.code === 'P2025') {
+        // Record not found
         console.log('   ⚠ System user not found, nothing to clear');
       } else {
         console.error('❌ Error clearing system user:', error);
@@ -96,7 +104,7 @@ export class SystemUserSeederService {
    */
   async verifySystemUser(): Promise<boolean> {
     const systemUser = await this.findSystemUser();
-    
+
     if (!systemUser) {
       console.error('❌ System user not found');
       return false;
@@ -118,7 +126,7 @@ export class SystemUserSeederService {
 
     if (issues.length > 0) {
       console.error('❌ System user verification failed:');
-      issues.forEach(issue => console.error(`   - ${issue}`));
+      issues.forEach((issue) => console.error(`   - ${issue}`));
       return false;
     }
 

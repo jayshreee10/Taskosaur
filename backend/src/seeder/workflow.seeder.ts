@@ -26,7 +26,9 @@ export class WorkflowSeederService {
             where: { id: organization.id },
             include: { owner: true },
           });
-          const creatorUser = orgWithOwner?.owner || { id: organization.ownerId };
+          const creatorUser = orgWithOwner?.owner || {
+            id: organization.ownerId,
+          };
 
           const workflow = await this.prisma.workflow.create({
             data: {

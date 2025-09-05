@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { HiXMark } from 'react-icons/hi2';
-import { cn } from '@/utils/classNames';
+import { cn } from '@/lib/utils';
 
 interface RemovableBadgeProps {
   children: ReactNode;
@@ -23,7 +23,7 @@ export function RemovableBadge({ children, onRemove, variant = 'default', classN
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 py-1 rounded-md text-xs font-medium gap-1',
+        'removable-badge-base',
         badgeVariants[variant],
         className
       )}
@@ -33,7 +33,7 @@ export function RemovableBadge({ children, onRemove, variant = 'default', classN
         <button 
           type="button" 
           onClick={onRemove} 
-          className="hover:text-red-600 dark:hover:text-red-400 transition-colors"
+          className="removable-badge-close"
         >
           <HiXMark size={12} />
         </button>

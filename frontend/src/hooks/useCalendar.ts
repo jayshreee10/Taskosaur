@@ -1,4 +1,4 @@
-'use client';
+;
 
 import { useState, useEffect } from 'react';
 
@@ -26,6 +26,7 @@ export function useCalendar() {
     isConnected: false
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Mock calendar events for demonstration
   const mockEvents: CalendarEvent[] = [
@@ -110,28 +111,43 @@ export function useCalendar() {
   // Connect to calendar provider
   const connectCalendar = async (provider: 'google' | 'outlook' | 'apple') => {
     setIsLoading(true);
+    setError(null);
+    
     try {
       // Mock integration - replace with actual OAuth flow
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve, reject) => {
+        setTimeout(() => {
+          // Simulate random failures for testing
+          if (Math.random() > 0.9) {
+            reject(new Error(`Failed to connect to ${provider} calendar`));
+          } else {
+            resolve(undefined);
+          }
+        }, 1000);
+      });
       
-      setIntegration({
+      const integrationData = {
         isConnected: true,
         provider,
         email: `user@${provider === 'google' ? 'gmail.com' : provider === 'outlook' ? 'outlook.com' : 'icloud.com'}`
-      });
+      };
+      
+      setIntegration(integrationData);
       
       // Load mock events after connection
       setEvents(mockEvents);
       
       // Store integration in localStorage
-      localStorage.setItem('calendarIntegration', JSON.stringify({
-        isConnected: true,
-        provider,
-        email: `user@${provider === 'google' ? 'gmail.com' : provider === 'outlook' ? 'outlook.com' : 'icloud.com'}`
-      }));
+      localStorage.setItem('calendarIntegration', JSON.stringify(integrationData));
       
     } catch (error) {
       console.error('Failed to connect calendar:', error);
+      const errorMessage = error instanceof Error ? error.message : `Failed to connect to ${provider} calendar`;
+      setError(errorMessage);
+      
+      // Reset integration state on error
+      setIntegration({ isConnected: false });
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -158,12 +174,13 @@ export function useCalendar() {
         console.error('Failed to parse saved calendar integration:', error);
       }
     }
-  }, []);
+  }, [mockEvents]);
 
   return {
     events,
     integration,
     isLoading,
+    error,
     getTodayEvents,
     getUpcomingEvents,
     formatEventTime,

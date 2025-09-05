@@ -6,7 +6,7 @@ import {
   IsEmail,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { OrganizationRole } from '@prisma/client';
+import { Role as OrganizationRole } from '@prisma/client';
 
 export class CreateOrganizationMemberDto {
   @ApiProperty({

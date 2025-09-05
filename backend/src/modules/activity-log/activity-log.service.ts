@@ -5,7 +5,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class ActivityLogService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async logActivity(data: {
     type: ActivityType;
@@ -201,6 +201,209 @@ export class ActivityLogService {
       return undefined;
     }
   }
+
+  async getTaskActivities(
+    taskId: string,
+    page: number = 1,
+    limit: number = 50,
+    filters?: {
+      activityTypes?: ActivityType[];
+      includeChatActivities?: boolean;
+      dateFrom?: Date;
+      dateTo?: Date;
+    }
+  ): Promise<{
+    activities: any[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }> {
+    // Validate input parameters
+    if (!taskId) {
+      throw new Error('Task ID is required');
+    }
+    let activityTypeFilter: any = {};
+
+    if (filters?.activityTypes && filters.activityTypes.length > 0) {
+      activityTypeFilter.type = { in: filters.activityTypes };
+    } else if (filters?.includeChatActivities !== false) {
+      activityTypeFilter.type = {
+        in: [
+          ActivityType.TASK_CREATED,
+          ActivityType.TASK_UPDATED,
+          ActivityType.TASK_ASSIGNED,
+          ActivityType.TASK_STATUS_CHANGED,
+          ActivityType.TASK_COMMENTED,
+          ActivityType.TASK_LABEL_ADDED,
+          ActivityType.TASK_LABEL_REMOVED,
+        ]
+      };
+    }
+    let dateFilter: any = {};
+    if (filters?.dateFrom || filters?.dateTo) {
+      dateFilter.createdAt = {};
+      if (filters.dateFrom) {
+        dateFilter.createdAt.gte = filters.dateFrom;
+      }
+      if (filters.dateTo) {
+        dateFilter.createdAt.lte = filters.dateTo;
+      }
+    }
+    const taskExists = await this.prisma.task.findFirst({
+      where: { id: taskId },
+    });
+
+    if (!taskExists) {
+      throw new Error('Task not found or access denied');
+    }
+    const whereClause = {
+      OR: [
+        {
+          entityId: taskId,
+          entityType: 'Task',
+          ...activityTypeFilter,
+          ...dateFilter,
+        },
+        {
+          entityType: 'Task Comment',
+          ...activityTypeFilter,
+          ...dateFilter,
+          OR: [
+            {
+              newValue: {
+                path: ['taskId'],
+                equals: taskId
+              }
+            },
+            {
+              oldValue: {
+                path: ['taskId'],
+                equals: taskId
+              }
+            }
+          ]
+        },
+        {
+          entityType: 'Task Label',
+          ...activityTypeFilter,
+          ...dateFilter,
+          entityId: taskId
+        }
+      ],
+    };
+
+    // Get total count for pagination
+    const totalCount = await this.prisma.activityLog.count({
+      where: whereClause,
+    });
+
+    const totalPages = Math.ceil(totalCount / limit);
+    const skip = (page - 1) * limit;
+
+    // Fetch activities - only include the user relation that exists
+    const activities = await this.prisma.activityLog.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    });
+
+    // Fetch task details separately
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+      },
+    });
+
+    // Fetch related comments/messages separately based on entityType and entityId
+    const commentIds = activities
+      .filter(activity => activity.entityType === 'TaskComment')
+      .map(activity => activity.entityId);
+
+    // Fetch comments if any exist
+    let comments: any[] = [];
+    if (commentIds.length > 0) {
+      comments = await this.prisma.taskComment.findMany({
+        where: { id: { in: commentIds } },
+        select: {
+          id: true,
+          content: true,
+          taskId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    }
+
+    // Transform activities with enhanced data
+    const transformedActivities = activities.map((activity) => {
+      const relatedComment = comments.find(c => c.id === activity.entityId);
+
+      return {
+        id: activity.id,
+        type: activity.type,
+        description: activity.description,
+        entityType: activity.entityType,
+        entityId: activity.entityId,
+        oldValue: activity.oldValue,
+        newValue: activity.newValue,
+        createdAt: activity.createdAt,
+        user: activity.user,
+        task: task,
+        // Include related data based on activity type
+        relatedData: this.getRelatedActivityData(activity, relatedComment),
+      };
+    });
+
+    return {
+      activities: transformedActivities,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  // Helper method to get related activity data
+  private getRelatedActivityData(activity: any, comment?: any) {
+    switch (activity.entityType) {
+      case 'TaskComment':
+        return comment ? {
+          comment,
+          type: 'comment',
+        } : null;
+      case 'Task':
+        return {
+          type: 'task',
+        };
+      default:
+        return null;
+    }
+  }
+
+
+
 
   // activity-log.service.ts
   // More efficient version using raw query or better Prisma relations

@@ -8,8 +8,11 @@ import {
   HttpStatus,
   Get,
   Param,
+  Query,
+  ParseUUIDPipe,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -17,15 +20,27 @@ import { AuthResponseDto, RefreshTokenDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyResetTokenResponseDto } from './dto/verify-reset-token.dto';
+import { SetupAdminDto } from './dto/setup-admin.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
-
+import { SetupService } from './services/setup.service';
+import { AccessControlService, AccessResult } from 'src/common/access-control.utils';
+export enum ScopeType {
+  ORGANIZATION = 'organization',
+  WORKSPACE = 'workspace',
+  PROJECT = 'project',
+  TASK = 'task',
+}
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly setupService: SetupService,
+    private readonly accessControlService: AccessControlService,
+  ) { }
 
   @Public()
   @Post('login')
@@ -96,7 +111,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('profile')
+  @Get('profile')
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({
     status: 200,
@@ -105,6 +120,44 @@ export class AuthController {
   getProfile(@CurrentUser() user: any) {
     return user;
   }
+  @UseGuards(JwtAuthGuard)
+  @Get('access-control')
+  @ApiOperation({ summary: 'Get user access for a specific resource' })
+  @ApiQuery({
+    name: 'scope',
+    enum: ScopeType,
+    description: 'The scope type (organization, workspace, project, task)',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'id',
+    description: 'The UUID of the resource',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Access information retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        isElevated: { type: 'boolean' },
+        role: { type: 'string', enum: ['SUPER_ADMIN','OWNER', 'MANAGER', 'MEMBER', 'VIEWER'] },
+        canChange: { type: 'boolean' },
+        userId: { type: 'string' },
+        scopeId: { type: 'string' },
+        scopeType: { type: 'string' },
+      },
+    },
+  })
+  async getResourceAccess(
+    @Query('scope') scope: ScopeType,
+    @Query('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: any,
+  ): Promise<AccessResult> {
+    return this.accessControlService.getResourceAccess(scope, id, user.id);
+  }
+
+
 
   @Public()
   @Post('forgot-password')
@@ -150,7 +203,7 @@ export class AuthController {
   async verifyResetToken(
     @Param('token') token: string,
   ): Promise<VerifyResetTokenResponseDto> {
-    const {isValid} = await this.authService.verifyResetToken(token);
+    const { isValid } = await this.authService.verifyResetToken(token);
     return {
       valid: isValid,
       message: isValid ? 'Token is valid' : 'Invalid or expired token',
@@ -195,6 +248,77 @@ export class AuthController {
     return {
       success: true,
       message: 'Password has been reset successfully',
+    };
+  }
+
+  @Public()
+  @Get('setup/required')
+  @ApiOperation({ summary: 'Check if system setup is required' })
+  @ApiResponse({
+    status: 200,
+    description: 'Setup requirement status',
+    schema: {
+      type: 'object',
+      properties: {
+        required: { type: 'boolean' },
+        canSetup: { type: 'boolean' },
+        message: { type: 'string' },
+      },
+    },
+  })
+  async isSetupRequired() {
+    const required = await this.setupService.isSetupRequired();
+    const { canSetup, message } = await this.setupService.validateSetupState();
+    return { required, canSetup, message };
+  }
+
+  @Public()
+  @Post('setup')
+  @ApiOperation({ summary: 'Setup super admin user (first-time setup only)' })
+  @ApiBody({ type: SetupAdminDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Super admin created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        user: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            firstName: { type: 'string' },
+            lastName: { type: 'string' },
+            username: { type: 'string' },
+            role: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Setup already completed or in progress',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid setup data',
+  })
+  async setupSuperAdmin(@Body() setupAdminDto: SetupAdminDto) {
+    const user = await this.setupService.setupSuperAdmin(setupAdminDto);
+    return {
+      success: true,
+      message: 'Super admin created successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        role: user.role,
+      },
     };
   }
 }

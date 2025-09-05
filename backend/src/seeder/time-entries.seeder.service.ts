@@ -29,12 +29,16 @@ export class TimeEntriesSeederService {
         include: { user: true },
       });
 
-      const availableUsers = projectMembers.length > 0 
-        ? projectMembers.map(pm => pm.user)
-        : users.slice(0, 4); // fallback to first 4 users
+      const availableUsers =
+        projectMembers.length > 0
+          ? projectMembers.map((pm) => pm.user)
+          : users.slice(0, 4); // fallback to first 4 users
 
       // Generate realistic time entries for this task
-      const timeEntriesData = this.generateTimeEntriesForTask(task, availableUsers);
+      const timeEntriesData = this.generateTimeEntriesForTask(
+        task,
+        availableUsers,
+      );
 
       for (const timeEntryData of timeEntriesData) {
         try {
@@ -48,19 +52,27 @@ export class TimeEntriesSeederService {
           });
 
           createdTimeEntries.push(timeEntry);
-          
-          const user = availableUsers.find(u => u.id === timeEntryData.userId);
+
+          const user = availableUsers.find(
+            (u) => u.id === timeEntryData.userId,
+          );
           const hours = Math.floor(timeEntryData.timeSpent / 60);
           const minutes = timeEntryData.timeSpent % 60;
-          
-          console.log(`   ✓ Logged ${hours}h ${minutes}m by ${user?.firstName} on: ${task.title}`);
+
+          console.log(
+            `   ✓ Logged ${hours}h ${minutes}m by ${user?.firstName} on: ${task.title}`,
+          );
         } catch (error) {
-          console.log(`   ⚠ Error creating time entry for task ${task.title}: ${error.message}`);
+          console.log(
+            `   ⚠ Error creating time entry for task ${task.title}: ${error.message}`,
+          );
         }
       }
     }
 
-    console.log(`✅ Time entries seeding completed. Created ${createdTimeEntries.length} time entries.`);
+    console.log(
+      `✅ Time entries seeding completed. Created ${createdTimeEntries.length} time entries.`,
+    );
     return createdTimeEntries;
   }
 
@@ -75,8 +87,11 @@ export class TimeEntriesSeederService {
     }> = [];
 
     // Determine how much total time should be logged based on task estimates
-    const estimatedTime = task.originalEstimate || this.getDefaultEstimate(task);
-    const actualTimeSpent = Math.floor(estimatedTime * (0.7 + Math.random() * 0.6)); // 70-130% of estimate
+    const estimatedTime =
+      task.originalEstimate || this.getDefaultEstimate(task);
+    const actualTimeSpent = Math.floor(
+      estimatedTime * (0.7 + Math.random() * 0.6),
+    ); // 70-130% of estimate
 
     let remainingTime = actualTimeSpent;
     const workDays = this.generateWorkDays(7); // Last 7 days
@@ -85,17 +100,23 @@ export class TimeEntriesSeederService {
     while (remainingTime > 0 && workDays.length > 0) {
       const workDay = workDays.shift()!;
       const workingUsers = this.selectWorkingUsers(task, availableUsers);
-      
+
       for (const user of workingUsers) {
         if (remainingTime <= 0) break;
 
         // Generate 1-3 time entries per user per day
-        const entriesCount = Math.min(Math.floor(Math.random() * 3) + 1, Math.ceil(remainingTime / 120)); // Max 3 entries, or enough to cover remaining time
-        
+        const entriesCount = Math.min(
+          Math.floor(Math.random() * 3) + 1,
+          Math.ceil(remainingTime / 120),
+        ); // Max 3 entries, or enough to cover remaining time
+
         for (let i = 0; i < entriesCount && remainingTime > 0; i++) {
-          const sessionTime = this.generateSessionTime(remainingTime, task.type);
+          const sessionTime = this.generateSessionTime(
+            remainingTime,
+            task.type,
+          );
           const { startTime, endTime } = this.generateWorkingHours(workDay);
-          
+
           timeEntries.push({
             description: this.generateTimeEntryDescription(task, i),
             timeSpent: sessionTime,
@@ -132,17 +153,17 @@ export class TimeEntriesSeederService {
   private generateWorkDays(count: number): Date[] {
     const days: Date[] = [];
     const today = new Date();
-    
+
     for (let i = count - 1; i >= 0; i--) {
       const day = new Date(today);
       day.setDate(today.getDate() - i);
-      
+
       // Skip weekends (basic implementation)
       if (day.getDay() !== 0 && day.getDay() !== 6) {
         days.push(day);
       }
     }
-    
+
     return days;
   }
 
@@ -151,22 +172,25 @@ export class TimeEntriesSeederService {
 
     // Always include assignee if available
     if (task.assigneeId) {
-      const assignee = availableUsers.find(u => u.id === task.assigneeId);
+      const assignee = availableUsers.find((u) => u.id === task.assigneeId);
       if (assignee) workingUsers.push(assignee);
     }
 
     // 30% chance to include additional collaborators
     if (Math.random() < 0.3 && availableUsers.length > 1) {
-      const otherUsers = availableUsers.filter(u => u.id !== task.assigneeId);
+      const otherUsers = availableUsers.filter((u) => u.id !== task.assigneeId);
       if (otherUsers.length > 0) {
-        const randomUser = otherUsers[Math.floor(Math.random() * otherUsers.length)];
+        const randomUser =
+          otherUsers[Math.floor(Math.random() * otherUsers.length)];
         workingUsers.push(randomUser);
       }
     }
 
     // Fallback to random user if no assignee
     if (workingUsers.length === 0) {
-      workingUsers.push(availableUsers[Math.floor(Math.random() * availableUsers.length)]);
+      workingUsers.push(
+        availableUsers[Math.floor(Math.random() * availableUsers.length)],
+      );
     }
 
     return workingUsers;
@@ -174,7 +198,7 @@ export class TimeEntriesSeederService {
 
   private generateSessionTime(remainingTime: number, taskType: string): number {
     // Generate realistic work sessions based on task type
-    let minSession = 30; // 30 minutes minimum
+    const minSession = 30; // 30 minutes minimum
     let maxSession = 240; // 4 hours maximum
 
     if (taskType === 'BUG') {
@@ -185,7 +209,7 @@ export class TimeEntriesSeederService {
 
     const sessionTime = Math.min(
       remainingTime,
-      Math.floor(Math.random() * (maxSession - minSession) + minSession)
+      Math.floor(Math.random() * (maxSession - minSession) + minSession),
     );
 
     return sessionTime;
@@ -195,17 +219,20 @@ export class TimeEntriesSeederService {
     // Generate realistic working hours (9 AM to 6 PM)
     const startHour = 9 + Math.floor(Math.random() * 8); // 9 AM to 4 PM start
     const sessionLength = 1 + Math.floor(Math.random() * 4); // 1-4 hour sessions
-    
+
     const startTime = new Date(date);
     startTime.setHours(startHour, Math.floor(Math.random() * 60), 0, 0);
-    
+
     const endTime = new Date(startTime);
     endTime.setHours(startTime.getHours() + sessionLength);
-    
+
     return { startTime, endTime };
   }
 
-  private generateTimeEntryDescription(task: Task, sessionIndex: number): string {
+  private generateTimeEntryDescription(
+    task: Task,
+    sessionIndex: number,
+  ): string {
     const taskTitle = task.title.toLowerCase();
     const descriptions = [
       // General development activities
@@ -215,23 +242,25 @@ export class TimeEntriesSeederService {
       'Testing and debugging',
       'Documentation updates',
       'Final testing and cleanup',
-      
+
       // Bug-specific activities
       'Investigating the issue',
       'Reproducing the bug',
       'Implementing the fix',
       'Testing the fix',
-      
+
       // Feature-specific activities
       'Designing the solution',
       'Implementing core functionality',
       'Adding error handling',
       'Integration with existing code',
       'User interface adjustments',
-      
+
       // Task-specific descriptions
       taskTitle.includes('auth') ? 'Working on authentication logic' : null,
-      taskTitle.includes('ui') || taskTitle.includes('dashboard') ? 'UI development and styling' : null,
+      taskTitle.includes('ui') || taskTitle.includes('dashboard')
+        ? 'UI development and styling'
+        : null,
       taskTitle.includes('api') ? 'API endpoint development' : null,
       taskTitle.includes('database') ? 'Database schema and queries' : null,
       taskTitle.includes('test') ? 'Writing and running tests' : null,

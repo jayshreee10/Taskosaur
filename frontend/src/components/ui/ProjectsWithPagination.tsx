@@ -1,114 +1,157 @@
-import React, { useState } from "react";
-import Link from "next/link";
-import { HiPlus, HiFolder, HiExternalLink } from "react-icons/hi";
-import { Badge, Button } from "@/components/ui";
-import { Pagination } from "@/components/ui/pagination";
-
-interface Project {
-  id: string;
-  name: string;
-  key: string;
-  description: string;
-  color: string;
-  status: string;
-  priority: string;
-  startDate: string;
-  endDate: string;
-  workspaceId: string;
-}
+import React from "react";
+import { useRouter } from 'next/router';
+import { HiFolder } from "react-icons/hi";
+import { InfoPanel } from "@/components/common/InfoPanel";
+import { StatusBadge } from "@/components/badges/StatusBadge";
+import ActionButton from "@/components/common/ActionButton";
+import { Project } from '@/types';
 
 interface ProjectsWithPaginationProps {
   projects: Project[];
-  workspaceSlug: string;
-  getStatusVariant: (status: string) => string;
   generateProjectSlug: (name: string) => string;
+  viewAllLink?: string;
+ 
 }
 
-const PAGE_SIZE = 3;
+
+const isValidProject = (project: Project): boolean => {
+  
+  if (!project.workspace?.slug) {
+    console.warn(`Project "${project.name}" (${project.id}) missing workspace.slug - excluding from display`);
+    return false;
+  }
+  
+ 
+  if (!project.slug && !project.name) {
+    console.warn(`Project "${project.id}" missing both slug and name - excluding from display`);
+    return false;
+  }
+  
+  return true;
+};
+
+
+const getWorkspaceSlug = (project: Project): string => {
+  return project.workspace?.slug || '';
+};
+
+
+const generateProjectUrl = (project: Project, generateProjectSlug: (name: string) => string): string => {
+  const workspaceSlug = getWorkspaceSlug(project);
+  const projectSlug = project.slug || generateProjectSlug(project.name);
+  
+  return `/${workspaceSlug}/${projectSlug}`;
+};
+
+
+const generateWorkspaceProjectsUrl = (project: Project): string => {
+  const workspaceSlug = getWorkspaceSlug(project);
+  return `/${workspaceSlug}/projects`;
+};
+
+
+const generateNewProjectUrl = (project: Project): string => {
+  const workspaceSlug = getWorkspaceSlug(project);
+  return `/${workspaceSlug}/projects/new`;
+};
 
 const ProjectsWithPagination: React.FC<ProjectsWithPaginationProps> = ({
   projects,
-  workspaceSlug,
-  getStatusVariant,
   generateProjectSlug,
+  viewAllLink,
 }) => {
-  const [page, setPage] = useState(1);
-  const totalPages = Math.ceil(projects.length / PAGE_SIZE);
-  const paginatedProjects = projects.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const router = useRouter();
+
+  const validProjects = projects.filter(isValidProject);
+  
+  if (validProjects.length !== projects.length) {
+    console.warn(`Filtered out ${projects.length - validProjects.length} invalid projects without workspace data`);
+  }
+
+  const displayedProjects = validProjects.slice(0, 3);
+
+  const firstValidProject = validProjects[0];
+  const workspaceProjectsUrl = firstValidProject ? generateWorkspaceProjectsUrl(firstValidProject) : '/workspaces';
+  const newProjectUrl = firstValidProject ? generateNewProjectUrl(firstValidProject) : '/workspaces';
+
+  const handleProjectClick = (project: Project) => {
+    const projectUrl = generateProjectUrl(project, generateProjectSlug);
+    router.push(projectUrl);
+  };
+
+  const handleNewProjectClick = () => {
+    router.push(newProjectUrl);
+  };
 
   return (
-    <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm">
-      <div className="p-4 pb-2">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-4 bg-[var(--primary)] rounded-full" />
-            <h3 className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wide">Projects</h3>
-          </div>
-          <Link href={`/${workspaceSlug}/projects`} className="text-xs font-medium text-[var(--primary)] hover:text-[var(--primary)]/90 flex items-center gap-1">
-            View all <HiExternalLink className="w-3 h-3" />
-          </Link>
-        </div>
-        <p className="text-xs text-gray-500 ml-3">All projects in this workspace</p>
-      </div>
-      <div className="px-4 pb-4">
-        {projects.length === 0 ? (
+    <InfoPanel
+      title="My Projects"
+      subtitle="Manage and track your active projects"
+      viewAllHref={viewAllLink || workspaceProjectsUrl}
+      viewAllText="View all"
+      className="dashboard-card"
+    >
+      <div className="py-4">
+        {validProjects.length === 0 ? (
           <div className="text-center py-8 flex flex-col items-center justify-center">
-            <div className="w-12 h-12 mb-3 rounded-xl bg-gray-100 flex items-center justify-center">
-              <HiFolder className="w-6 h-6 text-gray-400" />
+            <div className="w-12 h-12 mb-3 rounded-xl bg-[var(--muted)] flex items-center justify-center">
+              <HiFolder className="w-6 h-6 text-[var(--muted-foreground)]" />
             </div>
-            <p className="text-sm font-medium text-[var(--accent-foreground)] mb-1">No projects found</p>
-            <p className="text-xs text-gray-500 mb-3">Create your first project to get started.</p>
-            <Link href={`/${workspaceSlug}/projects/new`} className="w-full flex justify-center">
-              <Button
-                variant="default"
-                className="relative h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-lg flex items-center gap-1 text-xs mx-auto"
-              >
-                <HiPlus className="w-3 h-3" />
-                New Project
-              </Button>
-            </Link>
+            <p className="text-sm font-medium text-[var(--accent-foreground)] mb-1">
+              No projects found
+            </p>
+            <p className="text-xs text-[var(--muted-foreground)] mb-3">
+              {projects.length > 0 
+                ? "Projects found but missing workspace data."
+                : "Create your first project to get started."
+              }
+            </p>
+            <ActionButton
+              primary
+              showPlusIcon
+              onClick={handleNewProjectClick}
+              className="text-xs mx-auto"
+            >
+              New Project
+            </ActionButton>
           </div>
         ) : (
-          <div className="space-y-2">
-            {paginatedProjects.map((project) => (
-              <div key={project.id} className="flex items-center gap-3 p-2 rounded-lg transition-colors group">
-                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-semibold bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white rounded-lg px-2 py-1 cursor-pointer">
-                    {project.name?.charAt(0)?.toUpperCase() || "?"}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[var(--accent-foreground)] truncate">{project.name}</p>
-                  <div className="project-meta">
-                    <Badge
-                      variant={getStatusVariant(project.status) as any}
-                      className="capitalize"
-                    >
-                      {project.status}
-                    </Badge>
+          <div className="space-y-3">
+            {displayedProjects.map((project) => (
+              <div
+                key={project.id}
+                className="flex items-center justify-between p-3 rounded-lg transition-colors bg-[var(--card)] hover:bg-[var(--hover-bg)] cursor-pointer"
+                onClick={() => handleProjectClick(project)}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold text-white uppercase"
+                    style={{ backgroundColor: project.color }}
+                  >
+                    {project.name?.charAt(0) || "?"}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-[var(--accent-foreground)] capitalize">
+                      {project.name}
+                    </div>
+                    {/* Optional: Show workspace name for context */}
+                    <div className="text-[12px] text-[var(--muted-foreground)] capitalize">
+                      {project.workspace?.name}
+                    </div>
                   </div>
                 </div>
-                <Link
-                  href={`/${workspaceSlug}/${generateProjectSlug(project.name)}`}
-                  className="project-link text-xs text-[var(--primary)] hover:underline"
-                >
-                  View
-                </Link>
+                <div className="flex items-center">
+                  <StatusBadge
+                    status={project.status}
+                    type="project"
+                  />
+                </div>
               </div>
             ))}
-            {totalPages > 1 && (
-              <div className="mt-4 flex justify-center">
-                <Pagination
-                  page={page}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                />
-              </div>
-            )}
           </div>
         )}
       </div>
-    </div>
+    </InfoPanel>
   );
 };
 

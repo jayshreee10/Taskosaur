@@ -1,13 +1,5 @@
-"use client";
-
-import {
-  authApi,
-  LoginData,
-  UploadFileResponse,
-  User,
-  UserData,
-} from "@/utils/api/authApi";
-import { userApi, UpdateEmailData, UpdateUserData } from "@/utils/api/userApi";
+import { authApi } from "@/utils/api/authApi";
+import { userApi, UpdateEmailData } from "@/utils/api/userApi";
 import { organizationApi } from "@/utils/api/organizationApi";
 import React, {
   createContext,
@@ -17,12 +9,20 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { notificationApi } from "@/utils/api/notificationApi";
 import {
-  Notification,
-  notificationApi,
+  ApiResponse,
+  ForgotPasswordData,
+  LoginData,
+  ResetPasswordData,
+  UploadFileResponse,
+  User,
+  UpdateUserData,
   NotificationPriority,
   NotificationType,
-} from "@/utils/api/notificationApi";
+  Notification,
+  UserData,
+} from "@/types";
 
 interface AuthState {
   user: User | null;
@@ -79,7 +79,12 @@ interface AuthContextType extends AuthState {
       byPriority: Record<string, number>;
     };
   }>;
+  forgotPassword: (data: ForgotPasswordData) => Promise<ApiResponse>;
+  resetPassword: (data: ResetPasswordData) => Promise<ApiResponse>;
+  changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) => Promise<ApiResponse>;
+  validateResetToken: (token: string) => Promise<ApiResponse<{ valid: boolean }> >;
   uploadFileToS3: (file: File, key: string) => Promise<UploadFileResponse>;
+  getUserAccess: (data: { name: string; id: string}) => Promise<any>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -107,9 +112,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentOrgId) {
         return;
       }
-      const organizations = await organizationApi.getOrganizationsByUser(
-        userId
-      );
+      const organizations = await organizationApi.getUserOrganizations(userId);
 
       if (organizations && organizations.length > 0) {
         const firstOrganization = organizations[0];
@@ -201,7 +204,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         const user = authApi.getCurrentUser();
         if (!user) return "/login";
 
-        const organizations = await organizationApi.getOrganizationsByUser(
+        const organizations = await organizationApi.getUserOrganizations(
           user.id
         );
         if (organizations && organizations.length > 0) {
@@ -209,7 +212,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           return "/dashboard";
         } else {
           localStorage.removeItem("currentOrganizationId");
-          return "/organization";
+          return "/intro";
         }
       } catch (err) {
         return "/login";
@@ -241,12 +244,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         await handleApiOperation(async () => {
           await authApi.logout();
-
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("currentOrganizationId");
-            window.dispatchEvent(new CustomEvent("organizationChanged"));
-          }
-
           setAuthState((prev) => ({ ...prev, user: null }));
         });
       },
@@ -285,7 +282,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return result;
       },
-
+      getUserAccess: async (data: { name: string; id: string;}) => {
+        const result = await handleApiOperation(() =>
+          authApi.getUserAccess(data)
+        );
+        return result;
+      },
       deleteUser: (userId: string) =>
         handleApiOperation(() => userApi.deleteUser(userId)),
 
@@ -319,10 +321,35 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           filters
         );
       },
+      forgotPassword: async (data: ForgotPasswordData) => {
+        const result = await handleApiOperation(() =>
+          authApi.forgotPassword(data)
+        );
+        return result;
+      },
 
+      resetPassword: async (data: ResetPasswordData) => {
+        const result = await handleApiOperation(() =>
+          authApi.resetPassword(data)
+        );
+        return result;
+      },
+      changePassword: async (data: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
+        const result = await handleApiOperation(() =>
+          authApi.changePassword(data)
+        );
+        return result;
+      },
+      validateResetToken: async (token: string) => {
+        const result = await handleApiOperation(() =>
+          authApi.validateResetToken(token)
+        );
+        return result;
+      },
       uploadFileToS3: async (file: File, key: string) =>
         authApi.uploadFileToS3(file, key),
     }),
+
     [
       authState,
       handleApiOperation,

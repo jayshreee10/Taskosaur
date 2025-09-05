@@ -1,21 +1,191 @@
-'use client';
-import React from 'react';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Checkbox } from '@/components/ui/checkbox';
-import Link from 'next/link';
-import { HiCalendar, HiUser, HiFlag, HiClipboardDocumentList } from 'react-icons/hi2';
-import { Task } from '@/utils/api';
+import { cn } from "@/lib/utils";
+import { useState } from "react";
+import type React from "react";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PriorityBadge } from "@/components/badges/PriorityBadge";
+import { Badge } from "@/components/ui/badge";
+
+import {
+  CalendarDays,
+  User,
+  MessageSquare,
+  FileText,
+  Bookmark,
+  X,
+  Calendar,
+  Target,
+  Timer,
+  Layers,
+  Paperclip,
+  Clock,
+  Plus,
+  Check,
+} from "lucide-react";
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
   PaginationLink,
   PaginationPrevious,
-  PaginationNext
+  PaginationNext,
 } from "@/components/ui/pagination";
-import { useRouter } from 'next/navigation';
+import type { Task, ColumnConfig } from "@/types";
+import { TaskPriorities } from "@/utils/data/taskData";
+import { StatusBadge } from "@/components/badges";
+import TaskDetailClient from "@/components/tasks/TaskDetailClient";
+import { CustomModal } from "@/components/common/CustomeModal";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTask } from "@/contexts/task-context";
+import { useProject } from "@/contexts/project-context";
+import { toast } from "sonner";
+import { availableStatuses } from "@/utils/data/projectFilters";
+import Tooltip from "@/components/common/ToolTip";
+
+// Data extraction utility functions
+function extractTaskValue(task: Task, columnId: string): any {
+  switch (columnId) {
+    case "description":
+      return task.description || "";
+
+    case "taskNumber":
+      return task.taskNumber || "";
+
+    case "timeline":
+      return {
+        startDate: task.startDate,
+        dueDate: task.dueDate,
+      };
+
+    case "completedAt":
+      return task.completedAt
+        ? new Date(task.completedAt).toLocaleDateString()
+        : "";
+
+    case "storyPoints":
+      return task.storyPoints || 0;
+
+    case "originalEstimate":
+      return task.originalEstimate || 0;
+
+    case "remainingEstimate":
+      return task.remainingEstimate || 0;
+
+    case "reporter":
+      return task.reporter
+        ? {
+            id: task.reporter.id,
+            firstName: task.reporter.firstName,
+            lastName: task.reporter.lastName,
+            name:
+              task.reporter.firstName ||
+              `${task.reporter.firstName} ${task.reporter.lastName}`,
+            email: task.reporter.email,
+            avatar: task.reporter.avatar,
+          }
+        : null;
+
+    case "createdBy":
+      return task.createdBy || "";
+
+    case "createdAt":
+      return task.createdAt
+        ? new Date(task.createdAt).toLocaleDateString()
+        : "";
+
+    case "updatedAt":
+      return task.updatedAt
+        ? new Date(task.updatedAt).toLocaleDateString()
+        : "";
+
+    case "sprint":
+      return task.sprint ? task.sprint.name : "";
+
+    case "parentTask":
+      return task.parentTask
+        ? task.parentTask.title || task.parentTask.taskNumber
+        : "";
+
+    case "childTasksCount":
+      return task._count?.childTasks || task.childTasks?.length || 0;
+
+    case "commentsCount":
+      return task._count?.comments || task.comments?.length || 0;
+
+    case "attachmentsCount":
+      return task._count?.attachments || task.attachments?.length || 0;
+
+    case "timeEntries":
+      return task.timeEntries?.length || 0;
+
+    default:
+      return "";
+  }
+}
+
+function formatColumnValue(value: any, columnType: string): string {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  switch (columnType) {
+    case "user":
+      if (typeof value === "object" && value.name) {
+        return value.name;
+      }
+      return value.toString();
+
+    case "dateRange":
+      if (typeof value === "object" && value.startDate && value.dueDate) {
+        const start = new Date(value.startDate).toLocaleDateString();
+        const end = new Date(value.dueDate).toLocaleDateString();
+        return `${start} - ${end}`;
+      } else if (typeof value === "object" && value.startDate) {
+        return `${new Date(value.startDate).toLocaleDateString()} - TBD`;
+      } else if (typeof value === "object" && value.dueDate) {
+        return `TBD - ${new Date(value.dueDate).toLocaleDateString()}`;
+      }
+      return "-";
+
+    case "date":
+      if (value instanceof Date) {
+        return value.toLocaleDateString();
+      }
+      if (typeof value === "string") {
+        const [day, month, year] = value.split("/");
+        const parsedDate = new Date(`${year}-${month}-${day}`);
+        return parsedDate.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
+      return value?.toString?.() ?? "";
+
+    case "number":
+      return value.toString();
+
+    case "text":
+    default:
+      return value.toString();
+  }
+}
+
 interface TaskTableProps {
   tasks: Task[];
   workspaceSlug?: string;
@@ -23,7 +193,9 @@ interface TaskTableProps {
   onTaskSelect?: (taskId: string) => void;
   selectedTasks?: string[];
   projects?: any[];
+  projectsOfCurrentWorkspace?: any[];
   showProject?: boolean;
+  columns?: ColumnConfig[];
   pagination?: {
     currentPage: number;
     pageSize: number;
@@ -33,6 +205,12 @@ interface TaskTableProps {
     hasNextPage: boolean;
   };
   onPageChange?: (page: number) => void;
+  onTaskRefetch?: () => void;
+  showAddTaskRow?: boolean;
+  addTaskStatuses?: Array<{ id: string; name: string }>;
+  projectMembers?: any[];
+  currentProject?: any;
+  workspaceMembers?: any[];
 }
 
 const TaskTable: React.FC<TaskTableProps> = ({
@@ -41,61 +219,54 @@ const TaskTable: React.FC<TaskTableProps> = ({
   projectSlug,
   onTaskSelect,
   selectedTasks = [],
-  projects,
   showProject = false,
+  columns = [],
   pagination,
-  onPageChange
+  onPageChange,
+  onTaskRefetch,
+  showAddTaskRow = true,
+  projects = [],
+  projectsOfCurrentWorkspace = [],
+  addTaskStatuses = [],
+  projectMembers,
+  workspaceMembers,
+  currentProject,
 }) => {
-  console.log('Rendering TaskTable with tasks:', tasks);
-  
-  const columnCount = 3 + 
-    (onTaskSelect ? 1 : 0) + 
-    (showProject ? 1 : 0) + 
-    1 + 
-    1;  
-const router = useRouter();
-  const getPriorityConfig = (priority: string) => {
-    switch (priority) {
-      case 'HIGHEST':
-        return { variant: 'destructive' as const, className: 'bg-red-100 text-red-800  dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' };
-      case 'HIGH':
-        return { variant: 'secondary' as const, className: 'bg-orange-100 text-orange-800  dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800' };
-      case 'MEDIUM':
-        return { variant: 'secondary' as const, className: 'bg-yellow-100 text-yellow-800  dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800' };
-      case 'LOW':
-        return { variant: 'secondary' as const, className: 'bg-green-100 text-green-800  dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' };
-      case 'LOWEST':
-        return { variant: 'outline' as const, className: 'bg-gray-50 text-gray-600  dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-700' };
-      default:
-        return { variant: 'secondary' as const, className: 'bg-[var(--muted)] text-[var(--muted-foreground)]' };
-    }
-  };
-  
-  const getStatusConfig = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'done':
-      case 'completed':
-        return { className: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' };
-      case 'in progress':
-      case 'in_progress':
-        return { className: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800' };
-      case 'blocked':
-        return { className: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' };
-      case 'review':
-        return { className: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800' };
-      case 'todo':
-        return { className: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-700' };
-      default:
-        return { className: 'bg-[var(--muted)] text-[var(--muted-foreground)] border-[var(--border)]' };
-    }
-  };
+  const { createTask } = useTask();
+
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [newTaskData, setNewTaskData] = useState({
+    title: "",
+    priority: "MEDIUM" as "LOW" | "MEDIUM" | "HIGH" | "HIGHEST",
+    statusId: "",
+    assigneeId: "",
+    dueDate: "",
+    projectId: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [titleTouched, setTitleTouched] = useState(false);
+
+  const today = new Date().toISOString().split("T")[0];
 
   const formatDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = date.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Tomorrow";
+      if (diffDays === -1) return "Yesterday";
+      if (diffDays < -1) return `${Math.abs(diffDays)} days ago`;
+      if (diffDays > 1) return `In ${diffDays} days`;
+
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
       });
     } catch {
       return dateString;
@@ -103,197 +274,874 @@ const router = useRouter();
   };
 
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+    return `${firstName?.charAt(0) || ""}${
+      lastName?.charAt(0) || ""
+    }`.toUpperCase();
+  };
+
+  const getTaskTypeIcon = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case "story":
+        return <Bookmark className="w-4 h-4 text-green-600" />;
+      case "bug":
+        return <div className="w-4 h-4 rounded-full bg-red-500" />;
+      case "task":
+      default:
+        return <FileText className="w-4 h-4 text-blue-600" />;
+    }
+  };
+
+  const isOverdue = (dueDate: string) => {
+    return new Date(dueDate) < new Date();
+  };
+
+  const renderDynamicCellContent = (task: Task, column: ColumnConfig) => {
+    const value = extractTaskValue(task, column.id);
+
+    switch (column.type) {
+      case "user":
+        if (value && typeof value === "object") {
+          return (
+            <div className="tasktable-assignee-container">
+              <Avatar className="tasktable-assignee-avatar">
+                <AvatarImage
+                  src={value.avatar || "/placeholder.svg"}
+                  alt={`${value.firstName || ""} ${value.lastName || ""}`}
+                />
+                <AvatarFallback className="tasktable-assignee-fallback">
+                  {getInitials(value.firstName, value.lastName)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="tasktable-assignee-name">
+                {value.name ||
+                  `${value.firstName || ""} ${value.lastName || ""}`.trim() ||
+                  value.email}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            <span className="tasktable-assignee-unassigned">Unassigned</span>
+          </div>
+        );
+
+      case "dateRange":
+        if (value && typeof value === "object") {
+          return (
+            <div className="tasktable-date-container">
+              <CalendarDays className="tasktable-date-icon w-4 h-4 text-gray-500" />
+              <span className="tasktable-date-text text-sm">
+                {formatColumnValue(value, column.type)}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <div className="tasktable-date-container">
+            <CalendarDays className="tasktable-date-icon w-4 h-4 text-gray-500" />
+            <span className="tasktable-date-empty">No timeline</span>
+          </div>
+        );
+
+      case "text":
+        if (column.id === "description" && value) {
+          return (
+            <div className="flex items-start gap-2">
+              <FileText className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+              <span
+                className="text-sm text-gray-900 line-clamp-2 max-w-xs"
+                title={value}
+              >
+                {value}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <span className="text-sm">
+            {formatColumnValue(value, column.type)}
+          </span>
+        );
+
+      case "number":
+        const numValue = formatColumnValue(value, column.type);
+        if (column.id === "storyPoints") {
+          return (
+            <div className="flex items-center gap-1">
+              <Target className="w-3 h-3 text-blue-500" />
+              <span className="text-sm font-medium">{numValue}</span>
+            </div>
+          );
+        }
+        if (
+          column.id === "originalEstimate" ||
+          column.id === "remainingEstimate"
+        ) {
+          return (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 text-orange-500" />
+              <span className="text-sm font-mono">{numValue}h</span>
+            </div>
+          );
+        }
+        if (column.id === "childTasksCount") {
+          return (
+            <div className="flex items-center gap-1">
+              <Layers className="w-3 h-3 text-purple-500" />
+              <span className="text-sm">{numValue}</span>
+            </div>
+          );
+        }
+        if (column.id === "commentsCount") {
+          return (
+            <div className="flex items-center gap-1">
+              <MessageSquare className="w-3 h-3 text-green-500" />
+              <span className="text-sm">{numValue}</span>
+            </div>
+          );
+        }
+        if (column.id === "attachmentsCount") {
+          return (
+            <div className="flex items-center gap-1">
+              <Paperclip className="w-3 h-3 text-gray-500" />
+              <span className="text-sm">{numValue}</span>
+            </div>
+          );
+        }
+        if (column.id === "timeEntries") {
+          return (
+            <div className="flex items-center gap-1">
+              <Timer className="w-4 h-4 text-indigo-500" />
+              <span className="text-sm">{numValue}</span>
+            </div>
+          );
+        }
+        return <span className="text-sm font-mono">{numValue}</span>;
+
+      case "date":
+        return (
+          <div className="tasktable-date-container">
+            <CalendarDays className="tasktable-date-icon w-4 h-4 text-gray-500" />
+            <span className="tasktable-date-text text-sm">
+              {formatColumnValue(value, column.type)}
+            </span>
+          </div>
+        );
+
+      default:
+        return (
+          <span className="text-sm">
+            {formatColumnValue(value, column.type)}
+          </span>
+        );
+    }
+  };
+
+  const handleRowClick = (task: Task) => {
+    setSelectedTask(task);
+    setIsEditModalOpen(true);
   };
 
   if (tasks.length === 0) {
     return (
-      <div className="text-center py-12 text-[var(--muted-foreground)]">
-        <div className="text-lg mb-2">No tasks found</div>
-        <div className="text-sm">Create your first task to get started</div>
+      <div className="tasktable-empty-state">
+        <h3 className="tasktable-empty-title">No tasks found</h3>
+        <p className="tasktable-empty-description">
+          Create your first task to get started with project management
+        </p>
       </div>
     );
   }
 
-  return (
-    <div className="rounded-md border-none bg-[var(--card)] shadow-sm overflow-hidden">
-      <div className="overflow-x-auto border-none">
-        <Table className="border-none w-full">
-          <TableHeader className="border-none">
-            <TableRow className="border-none  bg-[var(--muted)]/30">
-              {onTaskSelect && (
-                <TableHead className="w-12 border-none">
-                  <Checkbox
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        tasks.forEach(task => onTaskSelect(task.id));
-                      } else {
-                        tasks.forEach(task => {
-                          if (selectedTasks.includes(task.id)) {
-                            onTaskSelect(task.id);
-                          }
-                        });
-                      }
-                    }}
-                  />
-                </TableHead>
-              )}
-              <TableHead className="text-[var(--muted-foreground)] font-medium min-w-[200px] border-none pl-6">Task</TableHead>
-              {showProject && <TableHead className="text-[var(--muted-foreground)] font-medium min-w-[120px] hidden sm:table-cell border-none">Project</TableHead>}
-              <TableHead className="text-[var(--muted-foreground)] font-medium min-w-[80px] border-none">Priority</TableHead>
-              <TableHead className="text-[var(--muted-foreground)] font-medium min-w-[80px] border-none">Status</TableHead>
-              <TableHead className="text-[var(--muted-foreground)] font-medium min-w-[120px] hidden md:table-cell border-none">Assignee</TableHead>
-              <TableHead className="text-[var(--muted-foreground)] font-medium min-w-[100px] hidden lg:table-cell border-none pr-6">Due Date</TableHead>
-            </TableRow>
-          </TableHeader>
+  const visibleColumns = columns.filter((col) => col.visible);
 
-          <TableBody className="bg-[var(--card)] border-none">
-            {tasks.map((task, idx) => {
-              const detailUrl = workspaceSlug && projectSlug
-                ? `/${workspaceSlug}/${projectSlug}/tasks/${task.id}`
-                : workspaceSlug
-                  ? `/${workspaceSlug}/tasks/${task.id}`
-                  : `/tasks/${task.id}`;
-              return (
+  const loadTaskCreationData = () => {
+    if (addTaskStatuses && addTaskStatuses.length > 0) {
+      const defaultStatus =
+        addTaskStatuses.find(
+          (s) =>
+            s.name.toLowerCase() === "todo" || s.name.toLowerCase() === "to do"
+        ) || addTaskStatuses[0];
+
+      if (defaultStatus) {
+        setNewTaskData((prev) => ({ ...prev, statusId: defaultStatus.id }));
+      }
+    }
+  };
+
+  const handleStartCreating = () => {
+    setIsCreatingTask(true);
+    loadTaskCreationData();
+  };
+
+  const handleCancelCreating = () => {
+    setIsCreatingTask(false);
+    setNewTaskData({
+      title: "",
+      priority: "MEDIUM",
+      statusId: "",
+      assigneeId: "",
+      dueDate: "",
+      projectId: "",
+    });
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskData.title.trim()) {
+      toast.error("Task title is required");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      let projectId = null;
+      if (currentProject && currentProject.id) {
+        projectId = currentProject.id;
+      } else if (tasks.length > 0) {
+        projectId = tasks[0].projectId || tasks[0].project?.id;
+      }
+
+      if (!projectId) {
+        toast.error(
+          "Unable to determine project context. Project ID is required."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      const taskData = {
+        title: newTaskData.title.trim(),
+        description: "",
+        priority: newTaskData.priority,
+        projectId,
+        statusId: newTaskData.statusId,
+        assigneeId: newTaskData.assigneeId || undefined,
+
+        dueDate: newTaskData.dueDate
+          ? new Date(newTaskData.dueDate + "T23:59:59.999Z").toISOString()
+          : undefined,
+      };
+
+      await createTask(taskData);
+
+      handleCancelCreating();
+
+      if (onTaskRefetch) {
+        await onTaskRefetch();
+      }
+
+      toast.success("Task created successfully!");
+    } catch (error) {
+      console.error("Failed to create task:", error);
+      toast.error("Failed to create task. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getToday = () => {
+    const today = new Date();
+    return today.toISOString().split("T")[0];
+  };
+
+  // Helper to check if title is invalid
+  const isTitleInvalid = !newTaskData.title.trim() && titleTouched;
+
+  return (
+    <div className="w-full">
+      <div className="tasktable-container">
+        <div className="tasktable-wrapper">
+          <Table className="tasktable-table">
+            <TableHeader className="tasktable-header">
+              <TableRow className="tasktable-header-row">
+                {onTaskSelect && (
+                  <TableHead className="tasktable-header-cell-checkbox w-12 min-w-[3rem] max-w-[3rem]">
+                    <Checkbox
+                      checked={
+                        selectedTasks.length === tasks.length &&
+                        tasks.length > 0
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          tasks.forEach((task) => onTaskSelect(task.id));
+                        } else {
+                          tasks.forEach((task) => {
+                            if (selectedTasks.includes(task.id)) {
+                              onTaskSelect(task.id);
+                            }
+                          });
+                        }
+                      }}
+                    />
+                  </TableHead>
+                )}
+                <TableHead className="tasktable-header-cell-task ">
+                  Task
+                </TableHead>
+                {showProject && (
+                  <TableHead className="tasktable-header-cell-project ">
+                    Project
+                  </TableHead>
+                )}
+                <TableHead className="tasktable-header-cell-priority">
+                  Priority
+                </TableHead>
+                <TableHead className="tasktable-header-cell-status ">
+                  <p className="ml-3">Status</p>
+                </TableHead>
+                <TableHead className="tasktable-header-cell-assignee ">
+                  Assignee
+                </TableHead>
+                <TableHead className="tasktable-header-cell-date">
+                  Due Date
+                </TableHead>
+
+                {/* Dynamic columns */}
+                {visibleColumns.map((column) => (
+                  <TableHead
+                    key={column.id}
+                    className="tasktable-header-cell w-[8%] min-w-[80px] max-w-[120px]"
+                  >
+                    <div className="flex items-center justify-between group">
+                      <span>{column.label}</span>
+                    </div>
+                  </TableHead>
+                ))}
+                {/* Action column for buttons, match body */}
+                <TableHead className="tasktable-header-cell w-20 min-w-[5rem] max-w-[5rem]">
+                  {" "}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody className="tasktable-body">
+              {showAddTaskRow &&
+                (isCreatingTask ? (
+                  <TableRow className="tasktable-add-row h-12 bg-[var(--mini-sidebar)]/50 border-none">
+                    {onTaskSelect && (
+                      <TableCell className="tasktable-cell-checkbox">
+                        <div className="w-4 h-4" />
+                      </TableCell>
+                    )}
+                    {/* Task Title */}
+                    <TableCell className="tasktable-cell-task">
+                      <Input
+                        value={newTaskData.title}
+                        onChange={(e) => {
+                          setNewTaskData((prev) => ({ ...prev, title: e.target.value }));
+                          if (!titleTouched) setTitleTouched(true);
+                        }}
+                        onBlur={() => setTitleTouched(true)}
+                        placeholder="Enter task title..."
+                        className={`border-none shadow-none focus-visible:ring-1 bg-transparent ${isTitleInvalid ? 'ring-2 ring-red-500' : ''}`}
+                        autoFocus
+                        disabled={isSubmitting}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleCreateTask();
+                          } else if (e.key === "Escape") {
+                            handleCancelCreating();
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    {/* Project column if shown */}
+                    {showProject && (
+                      <TableCell className="tasktable-cell-project">
+                        {workspaceSlug && !projectSlug ? (
+                          <Select
+                            value={newTaskData.projectId || ""}
+                            onValueChange={(value) =>
+                              setNewTaskData((prev) => ({
+                                ...prev,
+                                projectId: value,
+                              }))
+                            }
+                            disabled={isSubmitting}
+                          >
+                            <SelectTrigger className="border-none shadow-none -ml-3">
+                              <SelectValue placeholder="Select project" />
+                            </SelectTrigger>
+                            <SelectContent className="overflow-y-auto bg-white border-none text-black">
+                              {Array.isArray(projectsOfCurrentWorkspace) &&
+                              projectsOfCurrentWorkspace.length > 0 ? (
+                                projectsOfCurrentWorkspace.map(
+                                  (project: any) => (
+                                    <SelectItem
+                                      key={project.id}
+                                      value={project.id}
+                                      className="text-black"
+                                    >
+                                      {project.name}
+                                    </SelectItem>
+                                  )
+                                )
+                              ) : (
+                                <SelectItem
+                                  value="no-projects"
+                                  disabled
+                                  className="text-black"
+                                >
+                                  No projects found
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        ) : workspaceSlug && projectSlug ? (
+                          <span className="text-sm text-gray-500">
+                            {projectsOfCurrentWorkspace &&
+                            projectsOfCurrentWorkspace.length > 0
+                              ? projectsOfCurrentWorkspace.find(
+                                  (p: any) =>
+                                    p.id === projectSlug ||
+                                    p.slug === projectSlug
+                                )?.name || "Current Project"
+                              : "Current Project"}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-500">
+                            Current Project
+                          </span>
+                        )}
+                      </TableCell>
+                    )}
+                    {/* Priority */}
+                    <TableCell className="tasktable-cell">
+                      <Select
+                        value={newTaskData.priority}
+                        onValueChange={(value) =>
+                          setNewTaskData((prev) => ({
+                            ...prev,
+                            priority: value as
+                              | "LOW"
+                              | "MEDIUM"
+                              | "HIGH"
+                              | "HIGHEST",
+                          }))
+                        }
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="border-none shadow-none bg-transparent -ml-3">
+                          <SelectValue />
+                        </SelectTrigger>
+
+                        <SelectContent className="bg-white border-none text-black">
+                          {(TaskPriorities || TaskPriorities || []).map(
+                            (priority) => {
+                              const value = priority.value ?? "undefined";
+                              const label = priority.name ?? "undefined";
+                              return (
+                                <SelectItem
+                                  key={value}
+                                  value={value}
+                                  className="text-black"
+                                >
+                                  {label}
+                                </SelectItem>
+                              );
+                            }
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    {/* Status */}
+                    <TableCell className="tasktable-cell">
+                      <Select
+                        value={newTaskData.statusId}
+                        onValueChange={(value) =>
+                          setNewTaskData((prev) => ({
+                            ...prev,
+                            statusId: value,
+                          }))
+                        }
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="border-none shadow-none bg-transparent ">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-none text-black">
+                          {addTaskStatuses.length > 0
+                            ? addTaskStatuses.map((status) => (
+                                <SelectItem
+                                  key={status.id}
+                                  value={status.id}
+                                  className="text-black"
+                                >
+                                  {status.name}
+                                </SelectItem>
+                              ))
+                            : availableStatuses.map((status) => (
+                                <SelectItem
+                                  key={status.id}
+                                  value={status.id}
+                                  className="text-black"
+                                >
+                                  {status.name}
+                                </SelectItem>
+                              ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    {/* Assignee */}
+                    <TableCell className="tasktable-cell-assignee">
+                      <Select
+                        value={newTaskData.assigneeId || ""}
+                        onValueChange={(value) =>
+                          setNewTaskData((prev) => ({
+                            ...prev,
+                            assigneeId: value === "unassigned" ? "" : value,
+                          }))
+                        }
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="border-none shadow-none bg-transparent -ml-3">
+                          <SelectValue placeholder="Select assignee..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-none text-black">
+                          {(projectMembers && projectMembers.length > 0
+                            ? projectMembers
+                            : workspaceMembers || []
+                          ).map((member) => (
+                            <SelectItem
+                              key={member.id}
+                              value={member.user?.id || member.id}
+                              className="text-black"
+                            >
+                              <p>
+                                {member.user?.firstName} {member.user?.lastName}
+                              </p>
+                              <p className="text-[13px]">
+                                ({member.user?.email})
+                              </p>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    {/* Due Date - Enhanced with calendar input */}
+                    <TableCell className="tasktable-cell-date">
+                      <div className="relative">
+                        <Input
+                          type="date"
+                          value={newTaskData.dueDate}
+                          onChange={(e) =>
+                            setNewTaskData((prev) => ({
+                              ...prev,
+                              dueDate: e.target.value,
+                            }))
+                          }
+                          min={getToday()}
+                          className="border-none -ml-3 shadow-none focus-visible:ring-1 bg-transparent text-sm w-full pr-8"
+                          disabled={isSubmitting}
+                          placeholder="Select due date"
+                        />
+                        {newTaskData.dueDate && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setNewTaskData((prev) => ({
+                                ...prev,
+                                dueDate: "",
+                              }))
+                            }
+                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded"
+                            title="Clear date"
+                            disabled={isSubmitting}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Dynamic columns - show empty cells */}
+                    {visibleColumns.map((column) => (
+                      <TableCell key={column.id} className="tasktable-cell">
+                        <span className="text-sm text-gray-400">-</span>
+                      </TableCell>
+                    ))}
+                    {/* Action buttons - add extra column for this */}
+                    <TableCell className="tasktable-cell">
+                      <div className="flex items-center gap-1">
+                        <Tooltip content="Create task" position="top">
+                          <button
+                            onClick={handleCreateTask}
+                            disabled={isSubmitting || !newTaskData.title.trim()}
+                            className="p-1 text-green-600 hover:bg-green-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Cancel" position="top">
+                          <button
+                            onClick={handleCancelCreating}
+                            disabled={isSubmitting}
+                            className="p-1 text-red-600 hover:bg-red-100 rounded disabled:opacity-50"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow className="tasktable-add-row h-12 border-none transition-colors bg-[var(--mini-sidebar)]/50">
+                    <TableCell
+                      colSpan={
+                        6 + // Base columns
+                        (onTaskSelect ? 1 : 0) +
+                        (showProject ? 1 : 0) +
+                        visibleColumns.length +
+                        1
+                      }
+                      className="text-center py-3"
+                    >
+                      <button
+                        onClick={handleStartCreating}
+                        className="flex items-center pl-4 justify-start gap-2 w-full  cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span className="text-sm font-medium ">Add task</span>
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              {tasks.map((task) => (
                 <TableRow
                   key={task.id}
-                  className={`border-none transition-colors bg-[var(--card)] hover:bg-[var(--muted)] cursor-pointer ${idx === 0 ? 'first:!pl-6' : ''}`}
-                  onClick={() => router.push(detailUrl)}
+                  className="tasktable-row h-12 odd:bg-[var(--odd-row)] cursor-pointer"
+                  onClick={() => handleRowClick(task)}
                 >
                   {onTaskSelect && (
-                    <TableCell className="bg-transparent border-none pl-6">
+                    <TableCell className="tasktable-cell-checkbox">
                       <Checkbox
                         checked={selectedTasks.includes(task.id)}
                         onCheckedChange={() => onTaskSelect(task.id)}
-                        onClick={e => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
                   )}
-                  <TableCell className="bg-transparent border-none pl-6">
-                    <div className="font-medium text-[var(--foreground)] truncate">
-                      {task.title}
-                    </div>
-                    {task.description && (
-                      <div className="text-sm text-[var(--muted-foreground)] truncate max-w-[200px] md:max-w-md">
-                        {task.description}
+
+                  <TableCell className="tasktable-cell-task">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getTaskTypeIcon(task.type)}
                       </div>
-                    )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="tasktable-task-title">{task.title}</h4>
+                          <Badge
+                            variant="outline"
+                            className="text-xs px-1.5 py-0 h-5"
+                          >
+                            <span className="text-muted text-xs">
+                              #{task.taskNumber}
+                            </span>
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 mt-2">
+                          {task._count?.comments > 0 && (
+                            <div className="flex items-center gap-0.5 text-xs text-[var(--muted-foreground)]">
+                              <MessageSquare className="w-4 h-4 mt-0.5" />
+                              <span className="">{task._count.comments}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </TableCell>
+
                   {showProject && (
-                    <TableCell className="bg-transparent border-none hidden sm:table-cell">
-                      <span className="text-[var(--foreground)] truncate block max-w-[100px]">
-                        {task.project?.name || 'Unknown Project'}
-                      </span>
+                    <TableCell className="tasktable-cell-project">
+                      <div className="flex items-center">
+                        <span className="tasktable-project-name">
+                          {task.project?.name || "Unknown Project"}
+                        </span>
+                      </div>
                     </TableCell>
                   )}
-                  <TableCell className="bg-transparent border-none">
-                    {(() => {
-                      const config = getPriorityConfig(task.priority);
-                      return (
-                        <Badge variant={config.variant} className={`flex items-center gap-1 w-fit rounded-md border-none ${config.className}`}>
-                          <HiFlag size={12} />
-                          {task.priority}
-                        </Badge>
-                      );
-                    })()}
+
+                  <TableCell className="tasktable-cell">
+                    <PriorityBadge priority={task.priority} />
                   </TableCell>
-                  <TableCell className="bg-transparent border-none">
-                    {(() => {
-                      const config = getStatusConfig(task.status?.name || '');
-                      return (
-                        <Badge variant="secondary" className={`rounded-md ${config.className} border-none`}>
-                          {task.status?.name || 'No Status'}
-                        </Badge>
-                      );
-                    })()}
+
+                  <TableCell className="tasktable-cell">
+                    <StatusBadge status={task.status} />
                   </TableCell>
-                  <TableCell className="bg-transparent border-none hidden md:table-cell">
+
+                  <TableCell className="tasktable-cell-assignee">
                     {task.assignee ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6 rounded-full border-none">
-                          <AvatarFallback className="bg-[var(--muted)] text-[var(--muted-foreground)] text-xs rounded-full">
-                            {getInitials(task.assignee.firstName, task.assignee.lastName)}
+                      <div className="tasktable-assignee-container">
+                        <Avatar className="tasktable-assignee-avatar">
+                          <AvatarImage
+                            src={task.assignee.avatar || "/placeholder.svg"}
+                            alt={`${task.assignee.firstName} ${task.assignee.lastName}`}
+                          />
+                          <AvatarFallback className="tasktable-assignee-fallback">
+                            {getInitials(
+                              task.assignee.firstName,
+                              task.assignee.lastName
+                            )}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-[var(--foreground)] text-sm truncate max-w-[80px]">
+                        <span className="tasktable-assignee-name">
                           {task.assignee.firstName} {task.assignee.lastName}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-[var(--muted-foreground)] text-sm">Unassigned</span>
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        <span className="tasktable-assignee-unassigned">
+                          Unassigned
+                        </span>
+                      </div>
                     )}
                   </TableCell>
-                  <TableCell className="bg-transparent border-none hidden lg:table-cell pr-6">
+
+                  <TableCell className="tasktable-cell-date">
                     {task.dueDate ? (
-                      <div className="flex items-center gap-2 text-sm text-[var(--foreground)]">
-                        <HiCalendar size={16} className="text-[var(--muted-foreground)]" />
-                        <span className="whitespace-nowrap">{formatDate(task.dueDate)}</span>
+                      <div className="tasktable-date-container">
+                        <CalendarDays className="tasktable-date-icon w-4 h-4" />
+                        <span
+                          className={cn(
+                            "tasktable-date-text",
+                            isOverdue(task.dueDate) && "text-red-600"
+                          )}
+                        >
+                          {formatDate(task.dueDate)}
+                        </span>
                       </div>
                     ) : (
-                      <span className="text-sm text-[var(--muted-foreground)]">No due date</span>
+                      <div className="tasktable-date-container">
+                        <CalendarDays className="tasktable-date-icon w-4 h-4" />
+                        <span className="tasktable-date-empty">
+                          No due date
+                        </span>
+                      </div>
                     )}
                   </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
 
-          {pagination && pagination.totalPages > 1 && (
-            <tfoot className="bg-[var(--muted)] border-none">
-              <tr className="border-none">
-                <td 
-                  colSpan={columnCount} 
-                  className="p-0 border-none bg-[var(--muted)] rounded-md shadow-sm"
-                >
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3">
-                    <div className="text-sm text-[var(--muted-foreground)]">
-                      Showing {((pagination.currentPage - 1) * pagination.pageSize) + 1} to {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount)} of {pagination.totalCount} tasks
-                    </div>
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            href="#"
-                            onClick={e => {
-                              e.preventDefault();
-                              if (pagination.hasPrevPage && onPageChange) onPageChange(pagination.currentPage - 1);
-                            }}
-                            aria-disabled={!pagination.hasPrevPage}
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: pagination.totalPages }, (_, i) => (
-                          <PaginationItem key={i}>
+                  {visibleColumns.map((column) => (
+                    <TableCell
+                      key={column.id}
+                      className="tasktable-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {renderDynamicCellContent(task, column)}
+                    </TableCell>
+                  ))}
+
+                  <TableCell className="tasktable-cell w-20"></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        {pagination && pagination.totalPages > 1 && (
+          <TableRow className="tasktable-footer-row">
+            <TableCell
+              colSpan={8 + visibleColumns.length}
+              className="tasktable-footer-cell"
+            >
+              <div className="tasktable-pagination-container">
+                <div className="tasktable-pagination-info">
+                  Showing{" "}
+                  {(pagination.currentPage - 1) * pagination.pageSize + 1} to{" "}
+                  {Math.min(
+                    pagination.currentPage * pagination.pageSize,
+                    pagination.totalCount
+                  )}{" "}
+                  of {pagination.totalCount} tasks
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (pagination.hasPrevPage && onPageChange) {
+                            onPageChange(pagination.currentPage - 1);
+                          }
+                        }}
+                        className={cn(
+                          !pagination.hasPrevPage &&
+                            "pointer-events-none opacity-50"
+                        )}
+                      />
+                    </PaginationItem>
+                    {Array.from(
+                      { length: Math.min(5, pagination.totalPages) },
+                      (_, i) => {
+                        const pageNum = i + 1;
+                        return (
+                          <PaginationItem key={pageNum}>
                             <PaginationLink
                               href="#"
-                              isActive={pagination.currentPage === i + 1}
-                              onClick={e => {
+                              isActive={pagination.currentPage === pageNum}
+                              onClick={(e) => {
                                 e.preventDefault();
-                                if (onPageChange) onPageChange(i + 1);
+                                if (onPageChange) onPageChange(pageNum);
                               }}
                             >
-                              {i + 1}
+                              {pageNum}
                             </PaginationLink>
                           </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext
-                            href="#"
-                            onClick={e => {
-                              e.preventDefault();
-                              if (pagination.hasNextPage && onPageChange) onPageChange(pagination.currentPage + 1);
-                            }}
-                            aria-disabled={!pagination.hasNextPage}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </div>
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </Table>
+                        );
+                      }
+                    )}
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (pagination.hasNextPage && onPageChange) {
+                            onPageChange(pagination.currentPage + 1);
+                          }
+                        }}
+                        className={cn(
+                          !pagination.hasNextPage &&
+                            "pointer-events-none opacity-50"
+                        )}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </TableCell>
+          </TableRow>
+        )}
       </div>
+
+      {isEditModalOpen && (
+        <CustomModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          animation="slide-right"
+          height="h-screen"
+          top="top-4"
+          zIndex="z-50"
+          width="w-full md:w-[80%] lg:w-[60%]"
+          position="items-start justify-end"
+          closeOnOverlayClick={true}
+        >
+          {selectedTask && (
+            <TaskDetailClient
+              task={selectedTask}
+              open="modal"
+              workspaceSlug={workspaceSlug as string}
+              projectSlug={projectSlug as string}
+              taskId={selectedTask.id}
+              onTaskRefetch={onTaskRefetch}
+              onClose={() => setIsEditModalOpen(false)}
+            />
+          )}
+        </CustomModal>
+      )}
     </div>
   );
 };
