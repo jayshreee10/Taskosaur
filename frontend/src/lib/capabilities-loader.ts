@@ -1,5 +1,3 @@
-import yaml from 'js-yaml';
-
 // Define types for the capabilities structure
 export interface CapabilityAction {
   name: string;

@@ -16,7 +16,7 @@ export interface ParsedIntent {
 
 class AutomationExecutor {
   // Map action names to actual automation functions
-  private actionMap: Record<string, Function> = {
+  private actionMap: Record<string, (...args: any[]) => Promise<AutomationResult> | AutomationResult> = {
     // Authentication
     login: automation.login,
     logout: automation.logout,
@@ -51,9 +51,30 @@ class AutomationExecutor {
     navigateToTasksView: automation.navigateToTasksView,
     
     // Navigation
-    navigateTo: automation.utils.navigateTo,
-    getCurrentContext: automation.utils.getCurrentContext,
-    isAuthenticated: automation.utils.isAuthenticated,
+    navigateTo: async (url: string): Promise<AutomationResult> => {
+      await automation.utils.navigateTo(url);
+      return {
+        success: true,
+        message: `Navigated to ${url}`,
+        data: { url }
+      };
+    },
+    getCurrentContext: (): AutomationResult => {
+      const context = automation.utils.getCurrentContext();
+      return {
+        success: true,
+        message: 'Retrieved current context',
+        data: context
+      };
+    },
+    isAuthenticated: (): AutomationResult => {
+      const authenticated = automation.utils.isAuthenticated();
+      return {
+        success: true,
+        message: authenticated ? 'User is authenticated' : 'User is not authenticated',
+        data: { authenticated }
+      };
+    },
     
     // Workflows
     completeProjectSetup: automation.workflows.completeProjectSetup,

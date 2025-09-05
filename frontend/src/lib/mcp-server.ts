@@ -78,8 +78,6 @@ class MCPServer {
     const history = this.conversationHistory.slice(0, -1); // Exclude current message
 
     try {
-      let response: string;
-
       // Call backend API using centralized API client
       const apiResponse = await api.post('/ai-chat/chat', {
         message,
@@ -93,7 +91,7 @@ class MCPServer {
         throw new Error(data.error || 'Chat request failed');
       }
 
-      response = data.message;
+      const response = data.message;
       
       // Clean command syntax from the response
       let userVisibleResponse = cleanCommandFromResponse(response);
@@ -255,7 +253,7 @@ class MCPServer {
                   .replace(/[^a-z0-9-]/g, '');
                 console.log(`MCP: listWorkspaces failed, using generated slug: "${parameters.workspaceSlug}"`);
               }
-            } catch (error) {
+            } catch {
               // Fallback to simple slug conversion if there's any error
               parameters.workspaceSlug = originalName
                 .toLowerCase()

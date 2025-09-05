@@ -1,5 +1,3 @@
-import { automationExecutor } from './automation-executor';
-
 export interface ParsedCommand {
   action: string;
   params: Record<string, any>;
