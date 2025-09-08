@@ -129,11 +129,6 @@ export function DashboardSettingsDropdown({
                           >
                             {item.label}
                           </span>
-                          {item.isDefault && (
-                            <span className="text-xs bg-[var(--muted)] text-[var(--muted-foreground)] px-1 py-0.5 rounded">
-                              default
-                            </span>
-                          )}
                         </div>
                       </div>
                     ))}

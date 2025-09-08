@@ -11,8 +11,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,6 +25,8 @@ import { Role } from '@prisma/client';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { Scope } from 'src/common/decorator/scope.decorator';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { GetWorkspaceChartsQueryDto, WorkspaceChartDataResponse, WorkspaceChartType } from './dto/get-workspace-charts-query.dto';
+import { WorkspaceChartsService } from './workspace-charts.service';
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('workspaces')
@@ -31,7 +35,9 @@ export class WorkspacesController {
   constructor(
     private readonly workspacesService: WorkspacesService,
     private readonly activityLogService: ActivityLogService,
-  ) {}
+    private readonly workspaceChartsService: WorkspaceChartsService,
+
+  ) { }
 
   // Only ORG MANAGER/OWNER can create workspaces
   @Post()
@@ -157,87 +163,71 @@ export class WorkspacesController {
   }
 
   // Chart endpoints - require workspace membership
-  @Get('organization/:organizationId/workspace/:slug/charts/project-status')
+  @Get('organization/:organizationId/workspace/:slug/charts')
+  @ApiOperation({
+    summary: 'Get workspace charts data',
+    description: 'Retrieve multiple workspace chart data types in a single request'
+  })
+  @ApiParam({
+    name: 'organizationId',
+    description: 'Organization UUID',
+    type: 'string',
+    format: 'uuid'
+  })
+  @ApiParam({
+    name: 'slug',
+    description: 'Workspace slug',
+    type: 'string'
+  })
+  @ApiQuery({
+    name: 'types',
+    description: 'Chart types to retrieve (can specify multiple)',
+    enum: WorkspaceChartType,
+    isArray: true,
+    style: 'form',
+    explode: true,
+    example: [WorkspaceChartType.KPI_METRICS, WorkspaceChartType.PROJECT_STATUS]
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Workspace chart data retrieved successfully',
+    schema: {
+      type: 'object',
+      additionalProperties: true,
+      example: {
+        'kpi-metrics': {
+          totalProjects: 8,
+          activeProjects: 5,
+          completionRate: 37.5
+        },
+        'project-status': [
+          { status: 'ACTIVE', _count: { status: 5 } },
+          { status: 'COMPLETED', _count: { status: 3 } }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid chart type or missing parameters'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Workspace not found'
+  })
   @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getProjectStatusDistribution(
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async getWorkspaceCharts(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
-    @Param('slug') slug: string,
+    @Param('slug') workspaceSlug: string,
+    @Query() query: GetWorkspaceChartsQueryDto,
     @CurrentUser() user: any,
-  ) {
-    return this.workspacesService.workspaceProjectStatusDistribution(
+  ): Promise<WorkspaceChartDataResponse> {
+    return this.workspaceChartsService.getMultipleWorkspaceChartData(
       organizationId,
-      slug,
+      workspaceSlug,
       user.id,
-    );
-  }
-
-  @Get('organization/:organizationId/workspace/:slug/charts/task-priority')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTaskPriorityBreakdown(
-    @Param('organizationId', ParseUUIDPipe) organizationId: string,
-    @Param('slug') slug: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.workspacesService.workspaceTaskPriorityBreakdown(
-      organizationId,
-      slug,
-      user.id,
-    );
-  }
-
-  @Get('organization/:organizationId/workspace/:slug/charts/kpi-metrics')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getKPIMetrics(
-    @Param('organizationId', ParseUUIDPipe) organizationId: string,
-    @Param('slug') slug: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.workspacesService.workspaceKPIMetrics(
-      organizationId,
-      slug,
-      user.id,
-    );
-  }
-
-  @Get('organization/:organizationId/workspace/:slug/charts/task-type')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTaskTypeDistribution(
-    @Param('organizationId', ParseUUIDPipe) organizationId: string,
-    @Param('slug') slug: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.workspacesService.workspaceTaskTypeDistribution(
-      organizationId,
-      slug,
-      user.id,
-    );
-  }
-
-  @Get('organization/:organizationId/workspace/:slug/charts/sprint-status')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getSprintStatusOverview(
-    @Param('organizationId', ParseUUIDPipe) organizationId: string,
-    @Param('slug') slug: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.workspacesService.workspaceSprintStatusOverview(
-      organizationId,
-      slug,
-      user.id,
-    );
-  }
-
-  @Get('organization/:organizationId/workspace/:slug/charts/monthly-completion')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getMonthlyTaskCompletion(
-    @Param('organizationId', ParseUUIDPipe) organizationId: string,
-    @Param('slug') slug: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.workspacesService.workspaceMonthlyTaskCompletion(
-      organizationId,
-      slug,
-      user.id,
+      query.types,
     );
   }
 }

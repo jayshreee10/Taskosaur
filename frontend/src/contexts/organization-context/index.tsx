@@ -21,6 +21,8 @@ import {
   TaskStatus,
   CreateWorkflowData,
   UpdateWorkflowData,
+  UpdateMemberRoleData,
+  ChartType,
 } from "@/types";
 
 // Add the AnalyticsData interface
@@ -82,11 +84,20 @@ interface OrganizationContextType extends OrganizationState {
     workflowId: string,
     workflowData: UpdateWorkflowData
   ) => Promise<Workflow>;
+  updatedOrganizationMemberRole: (
+    memberId: string,
+    updateData: UpdateMemberRoleData,
+    requestUserId: string
+  ) => Promise<OrganizationMember>;
+  removeOrganizationMember: (
+    memberId: string,
+    requestUserId: string
+  ) => Promise<{ success: boolean; message: string }>;
   createWorkflow: (workflowData: CreateWorkflowData) => Promise<Workflow>;
   updateTaskStatusPositions: (
     statusUpdates: { id: string; position: number }[]
   ) => Promise<TaskStatus[]>;
-  
+
   // Add analytics methods
   fetchAnalyticsData: (organizationId: string) => Promise<void>;
   clearAnalyticsError: () => void;
@@ -182,88 +193,69 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       }));
       throw error;
     }
-  }, []);
+  },
+  []);
 
   // Add fetchAnalyticsData function
-  const fetchAnalyticsData = useCallback(async (organizationId: string): Promise<void> => {
-    try {
-      setOrganizationState(prev => ({
-        ...prev,
-        analyticsLoading: true,
-        analyticsError: null,
-        refreshingAnalytics: true,
-      }));
+  const fetchAnalyticsData = useCallback(
+    async (organizationId: string): Promise<void> => {
+      try {
+        setOrganizationState((prev) => ({
+          ...prev,
+          analyticsLoading: true,
+          analyticsError: null,
+          refreshingAnalytics: true,
+        }));
 
-      const requests = [
-        orgChartsApi.getKPIMetrics(organizationId),
-        orgChartsApi.getProjectPortfolio(organizationId),
-        orgChartsApi.getTeamUtilization(organizationId),
-        orgChartsApi.getTaskDistribution(organizationId),
-        orgChartsApi.getTaskTypeDistribution(organizationId),
-        orgChartsApi.getSprintMetrics(organizationId),
-        orgChartsApi.getQualityMetrics(organizationId),
-        orgChartsApi.getWorkspaceProjectCount(organizationId),
-        orgChartsApi.getMemberWorkload(organizationId),
-        orgChartsApi.getResourceAllocation(organizationId),
-      ];
+        // Get all charts data - returns an object, not an array
+        const results = await orgChartsApi.getAllCharts(organizationId);
 
-      const results = await Promise.allSettled(requests);
+        // Check for any failed requests (charts with error property)
+        const failedCharts = Object.entries(results).filter(
+          ([, data]) => data && typeof data === "object" && "error" in data
+        );
 
-      // Check if any requests failed
-      const failedRequests = results.filter(
-        (result) => result.status === "rejected"
-      );
+        if (failedCharts.length > 0) {
+          console.error("Some chart requests failed:", failedCharts);
+        }
 
-      if (failedRequests.length > 0) {
-        console.error("Some requests failed:", failedRequests);
+        // Extract chart data using ChartType enum keys
+        const analyticsData = {
+          kpiMetrics: results[ChartType.KPI_METRICS],
+          projectPortfolio: results[ChartType.PROJECT_PORTFOLIO],
+          teamUtilization: results[ChartType.TEAM_UTILIZATION],
+          taskDistribution: results[ChartType.TASK_DISTRIBUTION],
+          taskType: results[ChartType.TASK_TYPE],
+          sprintMetrics: results[ChartType.SPRINT_METRICS],
+          qualityMetrics: results[ChartType.QUALITY_METRICS],
+          workspaceProjectCount: results[ChartType.WORKSPACE_PROJECT_COUNT],
+          memberWorkload: results[ChartType.MEMBER_WORKLOAD],
+          resourceAllocation: results[ChartType.RESOURCE_ALLOCATION],
+        };
+
+        setOrganizationState((prev) => ({
+          ...prev,
+          analyticsData,
+          analyticsLoading: false,
+          refreshingAnalytics: false,
+        }));
+      } catch (err) {
+        console.error("Error fetching analytics data:", err);
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : "Failed to load organization analytics data";
+
+        setOrganizationState((prev) => ({
+          ...prev,
+          analyticsLoading: false,
+          refreshingAnalytics: false,
+          analyticsError: errorMessage,
+        }));
       }
-
-      const [
-        kpiMetrics,
-        projectPortfolio,
-        teamUtilization,
-        taskDistribution,
-        taskType,
-        sprintMetrics,
-        qualityMetrics,
-        workspaceProjectCount,
-        memberWorkload,
-        resourceAllocation,
-      ] = results.map((result) =>
-        result.status === "fulfilled" ? result.value : null
-      );
-
-      setOrganizationState(prev => ({
-        ...prev,
-        analyticsData: {
-          kpiMetrics,
-          projectPortfolio,
-          teamUtilization,
-          taskDistribution,
-          taskType,
-          sprintMetrics,
-          qualityMetrics,
-          workspaceProjectCount,
-          memberWorkload,
-          resourceAllocation,
-        },
-        analyticsLoading: false,
-        refreshingAnalytics: false,
-      }));
-    } catch (err) {
-      console.error("Error fetching analytics data:", err);
-      const errorMessage = err instanceof Error
-        ? err.message
-        : "Failed to load organization analytics data";
-      
-      setOrganizationState(prev => ({
-        ...prev,
-        analyticsLoading: false,
-        refreshingAnalytics: false,
-        analyticsError: errorMessage,
-      }));
-    }
-  }, []);
+    },
+    []
+  );
 
   // Helper function for organization redirect logic
   const checkOrganizationAndRedirect = useCallback((): string => {
@@ -411,6 +403,34 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       ): Promise<OrganizationMember[]> => {
         return handleApiOperation(
           () => organizationApi.getOrganizationMembers(slug),
+          false
+        );
+      },
+
+      updatedOrganizationMemberRole: async (
+        memberId: string,
+        updateData: UpdateMemberRoleData,
+        requestUserId: string
+      ): Promise<OrganizationMember> => {
+        const result = handleApiOperation(
+          () =>
+            organizationApi.updatedOrganizationMemberRole(
+              memberId,
+              updateData,
+              requestUserId
+            ),
+          false
+        );
+        return result;
+      },
+
+      removeOrganizationMember: async (
+        memberId: string,
+        requestUserId: string
+      ): Promise<{ success: boolean; message: string }> => {
+        return handleApiOperation(
+          () =>
+            organizationApi.removeOrganizationMember(memberId, requestUserId),
           false
         );
       },

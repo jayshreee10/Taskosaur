@@ -24,6 +24,9 @@ export interface Invitation {
   organization?: Organization;
   workspace?: Workspace;
   project?: Project;
+  organizationId?: string;
+  workspaceId?: string;
+  projectId?: string;
 }
 
 export interface CreateInvitationData {

@@ -1,4 +1,5 @@
 # Taskosaur - Where AI Meets Action
+
 ### The First Full-Featured AI Mode Open Source Project Management Tool
 
 > **"Stop Managing Projects. Start Talking to Them"**
@@ -6,6 +7,7 @@
 🚀 **World's First AI Mode Project Management Tool** - Taskosaur isn't just project management software, it's a complete **Project Manager Assistant** rolled into one. Our groundbreaking AI Mode allows you to accomplish almost all project management tasks through natural language conversation - a first in the industry.
 
 <!-- Badges will be added here -->
+
 ![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue.svg)
 ![NestJS](https://img.shields.io/badge/nestjs-%5E11.0.0-red.svg)
@@ -54,21 +56,23 @@
 ### Enable AI Mode in 3 Simple Steps:
 
 1. **Navigate to Organization Settings**
+
    ```
    Go to Settings → Organization Settings → AI Assistant Settings
    ```
 
 2. **Add Your LLM API Key**
+
    - Toggle "Enable AI Chat" to ON
    - Add your API key from any compatible provider:
      - **OpenRouter** (100+ models, free options): `https://openrouter.ai/api/v1`
-     - **OpenAI** (GPT models): `https://api.openai.com/v1` 
+     - **OpenAI** (GPT models): `https://api.openai.com/v1`
      - **Anthropic** (Claude models): `https://api.anthropic.com/v1`
      - **Local AI** (Ollama, etc.): Your local endpoint
 
 3. **Start Managing with AI**
    - Open the AI chat panel (sparkles icon)
-   - Type: *"Create a new project called Website Redesign with 5 tasks"*
+   - Type: _"Create a new project called Website Redesign with 5 tasks"_
    - Watch Taskosaur execute complex workflows automatically!
 
 ### What Makes Taskosaur's AI Mode Revolutionary?
@@ -76,11 +80,12 @@
 Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually performs actions**:
 
 - **Direct Browser Automation** - AI navigates your interface and clicks buttons
-- **Complex Workflow Execution** - Multi-step operations handled seamlessly  
+- **Complex Workflow Execution** - Multi-step operations handled seamlessly
 - **Context-Aware Actions** - Understands your current project/workspace context
 - **Natural Language Interface** - No commands to memorize, just speak naturally
 
 **Example AI Mode Commands:**
+
 ```
 "Set up a new marketing workspace with Q1 campaign project"
 "Move all high-priority bugs to in-progress and assign to John"
@@ -91,53 +96,61 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
 
 ## Features
 
-*Taskosaur is actively under development. The following features represent our planned capabilities, with many already implemented and others in progress.*
+_Taskosaur is actively under development. The following features represent our planned capabilities, with many already implemented and others in progress._
 
 ### 🤖 Revolutionary AI Mode Capabilities
 
 **The World's First AI Project Manager Assistant That Actually Works**
 
 🎯 **Complete Workflow Automation**
+
 - **Browser-Based Task Execution**: AI doesn't just suggest - it navigates your interface, fills forms, and completes tasks
 - **Multi-Step Workflow Processing**: "Create workspace → Add team → Set up projects → Generate initial tasks" - all in one command
 - **Intelligent Context Understanding**: AI knows your current workspace, project, and team context automatically
 - **Proactive Project Management**: AI identifies bottlenecks, suggests improvements, and flags potential issues
 
-🧠 **Advanced Natural Language Processing**  
+🧠 **Advanced Natural Language Processing**
+
 - **Intent Recognition**: Understands complex project management requests in natural language
 - **Command Parsing**: Extracts specific actions, parameters, and context from conversational inputs
 - **Smart Parameter Inference**: Fills in missing details based on current context and project history
 
 ⚡ **Real-Time Action Execution**
+
 - **Live Browser Automation**: Watch AI click buttons, fill forms, and navigate interfaces in real-time
 - **Bulk Operations**: Process hundreds of tasks, assignments, or updates with single commands
 - **Cross-Platform Integration**: AI works with your existing tools and workflows seamlessly
 
 🚀 **Intelligent Project Workflows**
+
 - **Automated Sprint Planning**: AI analyzes task complexity, team capacity, and historical data
 - **Smart Task Distribution**: Optimal task assignment based on team skills and current workload
 - **Predictive Analytics**: Forecast project completion, identify risks, and suggest mitigation strategies
 
 **Real AI Mode Examples:**
+
 - "Set up Q1 marketing campaign: create workspace, add team, set up 3 projects with standard templates"
-- "Analyze all overdue tasks and reschedule based on team capacity and priorities"  
+- "Analyze all overdue tasks and reschedule based on team capacity and priorities"
 - "Create automated workflow: high-priority bugs → assign to senior dev → notify team lead"
 - "Generate sprint retrospective with team velocity analysis and improvement suggestions"
 - "Migrate all design tasks from old project to new workspace with updated assignments"
 
 ### Organization Management
+
 - **Multi-tenant Architecture**: Planned support for multiple organizations with isolated data
 - **Workspace Organization**: Group projects within workspaces for better organization
 - **Role-based Access Control**: Implementing granular permissions (Admin, Manager, Member, Viewer)
 - **Team Management**: Invite and manage team members across organizations
 
 ### Project Management
+
 - **Flexible Project Structure**: Create and manage projects with custom workflows
 - **Sprint Planning**: Planned agile sprint management with planning and tracking
 - **Task Dependencies**: Working on relationships between tasks with various dependency types
 - **Custom Workflows**: Implementing custom status workflows for different project needs
 
 ### Task Management
+
 - **Rich Task Types**: Support for Tasks, Bugs, Epics, Stories, and Subtasks
 - **Priority Management**: Set task priorities from Lowest to Highest
 - **Custom Fields**: Add custom fields to capture project-specific data
@@ -148,6 +161,7 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
 - **Task Watchers**: Subscribe to task updates and notifications
 
 ### Multiple Views
+
 - **Kanban Board**: Visual task management with drag-and-drop
 - **Calendar View**: Planned schedule and timeline visualization
 - **Gantt Charts**: Planned project timeline and dependency visualization
@@ -155,6 +169,7 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
 - **Analytics Dashboard**: Working toward project metrics, burndown charts, and team velocity
 
 ### Automation & Integrations
+
 - **Automation Rules**: Planned custom automation workflows
 - **Email Notifications**: Automated email alerts for task updates
 - **Real-time Updates**: Live updates using WebSocket connections
@@ -162,6 +177,7 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
 - **Search Functionality**: Working toward global search across projects and tasks
 
 ### Analytics & Reporting
+
 - **Sprint Burndown Charts**: Planned sprint progress tracking
 - **Team Velocity**: Planned team performance monitoring over time
 - **Task Distribution**: Working toward task allocation and workload analysis
@@ -178,39 +194,43 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/Taskosaur/taskosaur.git
    cd taskosaur
    ```
 
 2. **Environment Setup**
-   
+
    Run the interactive setup command to create your environment configuration:
-   
+
    ```bash
    npm run setup
    ```
-   
+
    This will create a single `.env` file with guided configuration for:
+
    - **Global Configuration**: App host and port settings
    - **Backend Configuration**: Database, authentication, Redis, email, and file upload settings
    - **Frontend Configuration**: API base URL and organization settings
-   
+
    After setup, you'll need to manually run:
+
    ```bash
    # Install dependencies
    npm run be:install && npm run fe:install
-   
+
    # Setup database
    npm run db:migrate
    npm run db:seed core
    ```
-   
+
 3. **Manual Setup (Alternative)**
-   
+
    If you prefer manual configuration, create a single environment file in the root directory:
 
    **Root Environment** (`.env`):
+
    ```env
    # Global/Proxy Configuration
    APP_HOST=127.0.0.1
@@ -220,34 +240,34 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
    BE_UNIX_SOCKET=1
    # BE_HOST=127.0.0.1  # Use when BE_UNIX_SOCKET=0
    # BE_PORT=9102       # Use when BE_UNIX_SOCKET=0
-   
+
    BE_DATABASE_URL="postgresql://your-db-username:your-db-password@localhost:5432/taskosaur"
-   
+
    # Authentication
    BE_JWT_SECRET="your-jwt-secret-key-change-this"
    BE_JWT_REFRESH_SECRET="your-refresh-secret-key-change-this-too"
    BE_JWT_EXPIRES_IN="15m"
    BE_JWT_REFRESH_EXPIRES_IN="7d"
-   
+
    # Redis Configuration (for Bull Queue)
    BE_REDIS_HOST=localhost
    BE_REDIS_PORT=6379
    BE_REDIS_PASSWORD=
-   
+
    # Email Configuration (for notifications)
    BE_SMTP_HOST=smtp.gmail.com
    BE_SMTP_PORT=587
    BE_SMTP_USER=your-email@gmail.com
    BE_SMTP_PASS=your-app-password
    BE_SMTP_FROM=noreply@taskosaur.com
-   
+
    # Frontend URL (for email links)
    BE_FRONTEND_URL=http://127.0.0.1:9123
-   
+
    # File Upload
    BE_UPLOAD_DEST="./uploads"
    BE_MAX_FILE_SIZE=10485760
-   
+
    # Queue Configuration
    BE_MAX_CONCURRENT_JOBS=5
    BE_JOB_RETRY_ATTEMPTS=3
@@ -257,29 +277,32 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
    FE_UNIX_SOCKET=1
    # FE_HOST=127.0.0.1  # Use when FE_UNIX_SOCKET=0
    # FE_PORT=9101       # Use when FE_UNIX_SOCKET=0
-   
+
    FE_NEXT_PUBLIC_API_BASE_URL=/api
    FE_NEXT_PUBLIC_DEFAULT_ORGANIZATION_ID=your-default-organization-id-here
    #### Frontend Configuration <<<<<
    ```
 
    Then install dependencies and setup database:
+
    ```bash
    # Install dependencies (run from root directory)
    npm install
    npm run be:install         # Install backend dependencies
    npm run fe:install         # Install frontend dependencies
-   
+
    # Setup database
    npm run db:migrate         # Run database migrations
+   npm run db:seed:admin            # Seed the database with admin data
    npm run db:seed core            # Seed the database with core data
    ```
 
 4. **Start the Application**
+
    ```bash
    # Development mode (with hot reload)
    npm run start:dev
-   
+
    # Production mode
    npm start
    ```
@@ -292,10 +315,11 @@ Unlike other tools that offer basic AI chat, Taskosaur's AI Mode **actually perf
 ## Development
 
 ### Root Commands (Unified)
+
 ```bash
 # Setup & Installation
 npm run setup             # Interactive setup (create .env only)
-npm run be:install        # Install backend dependencies  
+npm run be:install        # Install backend dependencies
 npm run fe:install        # Install frontend dependencies
 
 # Application Management
@@ -304,12 +328,13 @@ npm run start:dev         # Start both backend and frontend in development
 
 # Database Operations
 npm run db:migrate           # Run database migrations
-npm run db:seed core         # Seed database with core data  
+npm run db:seed core         # Seed database with core data
 npm run db:reset             # Reset database (deletes all data!)
 npm run db:generate          # Generate Prisma client
 ```
 
 ### Backend Commands
+
 ```bash
 # All commands run from root directory with environment variables loaded
 
@@ -334,6 +359,7 @@ npm run be:format          # Format code with Prettier
 ```
 
 ### Frontend Commands
+
 ```bash
 # All commands run from root directory with environment variables loaded
 
@@ -376,6 +402,7 @@ taskosaur/
 ### Production Deployment
 
 #### Using Docker (Recommended)
+
 ```bash
 # Clone the repository
 git clone https://github.com/Taskosaur/taskosaur.git
@@ -388,12 +415,14 @@ docker-compose -f docker-compose.prod.yml up -d
 #### Manual Deployment
 
 **Prerequisites for Production:**
+
 - Node.js 22+ LTS
 - PostgreSQL 13+
 - Redis 6+
 - Reverse proxy (Nginx recommended)
 
 **Backend Deployment:**
+
 ```bash
 # From root directory
 npm install --production
@@ -403,6 +432,7 @@ npm run be:start:prod
 ```
 
 **Frontend Deployment:**
+
 ```bash
 # From root directory
 npm install --production
@@ -415,6 +445,7 @@ npm run fe:start
 Update your environment variables for production:
 
 **Root (.env):**
+
 ```env
 # Global/Proxy Configuration
 APP_HOST=0.0.0.0
@@ -427,13 +458,14 @@ BE_JWT_SECRET="your-secure-production-jwt-secret"
 BE_REDIS_HOST="your-redis-host"
 BE_CORS_ORIGIN="https://your-domain.com"
 
-# Frontend Configuration  
+# Frontend Configuration
 FE_NEXT_PUBLIC_API_BASE_URL=https://api.your-domain.com
 ```
 
 #### Hosting Platforms
 
 **Recommended platforms:**
+
 - **Backend**: Railway, Render, DigitalOcean App Platform
 - **Frontend**: Vercel, Netlify, Railway
 - **Database**: Railway PostgreSQL, Supabase, AWS RDS
@@ -442,6 +474,7 @@ FE_NEXT_PUBLIC_API_BASE_URL=https://api.your-domain.com
 ## API Documentation
 
 The API documentation is automatically generated using Swagger and is available at:
+
 - Development: [http://localhost:9123/api/docs](http://localhost:9123/api/docs)
 - Production: `https://your-domain.com/api/docs`
 

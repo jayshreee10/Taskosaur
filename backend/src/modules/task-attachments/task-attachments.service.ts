@@ -15,7 +15,7 @@ import * as path from 'path';
 
 @Injectable()
 export class TaskAttachmentsService {
-  private readonly uploadPath = process.env.UPLOAD_PATH || './uploads';
+  private readonly uploadPath = process.env.UPLOAD_DEST || './uploads';
 
   constructor(private prisma: PrismaService) {
     // Ensure upload directory exists

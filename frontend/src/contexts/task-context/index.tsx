@@ -52,6 +52,7 @@ interface TaskContextType extends TaskState {
     workspaceId?: string;
     parentTaskId?: string;
     statuses?: string[];
+    search?: string;
     priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
   }) => Promise<Task[]>;
 
@@ -239,6 +240,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
         workspaceId?: string;
         parentTaskId?: string;
         statuses?: string[];
+        search?: string;
         priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
       }): Promise<Task[]> => {
         const organizationId =
@@ -259,6 +261,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
               workspaceId: params.workspaceId,
               parentTaskId: params.parentTaskId,
               statuses: params.statuses,
+              search: params.search,
               priorities: params.priorities,
             }),
           false

@@ -26,21 +26,22 @@ interface TaskStatusChartProps {
 
 export function TaskStatusChart({ data }: TaskStatusChartProps) {
   // Sort data by status position for better visualization
-  const sortedData = [...data].sort(
+  const safeData = Array.isArray(data) ? data : [];
+  const sortedData = [...safeData].sort(
     (a, b) => (a.status?.position || 0) - (b.status?.position || 0)
   );
 
-  const chartData = sortedData.map((item) => {
+  const chartData = sortedData?.map((item) => {
     const status = item.status;
     return {
       name: status?.name || "Unknown",
       value: item.count,
-      color: status?.color || "#8B5CF6", // Use status color directly, fallback to default
+      color: status?.color || "#8B5CF6",
     };
   });
 
   // Build dynamic config from status data for legend
-  const chartConfig = sortedData.reduce((config, item) => {
+  const chartConfig = sortedData?.reduce((config, item) => {
     if (item.status) {
       config[item.status.id] = {
         label: item.status.name,
@@ -99,7 +100,7 @@ export function TaskStatusChart({ data }: TaskStatusChartProps) {
             paddingAngle={2}
             dataKey="value"
           >
-            {chartData.map((entry, index) => (
+            {chartData?.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>

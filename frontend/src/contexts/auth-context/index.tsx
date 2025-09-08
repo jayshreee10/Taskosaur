@@ -81,10 +81,16 @@ interface AuthContextType extends AuthState {
   }>;
   forgotPassword: (data: ForgotPasswordData) => Promise<ApiResponse>;
   resetPassword: (data: ResetPasswordData) => Promise<ApiResponse>;
-  changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) => Promise<ApiResponse>;
-  validateResetToken: (token: string) => Promise<ApiResponse<{ valid: boolean }> >;
+  changePassword: (data: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) => Promise<ApiResponse>;
+  validateResetToken: (
+    token: string
+  ) => Promise<ApiResponse<{ valid: boolean }>>;
   uploadFileToS3: (file: File, key: string) => Promise<UploadFileResponse>;
-  getUserAccess: (data: { name: string; id: string}) => Promise<any>;
+  getUserAccess: (data: { name: string; id: string }) => Promise<any>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -108,21 +114,28 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setupUserOrganization = useCallback(async (userId: string) => {
     try {
-      const currentOrgId = localStorage.getItem("currentOrganizationId");
-      if (currentOrgId) {
-        return;
-      }
+      // Check if a current orgId exists in local storage
+      const savedOrgId = localStorage.getItem("currentOrganizationId");
       const organizations = await organizationApi.getUserOrganizations(userId);
 
-      if (organizations && organizations.length > 0) {
-        const firstOrganization = organizations[0];
-
-        // Store the first organization as current
-        localStorage.setItem("currentOrganizationId", firstOrganization.id);
-        window.dispatchEvent(new CustomEvent("organizationChanged"));
-      } else {
+      if (!organizations || organizations.length === 0) {
         localStorage.removeItem("currentOrganizationId");
+        return;
       }
+
+      let selectedOrg = organizations[0];
+
+      if (savedOrgId) {
+        const matchingOrg = organizations.find((org) => org.id === savedOrgId);
+        if (matchingOrg) {
+          selectedOrg = matchingOrg;
+          return; // Early return since the org is already set
+        } else {
+          selectedOrg = organizations[0];
+        }
+      }
+      localStorage.setItem("currentOrganizationId", selectedOrg.id);
+      window.dispatchEvent(new CustomEvent("organizationChanged"));
     } catch (error) {
       console.error("Error setting up user organization:", error);
     }
@@ -200,20 +213,32 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkOrganizationAndRedirect =
     useCallback(async (): Promise<string> => {
       if (typeof window === "undefined") return "/login";
+
       try {
         const user = authApi.getCurrentUser();
         if (!user) return "/login";
-
         const organizations = await organizationApi.getUserOrganizations(
           user.id
         );
-        if (organizations && organizations.length > 0) {
-          localStorage.setItem("currentOrganizationId", organizations[0].id);
-          return "/dashboard";
-        } else {
+        if (!organizations || organizations.length === 0) {
           localStorage.removeItem("currentOrganizationId");
-          return "/intro";
+          return "/organization";
         }
+        const savedOrgId = localStorage.getItem("currentOrganizationId");
+        let selectedOrg = organizations[0];
+
+        if (savedOrgId) {
+          const matchingOrg = organizations.find(
+            (org) => org.id === savedOrgId
+          );
+          if (matchingOrg) {
+            selectedOrg = matchingOrg;
+          } else {
+            selectedOrg = organizations[0];
+          }
+        }
+        localStorage.setItem("currentOrganizationId", selectedOrg.id);
+        return "/dashboard";
       } catch (err) {
         return "/login";
       }
@@ -282,7 +307,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return result;
       },
-      getUserAccess: async (data: { name: string; id: string;}) => {
+      getUserAccess: async (data: { name: string; id: string }) => {
         const result = await handleApiOperation(() =>
           authApi.getUserAccess(data)
         );
@@ -334,7 +359,11 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         );
         return result;
       },
-      changePassword: async (data: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
+      changePassword: async (data: {
+        currentPassword: string;
+        newPassword: string;
+        confirmPassword: string;
+      }) => {
         const result = await handleApiOperation(() =>
           authApi.changePassword(data)
         );

@@ -7,6 +7,8 @@ import {
   UpdateMemberRoleData,
   Workspace,
   WorkspaceActivityResponse,
+  WorkspaceChartDataResponse,
+  WorkspaceChartType,
   WorkspaceData,
   WorkspaceMember,
   WorkspaceStats,
@@ -53,7 +55,7 @@ export const workspaceApi = {
   },
 
   getWorkspacesByOrganization: async (
-    organizationId: string
+    organizationId: string, search?: string
   ): Promise<Workspace[]> => {
     try {
       // Validate organizationId format
@@ -66,7 +68,7 @@ export const workspaceApi = {
       }
 
       const response = await api.get<Workspace[]>(
-        `/workspaces?organizationId=${organizationId}`
+        `/workspaces?organizationId=${organizationId}&search=${encodeURIComponent(search || "")}`
       );
       return response.data;
     } catch (error) {
@@ -274,120 +276,48 @@ export const workspaceApi = {
       throw error;
     }
   },
-
-  searchWorkspacesByOrganization: async (
+  getMultipleCharts: async (
     organizationId: string,
-    search: string
-  ): Promise<Workspace[]> => {
+    workspaceSlug: string,
+    chartTypes: WorkspaceChartType[]
+  ): Promise<WorkspaceChartDataResponse> => {
     try {
-      // Validate organizationId format (following your existing pattern)
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(organizationId)) {
-        throw new Error(
-          `Invalid organizationId format: ${organizationId}. Expected UUID format.`
-        );
-      }
+      const params = new URLSearchParams();
+      chartTypes.forEach(type => params.append('types', type));
 
-      // URL encode the search parameter to handle spaces and special characters
-      const encodedSearch = encodeURIComponent(search.trim());
-      const response = await api.get<Workspace[]>(
-        `/workspaces/search?organizationId=${organizationId}&search=${encodedSearch}`
+      const response = await api.get(
+        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts?${params.toString()}`
       );
-
       return response.data;
     } catch (error) {
-      console.error("Search workspaces error:", error);
+      console.error("Get multiple workspace charts error:", error);
       throw error;
     }
   },
-
-  getProjectStatusDistribution: async (
+  getSingleChart: async (
     organizationId: string,
-    workspaceSlug: string
+    workspaceSlug: string,
+    chartType: WorkspaceChartType
   ): Promise<any> => {
     try {
       const response = await api.get(
-        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts/project-status`
+        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts?types=${chartType}`
       );
-      return response.data;
+      return response.data[chartType];
     } catch (error) {
-      console.error("Get project status distribution error:", error);
+      console.error(`Get ${chartType} chart error:`, error);
       throw error;
     }
   },
-
-  getTaskPriorityBreakdown: async (
+  getAllCharts: async (
     organizationId: string,
     workspaceSlug: string
-  ): Promise<any> => {
+  ): Promise<WorkspaceChartDataResponse> => {
     try {
-      const response = await api.get(
-        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts/task-priority`
-      );
-      return response.data;
+      const allChartTypes = Object.values(WorkspaceChartType);
+      return await workspaceApi.getMultipleCharts(organizationId, workspaceSlug, allChartTypes);
     } catch (error) {
-      console.error("Get task priority breakdown error:", error);
-      throw error;
-    }
-  },
-
-  getKPIMetrics: async (
-    organizationId: string,
-    workspaceSlug: string
-  ): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts/kpi-metrics`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get workspace KPI metrics error:", error);
-      throw error;
-    }
-  },
-
-  getTaskTypeDistribution: async (
-    organizationId: string,
-    workspaceSlug: string
-  ): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts/task-type`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get task type distribution error:", error);
-      throw error;
-    }
-  },
-
-  getSprintStatusOverview: async (
-    organizationId: string,
-    workspaceSlug: string
-  ): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts/sprint-status`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get sprint status overview error:", error);
-      throw error;
-    }
-  },
-
-  getMonthlyTaskCompletion: async (
-    organizationId: string,
-    workspaceSlug: string
-  ): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts/monthly-completion`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get monthly task completion error:", error);
+      console.error("Get all workspace charts error:", error);
       throw error;
     }
   },

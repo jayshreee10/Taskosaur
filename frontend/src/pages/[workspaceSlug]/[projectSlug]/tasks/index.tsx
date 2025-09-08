@@ -27,7 +27,10 @@ import {
   useGenericFilters,
 } from "@/components/common/FilterDropdown";
 import { CheckSquare, Flame } from "lucide-react";
-import SortingManager, { SortOrder, SortField } from "@/components/tasks/SortIngManager";
+import SortingManager, {
+  SortOrder,
+  SortField,
+} from "@/components/tasks/SortIngManager";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState<T>(value);
@@ -82,7 +85,7 @@ function ProjectTasksContent() {
   const projectApi = useProjectContext();
   const taskApi = useTask();
   const { getUserAccess } = useAuth();
-  
+
   const [hasAccess, setHasAccess] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [project, setProject] = useState<Project | null>(null);
@@ -166,16 +169,16 @@ function ProjectTasksContent() {
 
   // Initialize filter states from URL
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const statusParams = params.get('statuses');
-      const priorityParams = params.get('priorities');
-      
+      const statusParams = params.get("statuses");
+      const priorityParams = params.get("priorities");
+
       if (statusParams) {
-        setSelectedStatuses(statusParams.split(','));
+        setSelectedStatuses(statusParams.split(","));
       }
       if (priorityParams) {
-        setSelectedPriorities(priorityParams.split(','));
+        setSelectedPriorities(priorityParams.split(","));
       }
     }
   }, []);
@@ -265,7 +268,7 @@ function ProjectTasksContent() {
       setAvailableStatuses(statuses || []);
       setStatusesLoaded(true);
     } catch (error) {
-      console.error('Failed to load task statuses:', error);
+      console.error("Failed to load task statuses:", error);
       setAvailableStatuses([]);
     }
   }, [project?.id, statusesLoaded, projectApi]);
@@ -278,7 +281,7 @@ function ProjectTasksContent() {
       setProjectMembers(members || []);
       setMembersLoaded(true);
     } catch (error) {
-      console.error('Failed to load project members:', error);
+      console.error("Failed to load project members:", error);
       setProjectMembers([]);
     }
   }, [project?.id, membersLoaded, projectApi]);
@@ -337,7 +340,6 @@ function ProjectTasksContent() {
         hasNextPage: currentPage < totalPages,
         hasPrevPage: currentPage > 1,
       });
-
     } catch (error) {
       console.error("Failed to load tasks:", error);
       setError(error instanceof Error ? error.message : "Failed to load tasks");
@@ -353,24 +355,33 @@ function ProjectTasksContent() {
     debouncedSearchQuery,
     selectedStatuses,
     selectedPriorities,
-    taskApi
+    taskApi,
   ]);
 
-  const loadKanbanData = useCallback(
-    async (projSlug: string) => {
-      try {
-        const data = await taskApi.getTaskKanbanStatus({
-          type: "project",
-          slug: projSlug,
-          includeSubtasks: true,
-        });
-        setKanban(data.data || []);
-      } catch (error) {
-        console.error("Failed to load kanban data:", error);
-      }
-    },
-    []
-  );
+  // Fetch tasks on tab (view) change
+  useEffect(() => {
+    if (
+      (currentView === "list" || currentView === "gantt") &&
+      workspace?.id &&
+      workspace.organizationId &&
+      project?.id
+    ) {
+      loadTasks();
+    }
+  }, [currentView, workspace?.id, workspace?.organizationId, project?.id]);
+
+  const loadKanbanData = useCallback(async (projSlug: string) => {
+    try {
+      const data = await taskApi.getTaskKanbanStatus({
+        type: "project",
+        slug: projSlug,
+        includeSubtasks: true,
+      });
+      setKanban(data.data || []);
+    } catch (error) {
+      console.error("Failed to load kanban data:", error);
+    }
+  }, []);
 
   // Effects
   useEffect(() => {
@@ -427,11 +438,10 @@ function ProjectTasksContent() {
       firstRenderRef.current = false;
       return;
     }
-    
+
     if (filtersChanged && validateRequiredData()) {
       loadTasks();
     }
-    
   }, [
     workspace?.organizationId,
     project?.id,
@@ -456,7 +466,11 @@ function ProjectTasksContent() {
       let aValue = a[sortField];
       let bValue = b[sortField];
       // Handle date fields
-      if (["createdAt", "updatedAt", "completedAt", "timeline"].includes(sortField)) {
+      if (
+        ["createdAt", "updatedAt", "completedAt", "timeline"].includes(
+          sortField
+        )
+      ) {
         aValue = aValue ? new Date(aValue).getTime() : 0;
         bValue = bValue ? new Date(bValue).getTime() : 0;
       }
@@ -481,10 +495,10 @@ function ProjectTasksContent() {
     () =>
       availableStatuses.map((status) => ({
         id: status.id,
-        label: status.name, 
+        label: status.name,
         value: status.id,
         selected: selectedStatuses.includes(status.id),
-        count: status._count?.tasks || 0, 
+        count: status._count?.tasks || 0,
         color: status.color || "#6b7280",
       })),
     [availableStatuses, selectedStatuses]
@@ -509,7 +523,7 @@ function ProjectTasksContent() {
         const newSelection = prev.includes(id)
           ? prev.filter((x) => x !== id)
           : [...prev, id];
-        
+
         const params = new URLSearchParams(window.location.search);
         if (newSelection.length > 0) {
           params.set("statuses", newSelection.join(","));
@@ -522,7 +536,7 @@ function ProjectTasksContent() {
       });
       setCurrentPage(1);
     } catch (error) {
-      console.error('Error toggling status filter:', error);
+      console.error("Error toggling status filter:", error);
     }
   }, []);
 
@@ -532,7 +546,7 @@ function ProjectTasksContent() {
         const newSelection = prev.includes(id)
           ? prev.filter((x) => x !== id)
           : [...prev, id];
-        
+
         const params = new URLSearchParams(window.location.search);
         if (newSelection.length > 0) {
           params.set("priorities", newSelection.join(","));
@@ -545,7 +559,7 @@ function ProjectTasksContent() {
       });
       setCurrentPage(1);
     } catch (error) {
-      console.error('Error toggling priority filter:', error);
+      console.error("Error toggling priority filter:", error);
     }
   }, []);
 
@@ -755,157 +769,168 @@ function ProjectTasksContent() {
   if (error) return <ErrorState error={error} onRetry={handleRetry} />;
 
   return (
-   <div className="dashboard-container h-[86vh] flex flex-col space-y-3">
-    {/* Sticky PageHeader */}
-    <div className="sticky top-0 z-30 bg-[var(--background)]">
-      <PageHeader
-            title={project ? `${project.name} Tasks` : "Project Tasks"}
-            description={`Manage and track all tasks for ${
-              project?.name || "this project"
-            }`}
-            actions={
-              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="relative w-full sm:max-w-xs">
-                    <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
-                    <Input
-                      type="text"
-                      placeholder="Search tasks..."
-                      value={searchInput}
-                      onChange={(e) => setSearchInput(e.target.value)}
-                      className="pl-10 rounded-md border border-[var(--border)]"
-                    />
-                    {searchInput && (
-                      <button
-                        onClick={clearSearch}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
-                      >
-                        <HiXMark size={16} />
-                      </button>
-                    )}
-                  </div>
-                  {currentView === "list" && (
-                    <FilterDropdown
-                      sections={filterSections}
-                      title="Advanced Filters"
-                      activeFiltersCount={totalActiveFilters}
-                      onClearAllFilters={clearAllFilters}
-                      placeholder="Filter results..."
-                      dropdownWidth="w-56"
-                      showApplyButton={false}
-                    />
+    <div className="dashboard-container h-[86vh] flex flex-col space-y-3">
+      {/* Sticky PageHeader */}
+      <div className="sticky top-0 z-30 bg-[var(--background)]">
+        <PageHeader
+          title={project ? `${project.name} Tasks` : "Project Tasks"}
+          description={`Manage and track all tasks for ${
+            project?.name || "this project"
+          }`}
+          actions={
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2">
+              <div className="flex items-center gap-2">
+                <div className="relative w-full sm:max-w-xs">
+                  <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+                  <Input
+                    type="text"
+                    placeholder="Search tasks..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="pl-10 rounded-md border border-[var(--border)]"
+                  />
+                  {searchInput && (
+                    <button
+                      onClick={clearSearch}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
+                    >
+                      <HiXMark size={16} />
+                    </button>
                   )}
                 </div>
-
-                {hasAccess && (
-                  <ActionButton
-                    primary
-                    showPlusIcon
-                    onClick={() => router.push(`/${workspaceSlug}/${projectSlug}/tasks/new`)}
-                    disabled={!workspace?.id || !project?.id}
-                  >
-                    Create Task
-                  </ActionButton>
+                {currentView === "list" && (
+                  <FilterDropdown
+                    sections={filterSections}
+                    title="Advanced Filters"
+                    activeFiltersCount={totalActiveFilters}
+                    onClearAllFilters={clearAllFilters}
+                    placeholder="Filter results..."
+                    dropdownWidth="w-56"
+                    showApplyButton={false}
+                  />
                 )}
-                <NewTaskModal
-                  isOpen={isNewTaskModalOpen}
-                  onClose={() => {
-                    setNewTaskModalOpen(false);
-                    setError(null);
-                  }}
-                  onTaskCreated={async () => {
-                    try {
-                      await handleTaskCreated();
-                    } catch (error) {
-                      const errorMessage =
-                        error instanceof Error
-                          ? error.message
-                          : "Failed to refresh tasks";
-                      console.error("Error creating task:", errorMessage);
-                      await loadTasks();
-                    }
-                  }}
-                  workspaceSlug={workspaceSlug as string}
-                  projectSlug={projectSlug as string}
-                />
               </div>
-            }
-          />
-        </div>
 
-        {/* Sticky TabView */}
-         <div className="sticky top-[64px] z-20 bg-[var(--background)]">
-      <TabView
-        currentView={currentView}
-        onViewChange={(v) => {
-          setCurrentView(v);
-          router.push(
-            `/${workspaceSlug}/${projectSlug}/tasks?type=${v}`,
-            undefined,
-            { shallow: true }
-          );
-        }}
-        viewKanban={true}
-        rightContent={
-          <>
-            {currentView === "gantt" && (
-              <div className="flex items-center bg-[var(--odd-row)] rounded-lg p-1 shadow-sm">
-                {(["days", "weeks", "months"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setGanttViewMode(mode)}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors capitalize cursor-pointer ${
-                      ganttViewMode === mode
-                        ? "bg-blue-500 text-white"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-[var(--accent)]/50"
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
-            )}
-            {currentView === "list" && (
-              <div className="flex items-center gap-2">
-                <SortingManager
-                  sortField={sortField}
-                  sortOrder={sortOrder}
-                  onSortFieldChange={setSortField}
-                  onSortOrderChange={setSortOrder}
-                />
-                <ColumnManager
-                  currentView={currentView}
-                  availableColumns={columns}
-                  onAddColumn={handleAddColumn}
-                  onRemoveColumn={handleRemoveColumn}
-                  setKabBanSettingModal={setKabBanSettingModal}
-                />
-              </div>
-            )}
-          </>
-        }
-      />
-    </div>
-
-        {/* Scrollable KanbanBoard/content */}
-         <div className="flex-1 overflow-y-auto rounded-md">
-      {renderContent()}
-    </div>
-
-    {/* Sticky Pagination */}
-    {showPagination && (
-      <div className="sticky bottom-0 z-10 bg-[var(--background)]">
-        <Pagination
-          pagination={pagination}
-          pageSize={pageSize}
-          onPageSizeChange={handlePageSizeChange}
-          onPageChange={handlePageChange}
-          itemType="tasks"
+              {hasAccess && (
+                <ActionButton
+                  primary
+                  showPlusIcon
+                  onClick={() =>
+                    router.push(`/${workspaceSlug}/${projectSlug}/tasks/new`)
+                  }
+                  disabled={!workspace?.id || !project?.id}
+                >
+                  Create Task
+                </ActionButton>
+              )}
+              <NewTaskModal
+                isOpen={isNewTaskModalOpen}
+                onClose={() => {
+                  setNewTaskModalOpen(false);
+                  setError(null);
+                }}
+                onTaskCreated={async () => {
+                  try {
+                    await handleTaskCreated();
+                  } catch (error) {
+                    const errorMessage =
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to refresh tasks";
+                    console.error("Error creating task:", errorMessage);
+                    await loadTasks();
+                  }
+                }}
+                workspaceSlug={workspaceSlug as string}
+                projectSlug={projectSlug as string}
+              />
+            </div>
+          }
         />
       </div>
-    )}
+
+      {/* Sticky TabView */}
+      <div className="sticky top-[64px] z-20 bg-[var(--background)]">
+        <TabView
+          currentView={currentView}
+          onViewChange={(v) => {
+            setCurrentView(v);
+            router.push(
+              `/${workspaceSlug}/${projectSlug}/tasks?type=${v}`,
+              undefined,
+              { shallow: true }
+            );
+          }}
+          viewKanban={true}
+          rightContent={
+            <>
+              {currentView === "gantt" && (
+                <div className="flex items-center bg-[var(--odd-row)] rounded-lg p-1 shadow-sm">
+                  {(["days", "weeks", "months"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setGanttViewMode(mode)}
+                      className={`px-3 py-1 text-sm font-medium rounded-md transition-colors capitalize cursor-pointer ${
+                        ganttViewMode === mode
+                          ? "bg-blue-500 text-white"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-[var(--accent)]/50"
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {currentView === "list" && (
+                <div className="flex items-center gap-2">
+                  <SortingManager
+                    sortField={sortField}
+                    sortOrder={sortOrder}
+                    onSortFieldChange={setSortField}
+                    onSortOrderChange={setSortOrder}
+                  />
+                  <ColumnManager
+                    currentView={currentView}
+                    availableColumns={columns}
+                    onAddColumn={handleAddColumn}
+                    onRemoveColumn={handleRemoveColumn}
+                    setKabBanSettingModal={setKabBanSettingModal}
+                  />
+                </div>
+              )}
+              {currentView === "kanban" && (
+                <div className="flex items-center gap-2">
+                  <ColumnManager
+                    currentView={currentView}
+                    availableColumns={columns}
+                    onAddColumn={handleAddColumn}
+                    onRemoveColumn={handleRemoveColumn}
+                    setKabBanSettingModal={setKabBanSettingModal}
+                  />
+                </div>
+              )}
+            </>
+          }
+        />
       </div>
+
+      {/* Scrollable KanbanBoard/content */}
+      <div className="flex-1 overflow-y-auto rounded-md">{renderContent()}</div>
+
+      {/* Sticky Pagination */}
+      {showPagination && (
+        <div className="sticky bottom-0 z-10 bg-[var(--background)]">
+          <Pagination
+            pagination={pagination}
+            pageSize={pageSize}
+            onPageSizeChange={handlePageSizeChange}
+            onPageChange={handlePageChange}
+            itemType="tasks"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

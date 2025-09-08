@@ -4,6 +4,8 @@ import {
   InviteMemberData,
   OrganizationMember,
   Project,
+  ProjectChartDataResponse,
+  ProjectChartType,
   ProjectData,
   ProjectMember,
   ProjectStats,
@@ -51,10 +53,27 @@ export const projectApi = {
     }
   },
 
-  getProjectsByWorkspace: async (workspaceId: string): Promise<Project[]> => {
+  getProjectsByWorkspace: async (workspaceId: string,
+    filters?: {
+      status?: string;
+      priority?: string;
+      page?: number;
+      pageSize?: number;
+      search?: string;
+    }): Promise<Project[]> => {
     try {
+      const params = new URLSearchParams({
+        workspaceId,
+      });
+      if (filters?.status) params.append("status", filters.status);
+      if (filters?.priority) params.append("priority", filters.priority);
+      if (filters?.page) params.append("page", filters.page.toString());
+      if (filters?.pageSize)
+        params.append("pageSize", filters.pageSize.toString());
+      if (filters?.search)
+        params.append("search", filters.search.trim());
       const response = await api.get<Project[]>(
-        `/projects?workspaceId=${workspaceId}`
+        `/projects?${params.toString()}`
       );
       return response.data;
     } catch (error) {
@@ -71,6 +90,7 @@ export const projectApi = {
       priority?: string;
       page?: number;
       pageSize?: number;
+      search?: string;
     }
   ): Promise<Project[]> => {
     try {
@@ -84,7 +104,8 @@ export const projectApi = {
       if (filters?.page) params.append("page", filters.page.toString());
       if (filters?.pageSize)
         params.append("pageSize", filters.pageSize.toString());
-
+      if (filters?.search)
+        params.append("search", filters.search.trim());
       const response = await api.get<Project[]>(
         `/projects/by-organization?${params.toString()}`
       );
@@ -266,7 +287,46 @@ export const projectApi = {
       throw error;
     }
   },
+  getMultipleCharts: async (
+    projectSlug: string,
+    chartTypes: ProjectChartType[]
+  ): Promise<ProjectChartDataResponse> => {
+    try {
+      const params = new URLSearchParams();
+      chartTypes.forEach(type => params.append('types', type));
 
+      const response = await api.get(
+        `/projects/${projectSlug}/charts?${params.toString()}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Get multiple project charts error:", error);
+      throw error;
+    }
+  },
+  getSingleChart: async (
+    projectSlug: string,
+    chartType: ProjectChartType
+  ): Promise<any> => {
+    try {
+      const response = await api.get(
+        `/projects/${projectSlug}/charts?types=${chartType}`
+      );
+      return response.data[chartType];
+    } catch (error) {
+      console.error(`Get ${chartType} chart error:`, error);
+      throw error;
+    }
+  },
+  getAllCharts: async (projectSlug: string): Promise<ProjectChartDataResponse> => {
+    try {
+      const allChartTypes = Object.values(ProjectChartType);
+      return await projectApi.getMultipleCharts(projectSlug, allChartTypes);
+    } catch (error) {
+      console.error("Get all project charts error:", error);
+      throw error;
+    }
+  },
   getProjectStats: async (projectId: string): Promise<ProjectStats> => {
     try {
       const response = await api.get<ProjectStats>(
@@ -278,83 +338,11 @@ export const projectApi = {
       throw error;
     }
   },
-  
-  getTaskStatusFlow: async (projectSlug: string): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/projects/${projectSlug}/charts/task-status`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get task status flow error:", error);
-      throw error;
-    }
-  },
-
-  getTaskTypeDistribution: async (projectSlug: string): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/projects/${projectSlug}/charts/task-type`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get task type distribution error:", error);
-      throw error;
-    }
-  },
-
-  getKPIMetrics: async (projectSlug: string): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/projects/${projectSlug}/charts/kpi-metrics`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get project KPI metrics error:", error);
-      throw error;
-    }
-  },
-
-  getTaskPriorityDistribution: async (projectSlug: string): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/projects/${projectSlug}/charts/task-priority`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get task priority distribution error:", error);
-      throw error;
-    }
-  },
-
-  getSprintVelocityTrend: async (projectSlug: string): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/projects/${projectSlug}/charts/sprint-velocity`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get sprint velocity trend error:", error);
-      throw error;
-    }
-  },
-
-  getSprintBurndown: async (projectSlug: string, sprintId: string): Promise<any> => {
-    try {
-      const response = await api.get(
-        `/projects/${projectSlug}/charts/sprint-burndown/${sprintId}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Get sprint burndown error:", error);
-      throw error;
-    }
-  },
 
   archiveProject: async (projectId: string): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await api.patch(`/projects/archive/${projectId}`);
-      
+
       // Handle different response types
       const contentType = response.headers?.["content-type"] || "";
       const status = response.status;

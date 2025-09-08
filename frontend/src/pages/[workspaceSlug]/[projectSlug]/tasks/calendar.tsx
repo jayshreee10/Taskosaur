@@ -134,7 +134,7 @@ function ProjectTasksCalendarPageContent() {
 
   const findProjectBySlug = (projects: any[], slug: string) => {
     return projects.find(
-      (project) => generateProjectSlug(project.name) === slug
+      (project) => project.slug === slug
     );
   };
   const organizationId =

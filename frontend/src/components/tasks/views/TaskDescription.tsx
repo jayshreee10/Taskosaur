@@ -81,47 +81,9 @@ const TaskDescription: React.FC<TaskDescriptionProps> = ({
       className="prose max-w-none bg-[var(--background)] text-sm text-[var(--foreground)] p-2 rounded-md border border-[var(--border)] markdown-body"
       data-color-mode={colorMode}
     >
-      {value ? (
-        <div>
-          {value.split("\n").map((line, lineIndex) => {
-            const hasUnchecked = line.includes("- [ ] ");
-            const hasChecked = line.includes("- [x] ");
-
-            if (hasUnchecked || hasChecked) {
-              const isChecked = hasChecked;
-              let checkboxIndex = 0;
-              const lines = value.split("\n");
-              for (let i = 0; i < lineIndex; i++) {
-                if (
-                  lines[i].includes("- [ ] ") ||
-                  lines[i].includes("- [x] ")
-                ) {
-                  checkboxIndex++;
-                }
-              }
-
-              return (
-                <div key={lineIndex}>
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => handleCheckboxToggle(checkboxIndex)}
-                    style={{ marginRight: "8px", marginTop: "3px" }}
-                    className="cursor-pointer"
-                  />
-                  <span>
-                    {line.replace("- [ ] ", "").replace("- [x] ", "")}
-                  </span>
-                </div>
-              );
-            }
-
-            return <div key={lineIndex}>{line}</div>;
-          })}
-        </div>
-      ) : (
-        <div>No description provided</div>
-      )}
+     <div className="overflow-y-auto h-full">
+            <MDEditor.Markdown source={value} className="prose max-w-none" />
+          </div>
     </div>
   );
 };

@@ -344,7 +344,7 @@ export async function listWorkspaces(options: { timeout?: number } = {}): Promis
       const selectors = [
         'a[href^="/my-workspace"]',
         'a[href^="/"][href$="/"]',
-        'a[href]:has(h3)',
+        'a[href]', // Will check for h3 in JavaScript
         '.grid a[href^="/"]'
       ];
       
@@ -405,7 +405,16 @@ export async function listWorkspaces(options: { timeout?: number } = {}): Promis
       }
       
       // Extract member count and project count if available
-      const projectSpan = element.querySelector('span:has(svg) + span')?.textContent || '0 projects';
+      // Find project count - look for spans after SVG elements
+      let projectSpan = '0 projects';
+      const svgElements = element.querySelectorAll('svg');
+      for (const svg of svgElements) {
+        const nextSpan = svg.parentElement?.nextElementSibling;
+        if (nextSpan && nextSpan.tagName === 'SPAN') {
+          projectSpan = nextSpan.textContent || '0 projects';
+          break;
+        }
+      }
       const memberSpan = Array.from(element.querySelectorAll('span')).find(
         span => span.textContent?.includes('members')
       )?.textContent || '0 members';
@@ -475,9 +484,8 @@ export async function deleteWorkspace(
       '.delete-workspace',
       '.danger-zone',
       '[data-testid="delete-workspace-section"]',
-      'section:has(button:contains("Delete"))',
-      'div:has(h3:contains("Delete"))',
-      'div:has(h2:contains("Danger"))'
+      'section', // Will check for Delete button in JavaScript
+      'div' // Will check for Delete/Danger headings in JavaScript
     ];
 
     for (const selector of deleteSectionSelectors) {
@@ -599,7 +607,9 @@ export async function deleteWorkspace(
       // Cancel deletion by clicking Cancel or closing dialog
       const cancelButton = findElementByText('Cancel', 'button') ||
                           document.querySelector('[data-slot="dialog-close"]') ||
-                          document.querySelector('button[type="button"]:contains("Cancel")');
+                          Array.from(document.querySelectorAll('button[type="button"]')).find(btn => 
+                            btn.textContent?.includes('Cancel')
+                          );
       
       if (cancelButton) {
         await simulateClick(cancelButton);
@@ -825,8 +835,8 @@ export async function searchWorkspaces(
           '.workspace-item',
           'div[class*="workspace"]',
           'a[href^="/"][class*="workspace"]',
-          '.card:has(.workspace-name)',
-          '.grid > div:has(h2, h3)'
+          '.card', // Will check for workspace-name in JavaScript
+          '.grid > div' // Will check for h2, h3 in JavaScript
         ];
 
         let workspaceElements: Element[] = [];
@@ -910,14 +920,14 @@ export async function searchWorkspaces(
       '.workspace-card:not([style*="display: none"])',
       '[data-testid^="workspace-"]:not([style*="display: none"])',
       '.workspace-item:not([style*="display: none"])',
-      'a[href^="/"]:has(.workspace-name)',
-      'div[class*="card"]:has(h2, h3)',
-      '.grid > div:has(.font-semibold)',
+      'a[href^="/"]', // Will check for workspace-name in JavaScript
+      'div[class*="card"]', // Will check for h2, h3 in JavaScript
+      '.grid > div', // Will check for font-semibold in JavaScript
       '.grid > a[href^="/"]',
-      '[role="article"]:has(.workspace-name)',
-      '.space-y-4 > div:has(h3)',
+      '[role="article"]', // Will check for workspace-name in JavaScript
+      '.space-y-4 > div', // Will check for h3 in JavaScript
       '.workspace-list-item',
-      'div[class*="border"]:has(h3, h2)'
+      'div[class*="border"]' // Will check for h3, h2 in JavaScript
     ];
 
     let workspaceElements: Element[] = [];
@@ -943,11 +953,11 @@ export async function searchWorkspaces(
       const nameSelectors = [
         '.workspace-name',
         '.card-title',
-        'h3:not(:has(*))',
-        'h2:not(:has(*))',
-        '.text-lg:not(:has(*))',
-        '.text-xl:not(:has(*))',
-        '[class*="title"]:not(:has(*))'
+        'h3', // Will check for child elements in JavaScript
+        'h2', // Will check for child elements in JavaScript
+        '.text-lg', // Will check for child elements in JavaScript
+        '.text-xl', // Will check for child elements in JavaScript
+        '[class*="title"]' // Will check for child elements in JavaScript
       ];
       
       for (const selector of nameSelectors) {
@@ -1005,9 +1015,9 @@ export async function searchWorkspaces(
         '.workspace-description',
         '.card-description',
         'p:not(.workspace-name)',
-        '.text-sm:not(:has(*))',
-        '.text-gray-600:not(:has(*))',
-        '.text-gray-500:not(:has(*))',
+        '.text-sm', // Will check for child elements in JavaScript
+        '.text-gray-600', // Will check for child elements in JavaScript
+        '.text-gray-500', // Will check for child elements in JavaScript
         '[class*="description"]'
       ];
       

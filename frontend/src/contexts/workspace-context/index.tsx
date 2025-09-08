@@ -18,6 +18,7 @@ import {
   CreateWorkspaceData,
   GetWorkspaceActivityParams,
   WorkspaceActivityResponse,
+  WorkspaceChartType,
 } from "@/types";
 
 interface AnalyticsData {
@@ -47,7 +48,8 @@ interface WorkspaceContextType extends WorkspaceState {
   createWorkspace: (workspaceData: WorkspaceData) => Promise<Workspace>;
   getWorkspaces: () => Promise<Workspace[]>;
   getWorkspacesByOrganization: (
-    organizationId?: string
+    organizationId?: string,
+    search?: string
   ) => Promise<Workspace[]>;
   getWorkspaceById: (workspaceId: string) => Promise<Workspace>;
   getWorkspaceBySlug: (
@@ -89,7 +91,6 @@ interface WorkspaceContextType extends WorkspaceState {
   // State management
   setCurrentWorkspace: (workspace: Workspace | null) => void;
   refreshWorkspaces: (organizationId?: string) => Promise<void>;
-  refreshWorkspaceMembers: (workspaceId: string) => Promise<void>;
   clearError: () => void;
 
   // Helper methods
@@ -103,14 +104,10 @@ interface WorkspaceContextType extends WorkspaceState {
     workspaceId: string,
     params?: GetWorkspaceActivityParams
   ) => Promise<WorkspaceActivityResponse>;
-
-  // Search methods
-  searchWorkspacesByOrganization: (
+  fetchAnalyticsData: (
     organizationId: string,
-    search: string
-  ) => Promise<Workspace[]>;
-  // Add analytics methods
-  fetchAnalyticsData: (organizationId: string, workspaceSlug: string) => Promise<void>;
+    workspaceSlug: string
+  ) => Promise<void>;
   workspaceRoleSet: (workspace: Workspace) => Promise<void>;
 
   clearAnalyticsError: () => void;
@@ -147,7 +144,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     analyticsLoading: false,
     analyticsError: null,
     refreshingAnalytics: false,
-    workspaceRole: null
+    workspaceRole: null,
   });
 
   // Helper to handle API operations with error handling
@@ -215,7 +212,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     });
   };
   const fetchAnalyticsData = useCallback(
-    async (organizationId:string, workspaceSlug: string): Promise<void> => {
+    async (organizationId: string, workspaceSlug: string): Promise<void> => {
       try {
         setWorkspaceState((prev) => ({
           ...prev,
@@ -224,47 +221,54 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           refreshingAnalytics: true,
         }));
 
-        const requests = [
-          workspaceApi.getProjectStatusDistribution(organizationId, workspaceSlug),
-          workspaceApi.getTaskPriorityBreakdown(organizationId, workspaceSlug),
-          workspaceApi.getKPIMetrics(organizationId, workspaceSlug),
-          workspaceApi.getTaskTypeDistribution(organizationId, workspaceSlug),
-          workspaceApi.getSprintStatusOverview(organizationId, workspaceSlug),
-          workspaceApi.getMonthlyTaskCompletion(organizationId, workspaceSlug),
-        ];
-
-        const results = await Promise.allSettled(requests);
-
-        // Check if any requests failed
-        const failedRequests = results.filter(
-          (result) => result.status === "rejected"
+        const results = await workspaceApi.getAllCharts(
+          organizationId,
+          workspaceSlug
         );
 
-        if (failedRequests.length > 0) {
-          console.error("Some requests failed:", failedRequests);
-        }
+        // Process each chart with individual error handling
+        const processChartData = (data: any, chartName: string) => {
+          if (!data) {
+            console.warn(`No data received for ${chartName}`);
+            return null;
+          }
+          if (data.error) {
+            console.error(`Error loading ${chartName}:`, data.error);
+            return null;
+          }
+          return data;
+        };
 
-        const [
-          projectStatus,
-          taskPriority,
-          kpiMetrics,
-          taskType,
-          sprintStatus,
-          monthlyCompletion,
-        ] = results.map((result) =>
-          result.status === "fulfilled" ? result.value : null
-        );
+        const analyticsData = {
+          projectStatus: processChartData(
+            results[WorkspaceChartType.PROJECT_STATUS],
+            "Project Status"
+          ),
+          taskPriority: processChartData(
+            results[WorkspaceChartType.TASK_PRIORITY],
+            "Task Priority"
+          ),
+          kpiMetrics: processChartData(
+            results[WorkspaceChartType.KPI_METRICS],
+            "KPI Metrics"
+          ),
+          taskType: processChartData(
+            results[WorkspaceChartType.TASK_TYPE],
+            "Task Type"
+          ),
+          sprintStatus: processChartData(
+            results[WorkspaceChartType.SPRINT_STATUS],
+            "Sprint Status"
+          ),
+          monthlyCompletion: processChartData(
+            results[WorkspaceChartType.MONTHLY_COMPLETION],
+            "Monthly Completion"
+          ),
+        };
 
         setWorkspaceState((prev) => ({
           ...prev,
-          analyticsData: {
-            projectStatus,
-            taskPriority,
-            kpiMetrics,
-            taskType,
-            sprintStatus,
-            monthlyCompletion,
-          },
+          analyticsData,
           analyticsLoading: false,
           refreshingAnalytics: false,
         }));
@@ -273,7 +277,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : "Failed to load organization analytics data";
+            : "Failed to load workspace analytics data";
 
         setWorkspaceState((prev) => ({
           ...prev,
@@ -285,6 +289,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
     },
     []
   );
+
   const getCurrentOrganizationId = useCallback((): string | null => {
     return workspaceApi.getCurrentOrganization();
   }, []);
@@ -352,16 +357,19 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       },
 
       getWorkspacesByOrganization: async (
-        organizationId?: string
+        organizationId?: string,
+        search?: string
       ): Promise<Workspace[]> => {
         const orgId = organizationId || getCurrentOrganizationId();
         if (!orgId) {
-          console.error("No organization selected. Please select an organization first.")
+          console.error(
+            "No organization selected. Please select an organization first."
+          );
           return;
         }
 
         const result = await handleApiOperation(() =>
-          workspaceApi.getWorkspacesByOrganization(orgId)
+          workspaceApi.getWorkspacesByOrganization(orgId, search)
         );
 
         setWorkspaceState((prev) => ({
@@ -602,10 +610,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         }
       },
 
-      refreshWorkspaceMembers: async (workspaceId: string): Promise<void> => {
-        await contextValue.getWorkspaceMembers(workspaceId);
-      },
-
       clearError: (): void => {
         setWorkspaceState((prev) => ({ ...prev, error: null }));
       },
@@ -638,25 +642,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           () => workspaceApi.getWorkspaceRecentActivity(workspaceId, params),
           false
         );
-      },
-
-      searchWorkspacesByOrganization: async (
-        organizationId: string,
-        search: string
-      ): Promise<Workspace[]> => {
-        const trimmedSearch = search.trim();
-        if (!trimmedSearch || trimmedSearch.length < 2) {
-          return [];
-        }
-        const result = await handleApiOperation(
-          () =>
-            workspaceApi.searchWorkspacesByOrganization(
-              organizationId,
-              trimmedSearch
-            ),
-          false
-        );
-        return result;
       },
       fetchAnalyticsData,
       workspaceRoleSet,

@@ -52,13 +52,13 @@ export const DEFAULT_SPRINT = {
 } as const;
 
 export const DEFAULT_WORKSPACE = {
-  name: 'Default Workspace',
+  name: 'Starter Hub',
   description: 'Auto-generated workspace for new organization setup',
   isDefault: true,
 } as const;
 
 export const DEFAULT_PROJECT = {
-  name: 'Default Project',
+  name: 'Starter Project',
   description: 'Initial project created in the default workspace',
   isDefault: true,
   color: '#6366f1',
@@ -66,15 +66,15 @@ export const DEFAULT_PROJECT = {
 
 export const DEFAULT_TASKS = [
   {
-    title: 'Set up project repository',
-    description: 'Initialize the repository and configure project structure',
+    title: 'Create your first task',
+    description: 'Add something simple you want to track or complete',
     status: 'To Do' as const,
     priority: 'HIGH' as const,
     isDefault: true,
   },
   {
-    title: 'Define core features',
-    description: 'List and document core features for the first sprint',
+    title: 'Organize your project',
+    description: 'Set up sections, priorities, or tags to stay organized',
     status: 'To Do' as const,
     priority: 'MEDIUM' as const,
     isDefault: true,

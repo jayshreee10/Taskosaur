@@ -83,7 +83,6 @@ export default function Sidebar() {
   const [isMounted, setIsMounted] = useState(false);
   const [miniPathName, setMiniPathName] = useState("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    
     if (typeof window !== "undefined") {
       return getSidebarCollapsedState();
     }
@@ -338,7 +337,7 @@ export default function Sidebar() {
                 </div>
               </div>
             );
-          })()}        
+          })()}
 
         {/* Workspace Level */}
         {currentWorkspaceSlug && !currentProjectSlug && (
@@ -356,25 +355,27 @@ export default function Sidebar() {
 
       <nav className="layout-sidebar-nav">
         <ul className="layout-sidebar-nav-list">
-          {navigationItems.map((item) => (
-            <li key={item.name} className="layout-sidebar-nav-item">
-              <Link
-                href={item.href}
-                className={`layout-sidebar-nav-link ${
-                  pathname.replace(/\/$/, "") === item.href.replace(/\/$/, "")
-                    ? "layout-sidebar-nav-link-active"
-                    : "layout-sidebar-nav-link-inactive"
-                }`}
-              >
-                <span className="layout-sidebar-nav-link-icon">
-                  {item.icon}
-                </span>
-                <span className="layout-sidebar-nav-link-text">
-                  {item.name}
-                </span>
-              </Link>
-            </li>
-          ))}
+          {navigationItems.map((item) => {
+            return (
+              <li key={item.name} className="layout-sidebar-nav-item">
+                <Link
+                  href={item.href}
+                  className={`layout-sidebar-nav-link ${
+                    pathname.replace(/\/$/, "") === item.href.replace(/\/$/, "")
+                      ? "layout-sidebar-nav-link-active"
+                      : "layout-sidebar-nav-link-inactive"
+                  }`}
+                >
+                  <span className="layout-sidebar-nav-link-icon">
+                    {item.icon}
+                  </span>
+                  <span className="layout-sidebar-nav-link-text">
+                    {item.name}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
     </div>

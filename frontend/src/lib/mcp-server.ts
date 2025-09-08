@@ -43,11 +43,31 @@ class MCPServer {
   private context: TaskosaurContext = {};
   private tools: Map<string, MCPTool> = new Map();
   private conversationHistory: ChatMessage[] = [];
+  private sessionId: string = this.getOrCreateSessionId();
 
   // Initialize MCP server with context
   initialize(context: TaskosaurContext = {}) {
     this.context = context;
     this.conversationHistory = [];
+    // Don't regenerate session ID on initialize - keep the persistent one
+  }
+  
+  private getOrCreateSessionId(): string {
+    // Try to get existing session ID from localStorage or sessionStorage
+    if (typeof window !== 'undefined') {
+      let sessionId = sessionStorage.getItem('mcp-session-id');
+      if (!sessionId) {
+        sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        sessionStorage.setItem('mcp-session-id', sessionId);
+        console.log(`[MCP] Created new persistent session ID: ${sessionId}`);
+      } else {
+        console.log(`[MCP] Using existing session ID: ${sessionId}`);
+      }
+      return sessionId;
+    }
+    
+    // Fallback for server-side rendering
+    return `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   // Update context (e.g., when user navigates to different workspace/project)
@@ -83,7 +103,8 @@ class MCPServer {
         message,
         history,
         workspaceId: this.context.currentWorkspace,
-        projectId: this.context.currentProject
+        projectId: this.context.currentProject,
+        sessionId: this.sessionId
       });
 
       const data = apiResponse.data;
@@ -165,6 +186,34 @@ class MCPServer {
     this.conversationHistory = [];
   }
 
+  // Clear context both locally and on backend
+  async clearContext(): Promise<void> {
+    try {
+      // Clear local context
+      this.context = {
+        currentUser: this.context.currentUser, // Keep user info
+        permissions: this.context.permissions // Keep permissions
+      };
+      
+      // Clear backend context
+      await api.delete(`/ai-chat/context/${this.sessionId}`);
+      
+      console.log(`[MCP] Context cleared for session: ${this.sessionId}`);
+    } catch (error) {
+      console.error('[MCP] Failed to clear context on backend:', error);
+      // Still clear local context even if backend fails
+      this.context = {
+        currentUser: this.context.currentUser,
+        permissions: this.context.permissions
+      };
+    }
+  }
+
+  // Get conversation history
+  getHistory() {
+    return this.conversationHistory;
+  }
+
   // Get current context
   getContext() {
     return this.context;
@@ -209,11 +258,11 @@ class MCPServer {
           
           // First try to get the slug from the current context
           const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-          const pathParts = currentPath.split('/').filter(Boolean);
+          const pathParts = currentPath?.split('/').filter(Boolean);
           console.log(`MCP: Current path parts: [${pathParts.join(', ')}]`);
           
           // If we're already in a workspace, use that slug
-          if (pathParts.length > 0 && !['dashboard', 'settings', 'activity'].includes(pathParts[0])) {
+          if (pathParts?.length > 0 && !['dashboard', 'settings', 'activity'].includes(pathParts[0])) {
             console.log(`MCP: Using current workspace slug: "${pathParts[0]}"`);
             parameters.workspaceSlug = pathParts[0];
           } else {
@@ -303,11 +352,67 @@ class MCPServer {
         this.conversationHistory[this.conversationHistory.length - 1].content = finalResponse;
       }
 
+      // Update context after successful workspace/project creation
+      if (result.success) {
+        if (action.name === 'createWorkspace' && parameters.name) {
+          // Generate slug for the new workspace
+          const workspaceSlug = parameters.name
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '');
+          
+          console.log(`[MCP] Updating context after workspace creation: ${workspaceSlug}`);
+          this.updateContext({
+            currentWorkspace: workspaceSlug,
+            currentProject: undefined // Clear project when switching workspaces
+          });
+        } else if (action.name === 'createProject' && parameters.name && parameters.workspaceSlug) {
+          // Generate slug for the new project
+          const projectSlug = parameters.name
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '');
+          
+          console.log(`[MCP] Updating context after project creation: ${parameters.workspaceSlug}/${projectSlug}`);
+          this.updateContext({
+            currentWorkspace: parameters.workspaceSlug,
+            currentProject: projectSlug
+          });
+        }
+      }
+
       // Emit automation success event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('aiAutomationSuccess', {
           detail: { action: action.name, parameters: parameters, result: result }
         }));
+
+        // Emit specific navigation events for workspace/project creation
+        if (result.success) {
+          if (action.name === 'createWorkspace' && parameters.name) {
+            const workspaceSlug = parameters.name
+              .toLowerCase()
+              .replace(/\s+/g, '-')
+              .replace(/[^a-z0-9-]/g, '');
+            
+            window.dispatchEvent(new CustomEvent('aiWorkspaceCreated', {
+              detail: { workspaceSlug: workspaceSlug, workspaceName: parameters.name }
+            }));
+          } else if (action.name === 'createProject' && parameters.name && parameters.workspaceSlug) {
+            const projectSlug = parameters.name
+              .toLowerCase()
+              .replace(/\s+/g, '-')
+              .replace(/[^a-z0-9-]/g, '');
+            
+            window.dispatchEvent(new CustomEvent('aiProjectCreated', {
+              detail: { 
+                workspaceSlug: parameters.workspaceSlug, 
+                projectSlug: projectSlug, 
+                projectName: parameters.name 
+              }
+            }));
+          }
+        }
       }
 
     } catch (error) {
@@ -340,14 +445,14 @@ export const mcpServer = new MCPServer();
 
 // Helper function to extract workspace and project from URL
 export function extractContextFromPath(pathname: string): Partial<TaskosaurContext> {
-  const pathParts = pathname.split('/').filter(Boolean);
+  const pathParts = pathname?.split('/').filter(Boolean);
   const context: Partial<TaskosaurContext> = {};
 
-  if (pathParts.length > 0 && !['dashboard', 'workspaces', 'settings', 'activities'].includes(pathParts[0])) {
+  if (pathParts?.length > 0 && !['dashboard', 'workspaces', 'settings', 'activities'].includes(pathParts[0])) {
     context.currentWorkspace = pathParts[0];
   }
 
-  if (pathParts.length > 1 && context.currentWorkspace && !['projects', 'members', 'settings'].includes(pathParts[1])) {
+  if (pathParts?.length > 1 && context.currentWorkspace && !['projects', 'members', 'settings'].includes(pathParts[1])) {
     context.currentProject = pathParts[1];
   }
 

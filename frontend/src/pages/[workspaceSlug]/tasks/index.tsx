@@ -20,7 +20,7 @@ import TabView from "@/components/tasks/TabView";
 import Loader from "@/components/common/Loader";
 import Pagination from "@/components/common/Pagination";
 import { ColumnManager } from "@/components/tasks/ColumnManager";
-import SortingManager, { SortField, SortOrder } from "@/components/tasks/SortIngManager";
+import SortingManager, { SortField, SortOrder } from "@/components/tasks/SortIngManager"; 
 import {
   FilterDropdown,
   useGenericFilters,
@@ -60,9 +60,8 @@ function WorkspaceTasksContent() {
   const router = useRouter();
   const { workspaceSlug } = router.query;
   const { getWorkspaceBySlug, getWorkspaceMembers } = useWorkspace();
-  const { getProjectsByWorkspace } = useProject();
+  const { getProjectsByWorkspace, getTaskStatusByProject } = useProject();
   const { getFilteredTasks } = useTask();
-  const { getTaskStatusByProject } = useProject();
   const { isAuthenticated } = useAuth();
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -762,22 +761,35 @@ function WorkspaceTasksContent() {
                   ))}
                 </div>
               )}
-              {currentView === "list" && (
-                <div className="flex items-center gap-2">
-                  <SortingManager
-                    sortField={sortField}
-                    sortOrder={sortOrder}
-                    onSortFieldChange={setSortField}
-                    onSortOrderChange={setSortOrder}
-                  />
-                  <ColumnManager
-                    currentView={currentView}
-                    availableColumns={columns}
-                    onAddColumn={handleAddColumn}
-                    onRemoveColumn={handleRemoveColumn}
-                  />
-                </div>
-              )}
+                {currentView === "list" && (
+                              <div className="flex items-center gap-2">
+                                <SortingManager
+                                  sortField={sortField}
+                                  sortOrder={sortOrder}
+                                  onSortFieldChange={setSortField}
+                                  onSortOrderChange={setSortOrder}
+                                />
+                                <ColumnManager
+                                  currentView={currentView}
+                                  availableColumns={columns}
+                                  onAddColumn={handleAddColumn}
+                                  onRemoveColumn={handleRemoveColumn}
+                                  
+                                />
+                              </div>
+                            )}
+                            {currentView === "kanban" && (
+                              <div className="flex items-center gap-2">
+                                <ColumnManager
+                                  currentView={currentView}
+                                  availableColumns={columns}
+                                  onAddColumn={handleAddColumn}
+                                  onRemoveColumn={handleRemoveColumn}
+                                 
+                                />
+                              </div>
+                            )}
+           
             </>
           }
         />

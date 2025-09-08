@@ -109,6 +109,11 @@ export class TasksController {
     description: 'Filter by status IDs (comma-separated)',
     example: 'status-1,status-2',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: "Filter by search query"
+  })
   @Scope('ORGANIZATION', 'organizationId')
   @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
   findAll(
@@ -120,6 +125,7 @@ export class TasksController {
     @Query('parentTaskId') parentTaskId?: string,
     @Query('priorities') priorities?: string,
     @Query('statuses') statuses?: string,
+    @Query('search') search?: string,
   ) {
     if (!organizationId) {
       throw new BadRequestException('Organization ID is required');
@@ -149,6 +155,7 @@ export class TasksController {
       priorityArray,
       statusArray,
       user.id,
+      search,
     );
   }
 

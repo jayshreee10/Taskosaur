@@ -16,7 +16,7 @@ export interface ParsedIntent {
 
 class AutomationExecutor {
   // Map action names to actual automation functions
-  private actionMap: Record<string, (...args: any[]) => Promise<AutomationResult> | AutomationResult> = {
+  private actionMap: Record<string, (...args: any[]) => any> = {
     // Authentication
     login: automation.login,
     logout: automation.logout,

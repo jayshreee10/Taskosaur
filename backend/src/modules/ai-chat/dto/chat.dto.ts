@@ -51,6 +51,13 @@ export class ChatRequestDto {
   @IsOptional()
   @IsString()
   projectId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Session ID for context tracking',
+  })
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
 }
 
 export class ChatResponseDto {

@@ -1,5 +1,3 @@
-;
-
 import { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -261,7 +259,11 @@ export function RegisterForm() {
               value={formData.password}
               onChange={handleChange}
               placeholder="Create a strong password"
-              className="signup-password-input"
+              className={`signup-password-input ${
+                formData.password && !isPasswordValid
+                  ? "border-red-500 ring-1 ring-red-500"
+                  : ""
+              }`}
             />
             <Button
               type="button"
@@ -381,7 +383,11 @@ export function RegisterForm() {
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="Confirm your password"
-              className="signup-password-input"
+              className={`signup-password-input ${
+                formData.confirmPassword && !passwordsMatch
+                  ? "border-red-500 ring-1 ring-red-500"
+                  : ""
+              }`}
             />
             <Button
               type="button"

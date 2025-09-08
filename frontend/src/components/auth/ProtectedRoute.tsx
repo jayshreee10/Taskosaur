@@ -40,11 +40,11 @@ export default function ProtectedRoute({
       const currentOrgId = TokenManager.getCurrentOrgId();
       const currentUser = getCurrentUser();
       const contextAuth = contextIsAuthenticated;
-      const isAuth = !!(accessToken && currentUser && contextAuth);
 
+      const isAuth = !!(accessToken && currentUser && contextAuth);
       if (!isAuth) {
         if (isPublicRoute) {
-          return { isAuth: false, isOrg: false }; // No redirect needed
+          return { isAuth: false, isOrg: false };
         }
         return { isAuth: false, redirectPath: redirectTo, isOrg: false };
       }
@@ -52,8 +52,12 @@ export default function ProtectedRoute({
       if (isPublicRoute) {
         if (typeof checkOrganizationAndRedirect === "function") {
           const orgRedirect = await checkOrganizationAndRedirect();
-          if (!currentOrgId && orgRedirect === "/intro") {
-            return { isAuth: true, redirectPath: "/intro", isOrg: false };
+          if (!currentOrgId && orgRedirect === "/organization") {
+            return {
+              isAuth: true,
+              redirectPath: "/organization",
+              isOrg: false,
+            };
           }
           if (!currentOrgId && orgRedirect === "/dashboard") {
             return { isAuth: true, redirectPath: "/dashboard", isOrg: true };
@@ -64,17 +68,22 @@ export default function ProtectedRoute({
 
       if (typeof checkOrganizationAndRedirect === "function") {
         const orgRedirect = await checkOrganizationAndRedirect();
-        if (!currentOrgId && orgRedirect === "/intro") {
-          return { isAuth: true, redirectPath: "/intro", isOrg: false };
+        if (currentOrgId && router.pathname === "/organization") {
+          return { isAuth: true, redirectPath: "/dashboard", isOrg: true };
+        }
+        if (!currentOrgId && orgRedirect === "/organization") {
+          return { isAuth: true, redirectPath: "/organization", isOrg: false };
         }
         if (!currentOrgId && orgRedirect === "/dashboard") {
           return { isAuth: true, redirectPath: "/dashboard", isOrg: true };
         }
       }
-
       return { isAuth: true, isOrg: true };
     } catch (error) {
-      console.error("Protected route auth check error:", error);
+      console.error(
+        "[checkAuthStatus] Protected route auth check error:",
+        error
+      );
       return { isAuth: false, redirectPath: redirectTo, isOrg: false };
     }
   }, [
@@ -93,7 +102,6 @@ export default function ProtectedRoute({
       setIsAuthenticated(isAuth);
       setHasOrganization(isOrg);
       setIsInitializing(false);
-
       if (redirectPath && redirectPath !== router.pathname) {
         setIsRedirecting(true);
         if (!isAuth && redirectPath === redirectTo) {

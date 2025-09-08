@@ -17,7 +17,7 @@ export function ProjectKPIMetrics({ data }: ProjectKPIMetricsProps) {
   {
     title: "Total Tasks",
     label: "Tasks", // 👈 Added
-    value: data.totalTasks,
+    value: data?.totalTasks,
     description: "All tasks in project",
     icon: <CheckCircle className="h-4 w-4" />,
     color: "text-blue-600",
@@ -26,14 +26,14 @@ export function ProjectKPIMetrics({ data }: ProjectKPIMetricsProps) {
   {
     title: "Completed Tasks",
     label: "Completed Tasks", // 👈 Added
-    value: data.completedTasks,
+    value: data?.completedTasks,
     description: "Successfully finished",
     icon: <CheckCircle className="h-4 w-4" />,
   },
   {
     title: "Active Sprints",
     label: "Active Sprints", // 👈 Added
-    value: data.activeSprints,
+    value: data?.activeSprints,
     description: "Currently running",
     icon: <Zap className="h-4 w-4" />,
     color: "text-purple-600"
@@ -41,17 +41,17 @@ export function ProjectKPIMetrics({ data }: ProjectKPIMetricsProps) {
   {
     title: "Bug Resolution",
     label: "Bug Resolution", // 👈 Added
-    value: `${data.bugResolutionRate.toFixed(1)}%`,
-    description: `${data.resolvedBugs}/${data.totalBugs} bugs fixed`,
+    value: `${data?.bugResolutionRate.toFixed(1)}%`,
+    description: `${data?.resolvedBugs}/${data?.totalBugs} bugs fixed`,
     icon: <Bug className="h-4 w-4" />,
   },
   {
     title: "Task Completion",
     label: "Task Completion", // 👈 Added
-    value: `${data.completionRate.toFixed(1)}%`,
+    value: `${data?.completionRate.toFixed(1)}%`,
     description: "Overall progress",
     icon:
-      data.completionRate > 75 ? (
+      data?.completionRate > 75 ? (
         <TrendingUp className="h-4 w-4" />
       ) : (
         <AlertTriangle className="h-4 w-4" />
@@ -60,10 +60,10 @@ export function ProjectKPIMetrics({ data }: ProjectKPIMetricsProps) {
   {
     title: "Open Bugs",
     label: "Open Bugs", // 👈 Added
-    value: data.totalBugs - data.resolvedBugs,
+    value: data?.totalBugs - data?.resolvedBugs,
     description: "Requiring attention",
     icon:
-      data.totalBugs - data.resolvedBugs === 0 ? (
+      data?.totalBugs - data?.resolvedBugs === 0 ? (
         <CheckCircle className="h-4 w-4" />
       ) : (
         <Bug className="h-4 w-4" />

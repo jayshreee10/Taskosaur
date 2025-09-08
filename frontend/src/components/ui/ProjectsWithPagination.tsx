@@ -38,7 +38,7 @@ const getWorkspaceSlug = (project: Project): string => {
 
 const generateProjectUrl = (project: Project, generateProjectSlug: (name: string) => string): string => {
   const workspaceSlug = getWorkspaceSlug(project);
-  const projectSlug = project.slug || generateProjectSlug(project.name);
+  const projectSlug = project.slug;
   
   return `/${workspaceSlug}/${projectSlug}`;
 };

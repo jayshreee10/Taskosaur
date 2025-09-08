@@ -16,6 +16,12 @@ async function bootstrap() {
         console.log('\n🎉 Core modules seeding completed successfully!');
         break;
 
+      case 'admin':
+        console.log('🚀 Starting admin modules seeding...\n');
+        await seederService.adminSeedModules();
+        console.log('\n🎉 Admin modules seeding completed successfully!');
+        break;
+
       case 'clear':
         console.log('🚀 Starting core modules clearing...\n');
         await seederService.clearCoreModules();

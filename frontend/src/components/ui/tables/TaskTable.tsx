@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type React from "react";
 import {
   Table,
@@ -54,7 +54,6 @@ import {
 import { useTask } from "@/contexts/task-context";
 import { useProject } from "@/contexts/project-context";
 import { toast } from "sonner";
-import { availableStatuses } from "@/utils/data/projectFilters";
 import Tooltip from "@/components/common/ToolTip";
 
 // Data extraction utility functions
@@ -233,6 +232,8 @@ const TaskTable: React.FC<TaskTableProps> = ({
   currentProject,
 }) => {
   const { createTask } = useTask();
+  const { getTaskStatusByProject } = useProject();
+  const { getProjectMembers } = useProject();
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -247,6 +248,45 @@ const TaskTable: React.FC<TaskTableProps> = ({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [titleTouched, setTitleTouched] = useState(false);
+
+  const [localAddTaskStatuses, setLocalAddTaskStatuses] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [localAddTaskProjectMembers, setLocalAddTaskProjectMembers] = useState<
+    any[]
+  >([]);
+
+  useEffect(() => {
+    const fetchProjectMeta = async () => {
+      const projectId = currentProject?.id || newTaskData?.projectId || projectSlug;
+      if (addTaskStatuses && addTaskStatuses.length > 0) {
+        setLocalAddTaskStatuses(addTaskStatuses);
+      } else if (projectId) {
+        try {
+          const statuses = await getTaskStatusByProject(projectId);
+          setLocalAddTaskStatuses(statuses || []);
+        } catch (err) {
+          setLocalAddTaskStatuses([]);
+        }
+      } else {
+        setLocalAddTaskStatuses([]);
+      }
+      // Only fetch members if projectId is defined
+      if (
+        projectId &&
+        (!projectSlug || !projectMembers || projectMembers.length === 0)
+      ) {
+        try {
+          const members = await getProjectMembers(projectId);
+          setLocalAddTaskProjectMembers(members || []);
+        } catch (err) {
+          setLocalAddTaskProjectMembers([]);
+        }
+      }
+    };
+    fetchProjectMeta();
+  }, [newTaskData.projectId, projectSlug]);
+
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -458,12 +498,12 @@ const TaskTable: React.FC<TaskTableProps> = ({
   const visibleColumns = columns.filter((col) => col.visible);
 
   const loadTaskCreationData = () => {
-    if (addTaskStatuses && addTaskStatuses.length > 0) {
+    if (localAddTaskStatuses && localAddTaskStatuses.length > 0) {
       const defaultStatus =
-        addTaskStatuses.find(
+        localAddTaskStatuses.find(
           (s) =>
             s.name.toLowerCase() === "todo" || s.name.toLowerCase() === "to do"
-        ) || addTaskStatuses[0];
+        ) || localAddTaskStatuses[0];
 
       if (defaultStatus) {
         setNewTaskData((prev) => ({ ...prev, statusId: defaultStatus.id }));
@@ -630,12 +670,17 @@ const TaskTable: React.FC<TaskTableProps> = ({
                       <Input
                         value={newTaskData.title}
                         onChange={(e) => {
-                          setNewTaskData((prev) => ({ ...prev, title: e.target.value }));
+                          setNewTaskData((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }));
                           if (!titleTouched) setTitleTouched(true);
                         }}
                         onBlur={() => setTitleTouched(true)}
                         placeholder="Enter task title..."
-                        className={`border-none shadow-none focus-visible:ring-1 bg-transparent ${isTitleInvalid ? 'ring-2 ring-red-500' : ''}`}
+                        className={`border-none shadow-none focus-visible:ring-1 bg-transparent ${
+                          isTitleInvalid ? "ring-2 ring-red-500" : ""
+                        }`}
                         autoFocus
                         disabled={isSubmitting}
                         onKeyDown={(e) => {
@@ -710,61 +755,31 @@ const TaskTable: React.FC<TaskTableProps> = ({
                     )}
                     {/* Priority */}
                     <TableCell className="tasktable-cell">
-                      <Select
-                        value={newTaskData.priority}
-                        onValueChange={(value) =>
-                          setNewTaskData((prev) => ({
-                            ...prev,
-                            priority: value as
-                              | "LOW"
-                              | "MEDIUM"
-                              | "HIGH"
-                              | "HIGHEST",
-                          }))
-                        }
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger className="border-none shadow-none bg-transparent -ml-3">
-                          <SelectValue />
-                        </SelectTrigger>
-
-                        <SelectContent className="bg-white border-none text-black">
-                          {(TaskPriorities || TaskPriorities || []).map(
-                            (priority) => {
-                              const value = priority.value ?? "undefined";
-                              const label = priority.name ?? "undefined";
-                              return (
-                                <SelectItem
-                                  key={value}
-                                  value={value}
-                                  className="text-black"
-                                >
-                                  {label}
-                                </SelectItem>
-                              );
-                            }
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    {/* Status */}
-                    <TableCell className="tasktable-cell">
-                      <Select
-                        value={newTaskData.statusId}
-                        onValueChange={(value) =>
-                          setNewTaskData((prev) => ({
-                            ...prev,
-                            statusId: value,
-                          }))
-                        }
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger className="border-none shadow-none bg-transparent ">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-none text-black">
-                          {addTaskStatuses.length > 0
-                            ? addTaskStatuses.map((status) => (
+                      {newTaskData.projectId ||
+                      projectSlug ||
+                      currentProject?.id ? (
+                        <Select
+                          value={newTaskData.statusId}
+                          onValueChange={(value) =>
+                            setNewTaskData((prev) => ({
+                              ...prev,
+                              statusId: value,
+                            }))
+                          }
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger className="border-none shadow-none bg-transparent ">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border-none text-black">
+                            {(addTaskStatuses && addTaskStatuses.length > 0
+                              ? addTaskStatuses
+                              : localAddTaskStatuses
+                            ).length > 0 ? (
+                              (addTaskStatuses && addTaskStatuses.length > 0
+                                ? addTaskStatuses
+                                : localAddTaskStatuses
+                              ).map((status) => (
                                 <SelectItem
                                   key={status.id}
                                   value={status.id}
@@ -773,7 +788,44 @@ const TaskTable: React.FC<TaskTableProps> = ({
                                   {status.name}
                                 </SelectItem>
                               ))
-                            : availableStatuses.map((status) => (
+                            ) : (
+                              <SelectItem
+                                value="no-status"
+                                disabled
+                                className="text-black"
+                              >
+                                No statuses found
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-sm text-gray-400">
+                          Select project first
+                        </span>
+                      )}
+                    </TableCell>
+                    {/* Status - only show if projectId is selected */}
+                    <TableCell className="tasktable-cell">
+                      {newTaskData.projectId ||
+                      projectSlug ||
+                      currentProject?.id ? (
+                        <Select
+                          value={newTaskData.statusId}
+                          onValueChange={(value) =>
+                            setNewTaskData((prev) => ({
+                              ...prev,
+                              statusId: value,
+                            }))
+                          }
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger className="border-none shadow-none bg-transparent ">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border-none text-black">
+                            {localAddTaskStatuses.length > 0 ? (
+                              localAddTaskStatuses.map((status) => (
                                 <SelectItem
                                   key={status.id}
                                   value={status.id}
@@ -781,45 +833,85 @@ const TaskTable: React.FC<TaskTableProps> = ({
                                 >
                                   {status.name}
                                 </SelectItem>
-                              ))}
-                        </SelectContent>
-                      </Select>
+                              ))
+                            ) : (
+                              <SelectItem
+                                value="no-status"
+                                disabled
+                                className="text-black"
+                              >
+                                No statuses found
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-sm text-gray-400">
+                          Select project first
+                        </span>
+                      )}
                     </TableCell>
-                    {/* Assignee */}
+                    {/* Assignee - only show if projectId is selected */}
                     <TableCell className="tasktable-cell-assignee">
-                      <Select
-                        value={newTaskData.assigneeId || ""}
-                        onValueChange={(value) =>
-                          setNewTaskData((prev) => ({
-                            ...prev,
-                            assigneeId: value === "unassigned" ? "" : value,
-                          }))
-                        }
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger className="border-none shadow-none bg-transparent -ml-3">
-                          <SelectValue placeholder="Select assignee..." />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-none text-black">
-                          {(projectMembers && projectMembers.length > 0
-                            ? projectMembers
-                            : workspaceMembers || []
-                          ).map((member) => (
-                            <SelectItem
-                              key={member.id}
-                              value={member.user?.id || member.id}
-                              className="text-black"
-                            >
-                              <p>
-                                {member.user?.firstName} {member.user?.lastName}
-                              </p>
-                              <p className="text-[13px]">
-                                ({member.user?.email})
-                              </p>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {newTaskData.projectId ||
+                      projectSlug ||
+                      currentProject?.id ? (
+                        <Select
+                          value={newTaskData.assigneeId || ""}
+                          onValueChange={(value) =>
+                            setNewTaskData((prev) => ({
+                              ...prev,
+                              assigneeId: value === "unassigned" ? "" : value,
+                            }))
+                          }
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger className="border-none shadow-none bg-transparent -ml-3">
+                            <SelectValue placeholder="Select assignee..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border-none text-black">
+                            {(projectSlug &&
+                            projectMembers &&
+                            projectMembers.length > 0
+                              ? projectMembers
+                              : localAddTaskProjectMembers
+                            ).length > 0 ? (
+                              (projectSlug &&
+                              projectMembers &&
+                              projectMembers.length > 0
+                                ? projectMembers
+                                : localAddTaskProjectMembers
+                              ).map((member) => (
+                                <SelectItem
+                                  key={member.id}
+                                  value={member.user?.id || member.id}
+                                  className="text-black"
+                                >
+                                  <p>
+                                    {member.user?.firstName}{" "}
+                                    {member.user?.lastName}
+                                  </p>
+                                  <p className="text-[13px]">
+                                    ({member.user?.email})
+                                  </p>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem
+                                value="no-assignee"
+                                disabled
+                                className="text-black"
+                              >
+                                No members found
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-sm text-gray-400">
+                          Select project first
+                        </span>
+                      )}
                     </TableCell>
                     {/* Due Date - Enhanced with calendar input */}
                     <TableCell className="tasktable-cell-date">
@@ -834,20 +926,21 @@ const TaskTable: React.FC<TaskTableProps> = ({
                             }))
                           }
                           min={getToday()}
-                          className="border-none -ml-3 shadow-none focus-visible:ring-1 bg-transparent text-sm w-full pr-8"
+                          className="border-none -ml-3 shadow-none focus-visible:ring-1 bg-transparent text-sm w-full pr-8 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                           disabled={isSubmitting}
                           placeholder="Select due date"
                         />
                         {newTaskData.dueDate && (
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setNewTaskData((prev) => ({
                                 ...prev,
                                 dueDate: "",
-                              }))
-                            }
-                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded"
+                              }));
+                            }}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded z-10"
                             title="Clear date"
                             disabled={isSubmitting}
                           >

@@ -19,11 +19,12 @@ type ProjectFilters = {
   priority?: string;
   page?: number;
   pageSize?: number;
+  search?: string;
 };
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService, private accessControl: AccessControlService) {}
+  constructor(private prisma: PrismaService, private accessControl: AccessControlService) { }
 
   async create(
     createProjectDto: CreateProjectDto,
@@ -211,24 +212,66 @@ export class ProjectsService {
     }
   }
 
-  async findAll(workspaceId?: string, userId?: string): Promise<Project[]> {
+  async findAll(
+    workspaceId?: string,
+    userId?: string,
+    filters?: {
+      status?: string;
+      priority?: string;
+      search?: string;
+      page?: number;
+      pageSize?: number;
+    },
+  ): Promise<Project[]> {
     if (!userId) {
       throw new ForbiddenException('User context required');
     }
 
+    const { status, priority, search, page = 1, pageSize = 10 } = filters || {};
+
+    // ✅ Step 1: Check workspace access (if workspaceId is given)
+    let isElevated = false;
+    if (workspaceId) {
+      const access = await this.accessControl.getWorkspaceAccess(workspaceId, userId);
+      isElevated = access.isElevated;
+    }
+
+    // ✅ Step 2: Build where clause
     const whereClause: any = { archive: false };
 
     if (workspaceId) {
       whereClause.workspaceId = workspaceId;
-      // Add access filtering based on user membership
-      whereClause.OR = [
-        { workspace: { organization: { ownerId: userId } } },
-        { workspace: { organization: { members: { some: { userId } } } } },
-        { workspace: { members: { some: { userId } } } },
-        { members: { some: { userId } } },
+    }
+
+    // 🔹 Add status filter (handles multiple values like "ACTIVE,COMPLETED")
+    if (status) {
+      whereClause.status = status.includes(',')
+        ? { in: status.split(',').map(s => s.trim()) }
+        : status;
+    }
+
+    // 🔹 Add priority filter (handles multiple values like "HIGH,LOW")
+    if (priority) {
+      whereClause.priority = priority.includes(',')
+        ? { in: priority.split(',').map(p => p.trim()) }
+        : priority;
+    }
+
+    // 🔹 Add search filter
+    if (search) {
+      whereClause.AND = [
+        ...(whereClause.AND || []),
+        {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { slug: { contains: search, mode: 'insensitive' } },
+          ],
+        },
       ];
-    } else {
-      // Show only projects user has access to
+    }
+
+    // Restrict if not elevated
+    if (!isElevated) {
       whereClause.OR = [
         { workspace: { organization: { ownerId: userId } } },
         { workspace: { organization: { members: { some: { userId } } } } },
@@ -237,6 +280,7 @@ export class ProjectsService {
       ];
     }
 
+    // ✅ Step 3: Query projects with pagination
     return this.prisma.project.findMany({
       where: whereClause,
       include: {
@@ -250,17 +294,28 @@ export class ProjectsService {
             },
           },
         },
-        members: userId
-          ? {
-              where: { userId },
-              select: { role: true },
-            }
-          : false,
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
         _count: { select: { members: true, tasks: true, sprints: true } },
       },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
   }
+
+
 
   async findByOrganizationId(
     filters: ProjectFilters,
@@ -273,56 +328,62 @@ export class ProjectsService {
       priority,
       page = 1,
       pageSize = 10,
+      search,
     } = filters;
 
-    // Check organization access
+    // Step 1: Verify org exists
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { ownerId: true },
+      select: { id: true },
     });
 
     if (!org) throw new NotFoundException('Organization not found');
 
-    const isOwner = org.ownerId === userId;
-    let hasOrgAccess = isOwner;
+    // Step 2: Get access level
+    const { isElevated } = await this.accessControl.getOrgAccess(
+      organizationId,
+      userId,
+    );
 
-    if (!isOwner) {
-      const orgMember = await this.prisma.organizationMember.findUnique({
-        where: { userId_organizationId: { userId, organizationId } },
-      });
-      hasOrgAccess = !!orgMember;
-    }
-
-    if (!hasOrgAccess) {
-      throw new ForbiddenException('No access to this organization');
-    }
-
+    // Step 3: Build where clause
     const whereClause: any = {
       workspace: { organizationId },
       archive: false,
-      ...(status && { status }),
-      ...(priority && { priority }),
+      ...(status && {
+        status: status.includes(',')
+          ? { in: status.split(',').map(s => s.trim()) }
+          : status,
+      }),
+      ...(priority && {
+        priority: priority.includes(',')
+          ? { in: priority.split(',').map(p => p.trim()) }
+          : priority,
+      }),
       ...(workspaceId && { workspaceId }),
     };
 
-    // If not elevated, filter to user's projects only
-    if (!isOwner) {
-      const orgMember = await this.prisma.organizationMember.findUnique({
-        where: { userId_organizationId: { userId, organizationId } },
-        select: { role: true },
-      });
-
-      const isElevated =
-        orgMember?.role === Role.MANAGER || orgMember?.role === Role.OWNER;
-
-      if (!isElevated) {
-        whereClause.OR = [
-          { workspace: { members: { some: { userId } } } },
-          { members: { some: { userId } } },
-        ];
-      }
+    if (!isElevated) {
+      // restrict to projects where user is a member
+      whereClause.OR = [
+        { workspace: { members: { some: { userId } } } },
+        { members: { some: { userId } } },
+      ];
     }
 
+    // Step 4: Add search filter
+    if (search) {
+      whereClause.AND = [
+        ...(whereClause.AND || []),
+        {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { slug: { contains: search, mode: 'insensitive' } }
+          ],
+        },
+      ];
+    }
+
+    // Step 5: Query projects with same include structure as findOne
     return this.prisma.project.findMany({
       where: whereClause,
       include: {
@@ -336,12 +397,36 @@ export class ProjectsService {
             },
           },
         },
-        members: userId
-          ? {
-              where: { userId },
-              select: { role: true },
-            }
-          : false,
+        workflow: {
+          select: {
+            id: true,
+            name: true,
+            isDefault: true,
+            statuses: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                category: true,
+                position: true,
+              },
+              orderBy: { position: 'asc' },
+            },
+          },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
         _count: { select: { members: true, tasks: true, sprints: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -349,6 +434,8 @@ export class ProjectsService {
       take: pageSize,
     });
   }
+
+
 
   async findOne(id: string, userId: string): Promise<Project> {
     const { isElevated } = await this.accessControl.getProjectAccess(id, userId);
@@ -399,26 +486,26 @@ export class ProjectsService {
         // Show tasks based on access level
         tasks: isElevated
           ? {
-              select: {
-                id: true,
-                title: true,
-                type: true,
-                priority: true,
-                status: true,
-              },
-              take: 10,
-            }
-          : {
-              select: {
-                id: true,
-                title: true,
-                type: true,
-                priority: true,
-                status: true,
-              },
-              where: { OR: [{ assigneeId: userId }, { reporterId: userId }] },
-              take: 10,
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              priority: true,
+              status: true,
             },
+            take: 10,
+          }
+          : {
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              priority: true,
+              status: true,
+            },
+            where: { OR: [{ assigneeId: userId }, { reporterId: userId }] },
+            take: 10,
+          },
       },
     });
 
@@ -500,10 +587,9 @@ export class ProjectsService {
   async remove(id: string, userId: string): Promise<void> {
     const { role } = await this.accessControl.getProjectAccess(id, userId);
 
-    if (role !== Role.OWNER) {
+    if (role !== Role.OWNER && role !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Only owners can delete projects');
     }
-
     try {
       await this.prisma.project.delete({ where: { id } });
     } catch (error: any) {
@@ -534,229 +620,6 @@ export class ProjectsService {
       }
       throw error;
     }
-  }
-
-  // Chart methods with role-based filtering
-  async projectTaskStatusFlow(projectSlug: string, userId: string) {
-    console.log(projectSlug)
-    const { isElevated } = await this.accessControl.getProjectAccessBySlug(
-      projectSlug,
-      userId,
-    );
-
-    const project = await this.prisma.project.findUnique({
-      where: { slug: projectSlug },
-      include: {
-        workflow: {
-          include: {
-            statuses: {
-              select: {
-                id: true,
-                name: true,
-                color: true,
-                category: true,
-                position: true,
-                _count: {
-                  select: {
-                    tasks: {
-                      where: {
-                        slug: projectSlug,
-                        ...(isElevated
-                          ? {}
-                          : {
-                              OR: [
-                                { assigneeId: userId },
-                                { reporterId: userId },
-                              ],
-                            }),
-                      },
-                    },
-                  },
-                },
-              },
-              orderBy: { position: 'asc' },
-            },
-          },
-        },
-      },
-    });
-
-    if (!project?.workflow) {
-      throw new NotFoundException('Project workflow not found');
-    }
-
-    return project.workflow.statuses.map((status) => ({
-      statusId: status.id,
-      count: status._count.tasks,
-      status: {
-        id: status.id,
-        name: status.name,
-        color: status.color,
-        category: status.category,
-        position: status.position,
-      },
-    }));
-  }
-
-  async projectTaskTypeDistribution(projectSlug: string, userId: string) {
-    const { isElevated } = await this.accessControl.getProjectAccessBySlug(
-      projectSlug,
-      userId,
-    );
-
-    const projectResult = await this.prisma.project.findUnique({
-      where: { slug: projectSlug },
-    });
-
-    const taskWhere = {
-      projectId: projectResult?.id,
-      ...(isElevated
-        ? {}
-        : { OR: [{ assigneeId: userId }, { reporterId: userId }] }),
-    };
-
-    return this.prisma.task.groupBy({
-      by: ['type'],
-      where: taskWhere,
-      _count: { type: true },
-    });
-  }
-
-  async projectKPIMetrics(projectSlug: string, userId: string) {
-    const { isElevated } = await this.accessControl.getProjectAccessBySlug(
-      projectSlug,
-      userId,
-    );
-    const projectResult = await this.prisma.project.findUnique({
-      where: { slug: projectSlug },
-    });
-    const taskWhere = {
-      projectId: projectResult?.id,
-      ...(isElevated
-        ? {}
-        : { OR: [{ assigneeId: userId }, { reporterId: userId }] }),
-    };
-
-    const [totalTasks, completedTasks, activeSprints, totalBugs, resolvedBugs] =
-      await Promise.all([
-        this.prisma.task.count({ where: taskWhere }),
-        this.prisma.task.count({
-          where: { ...taskWhere, completedAt: { not: null } },
-        }),
-        this.prisma.sprint.count({
-          where: {
-            projectId: projectResult?.id,
-            archive: false,
-            status: 'ACTIVE',
-          },
-        }),
-        this.prisma.task.count({ where: { ...taskWhere, type: 'BUG' } }),
-        this.prisma.task.count({
-          where: { ...taskWhere, type: 'BUG', completedAt: { not: null } },
-        }),
-      ]);
-
-    return {
-      totalTasks,
-      completedTasks,
-      activeSprints,
-      totalBugs,
-      resolvedBugs,
-      completionRate: totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
-      bugResolutionRate: totalBugs > 0 ? (resolvedBugs / totalBugs) * 100 : 0,
-    };
-  }
-
-  async projectTaskPriorityDistribution(projectSlug: string, userId: string) {
-    const { isElevated } = await this.accessControl.getProjectAccessBySlug(
-      projectSlug,
-      userId,
-    );
-
-    const projectResult = await this.prisma.project.findUnique({
-      where: { slug: projectSlug },
-    });
-
-    const taskWhere = {
-      projectId: projectResult?.id,
-      ...(isElevated
-        ? {}
-        : { OR: [{ assigneeId: userId }, { reporterId: userId }] }),
-    };
-
-    return this.prisma.task.groupBy({
-      by: ['priority'],
-      where: taskWhere,
-      _count: { priority: true },
-    });
-  }
-
-  async projectSprintVelocityTrend(projectSlug: string, userId: string) {
-    const { isElevated } = await this.accessControl.getProjectAccessBySlug(
-      projectSlug,
-      userId,
-    );
-
-    const projectResult = await this.prisma.project.findUnique({
-      where: { slug: projectSlug },
-    });
-
-    const sprints = await this.prisma.sprint.findMany({
-      where: {
-        projectId: projectResult?.id,
-        status: 'COMPLETED',
-        archive: false,
-      },
-      include: {
-        tasks: {
-          where: {
-            completedAt: { not: null },
-            ...(isElevated
-              ? {}
-              : { OR: [{ assigneeId: userId }, { reporterId: userId }] }),
-          },
-          select: { storyPoints: true },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    return sprints.map((sprint) => ({
-      ...sprint,
-      velocity: sprint.tasks.reduce(
-        (sum, task) => sum + (task.storyPoints || 0),
-        0,
-      ),
-    }));
-  }
-
-  async projectSprintBurndown(
-    sprintId: string,
-    projectSlug: string,
-    userId: string,
-  ) {
-
-    const { isElevated } = await this.accessControl.getProjectAccessBySlug(
-      projectSlug,
-      userId,
-    );
-
-    return this.prisma.task.findMany({
-      where: {
-        sprintId,
-        project: { archive: false },
-        sprint: { archive: false },
-        ...(isElevated
-          ? {}
-          : { OR: [{ assigneeId: userId }, { reporterId: userId }] }),
-      },
-      select: {
-        completedAt: true,
-        storyPoints: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
   }
 
   // Additional helper methods for search functionality

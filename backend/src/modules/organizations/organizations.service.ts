@@ -16,19 +16,45 @@ import {
   DEFAULT_SPRINT,
   DEFAULT_TASKS,
 } from '../../constants/defaultWorkflow';
+import slugify from 'slugify';
 
 @Injectable()
 export class OrganizationsService {
   constructor(private prisma: PrismaService) { }
+
+  private async generateUniqueSlug(name: string): Promise<string> {
+    const baseSlug = slugify(name, {
+      lower: true,
+      strict: true, // remove special chars
+    });
+
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (true) {
+      const exists = await this.prisma.organization.findUnique({
+        where: { slug },
+        select: { id: true },
+      });
+
+      if (!exists) break; // ✅ slug is available
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    return slug;
+  }
 
   async create(
     createOrganizationDto: CreateOrganizationDto,
     userId: string,
   ): Promise<Organization> {
     try {
+      const slug = await this.generateUniqueSlug(createOrganizationDto.name);
       const organization = await this.prisma.organization.create({
         data: {
           ...createOrganizationDto,
+          slug,
           createdBy: userId,
           updatedBy: userId,
           workflows: {

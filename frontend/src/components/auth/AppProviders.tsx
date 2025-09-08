@@ -7,7 +7,7 @@ import TaskProvider from "@/contexts/task-context";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import Breadcrumb from "@/components/layout/Breadcrumb";
-import { Toaster } from "sonner";
+
 
 interface CommonProvidersProps {
   children: ReactNode;
@@ -33,10 +33,10 @@ export default function AppProviders({ children }: CommonProvidersProps) {
                 >
                   <div className="flex h-screen">
                     <Sidebar />
-                    <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 flex flex-col overflow-hidden ">
                       <Header />
                       <div
-                        className="flex-1 overflow-y-scroll"
+                        className="flex-1 overflow-y-scroll scrollbar-none "
                         style={{ scrollbarGutter: "stable" }}
                       >
                         {mounted && (

@@ -1,0 +1,715 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useWorkspaceContext } from "@/contexts/workspace-context";
+import { useProjectContext } from "@/contexts/project-context";
+import { useAuth } from "@/contexts/auth-context";
+import ProjectAvatar from "@/components/ui/avatars/ProjectAvatar";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/common/PageHeader";
+import { EntityCard } from "@/components/common/EntityCard";
+import ActionButton from "@/components/common/ActionButton";
+import {
+  HiFolder,
+  HiClipboardDocumentList,
+  HiCalendarDays,
+  HiXMark,
+} from "react-icons/hi2";
+import { HiSearch, HiExclamation, HiChevronDown, HiViewBoards } from "react-icons/hi";
+import { useRouter } from "next/router";
+import { DynamicBadge } from "@/components/common/DynamicBadge";
+import { NewProjectModal } from "@/components/projects/NewProjectModal";
+import {
+  availableStatuses,
+  availablePriorities,
+} from "@/utils/data/projectFilters";
+import {
+  FilterDropdown,
+  useGenericFilters,
+} from "@/components/common/FilterDropdown";
+import { CheckSquare, Flame } from "lucide-react";
+import Loader from "@/components/common/Loader";
+import ErrorState from "@/components/common/ErrorState";
+import { EmptyState, LoadingSkeleton } from "@/components/ui";
+
+import { toast } from "sonner";
+
+interface ProjectsContentProps {
+  // Context type - determines which API to use
+  contextType: 'workspace' | 'organization';
+  
+  // ID of the parent entity
+  contextId: string;
+  
+  // Optional workspace slug (for workspace context)
+  workspaceSlug?: string;
+  
+  // Page configuration
+  title: string;
+  description: string;
+  emptyStateTitle: string;
+  emptyStateDescription: string;
+  
+  // Feature flags - now always true for search and filters
+  enablePagination?: boolean;
+  
+  // Custom link generator
+  generateProjectLink: (project: any, workspaceSlug?: string) => string;
+}
+
+// Common components
+
+// Utility functions
+const formatDate = (dateString: string) => {
+  if (!dateString) return "Unknown";
+  try {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "Unknown";
+  }
+};
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debounced;
+}
+
+const ProjectsContent: React.FC<ProjectsContentProps> = ({
+  contextType,
+  contextId,
+  workspaceSlug,
+  title,
+  description,
+  emptyStateTitle,
+  emptyStateDescription,
+  enablePagination = false,
+  generateProjectLink,
+}) => {
+  const router = useRouter();
+  const { isAuthenticated, getUserAccess } = useAuth();
+  const { getWorkspaceBySlug } = useWorkspaceContext();
+  
+  // Use context state and methods
+  const {
+    projects,
+    isLoading,
+    error,
+    getProjectsByWorkspace,
+    getProjectsByOrganization,
+    refreshProjects,
+    clearError,
+  } = useProjectContext();
+
+  // States
+  const [hasAccess, setHasAccess] = useState(false);
+  const [workspace, setWorkspace] = useState<any>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+
+  // Filter states - always enabled
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(12);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Refs for cleanup and state management
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<string>("");
+  const currentContextRef = useRef<string>("");
+  const isInitializedRef = useRef(false);
+
+  // Debounced search - always call API on search
+  const debouncedSearchQuery = useDebounce(searchInput, 500);
+
+  const { createSection } = useGenericFilters();
+
+  // Project icon component
+  const ProjectLeadingIcon = ({ project }: { project: any }) => {
+    const hasImage =
+      project.avatar || project.image || project.logo || project.icon;
+
+    if (hasImage) {
+      return (
+        <div className="w-10 h-10 rounded-sm overflow-hidden flex-shrink-0 bg-transparent">
+          <ProjectAvatar
+            project={project}
+            size="md"
+            className="w-full h-full object-cover rounded-sm"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-10 h-10 rounded-md bg-[var(--primary)] flex items-center justify-center text-[var(--primary-foreground)] font-semibold flex-shrink-0">
+        {project.name.charAt(0).toUpperCase()}
+      </div>
+    );
+  };
+
+  const formatStatus = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case "ACTIVE":
+        return "Active";
+      case "PLANNING":
+        return "Planning";
+      case "ON_HOLD":
+        return "On Hold";
+      case "COMPLETED":
+        return "Completed";
+      default:
+        return "Active";
+    }
+  };
+
+  // Filter functions
+  const toggleStatus = useCallback((id: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const togglePriority = useCallback((id: string) => {
+    setSelectedPriorities((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setSelectedStatuses([]);
+    setSelectedPriorities([]);
+    setSearchInput("");
+  }, []);
+
+  // Filter data preparation - always use context projects
+  const statusFilters = useMemo(
+    () =>
+      availableStatuses.map((status) => ({
+        id: status.id,
+        name: status.name,
+        value: status.value,
+        selected: selectedStatuses.includes(status.value),
+        count: projects.filter((project) => project.status === status.value)
+          .length,
+        color: status.color,
+        icon: status.icon,
+      })),
+    [availableStatuses, selectedStatuses, projects]
+  );
+
+  const priorityFilters = useMemo(
+    () =>
+      availablePriorities.map((priority) => ({
+        id: priority.id,
+        name: priority.name,
+        value: priority.value,
+        selected: selectedPriorities.includes(priority.value),
+        count: projects.filter(
+          (project) => project.priority === priority.value
+        ).length,
+        color: priority.color,
+        icon: priority.icon,
+      })),
+    [availablePriorities, selectedPriorities, projects]
+  );
+
+  const filterSections = useMemo(
+    () => [
+      createSection({
+        id: "status",
+        title: "Status",
+        icon: CheckSquare,
+        data: statusFilters,
+        selectedIds: selectedStatuses,
+        allowSelectAll: false,
+        searchable: false,
+        multiSelect: true,
+        onToggle: toggleStatus,
+        onSelectAll: () =>
+          setSelectedStatuses(statusFilters.map((s) => s.value)),
+        onClearAll: () => setSelectedStatuses([]),
+      }),
+      createSection({
+        id: "priority",
+        title: "Priority",
+        icon: Flame,
+        data: priorityFilters,
+        selectedIds: selectedPriorities,
+        searchable: false,
+        multiSelect: true,
+        allowSelectAll: false,
+        onToggle: togglePriority,
+        onSelectAll: () =>
+          setSelectedPriorities(priorityFilters.map((p) => p.value)),
+        onClearAll: () => setSelectedPriorities([]),
+      }),
+    ],
+    [
+      statusFilters,
+      priorityFilters,
+      selectedStatuses,
+      selectedPriorities,
+      toggleStatus,
+      togglePriority,
+    ]
+  );
+
+  // Data fetching function - always call API for both search and filters
+  const fetchData = useCallback(async (
+    page: number = 1, 
+    resetData: boolean = true
+  ) => {
+    const contextKey = `${contextType}/${contextId}`;
+    const requestId = `${contextKey}-${Date.now()}-${Math.random()}`;
+
+    if (!contextId || !isAuthenticated()) {
+      return;
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    requestIdRef.current = requestId;
+    currentContextRef.current = contextKey;
+
+    try {
+      // Build filters object - always include search and filters
+      const filters = {
+        ...(selectedStatuses.length > 0 && {
+          status: selectedStatuses.join(","),
+        }),
+        ...(selectedPriorities.length > 0 && {
+          priority: selectedPriorities.join(","),
+        }),
+        ...(debouncedSearchQuery.trim() && {
+          search: debouncedSearchQuery.trim(),
+        }),
+        ...(enablePagination && {
+          page,
+          pageSize,
+        }),
+      };
+
+      let projectsData: any[] = [];
+
+      if (contextType === 'workspace') {
+        // For workspace context, get workspace first if needed
+        if (!workspace) {
+          const workspaceData = await getWorkspaceBySlug(contextId);
+          
+          if (requestIdRef.current !== requestId || !isMountedRef.current) {
+            return;
+          }
+
+          if (!workspaceData) {
+            throw new Error("Workspace not found");
+          }
+          
+          setWorkspace(workspaceData);
+          
+          // Call workspace projects API with filters
+          projectsData = await getProjectsByWorkspace(workspaceData.id, filters);
+        } else {
+          // Call workspace projects API with filters
+          projectsData = await getProjectsByWorkspace(workspace.id, filters);
+        }
+      } else if (contextType === 'organization') {
+        // Call organization projects API with filters
+        projectsData = await getProjectsByOrganization(contextId, filters);
+      }
+
+      if (requestIdRef.current !== requestId || !isMountedRef.current) {
+        return;
+      }
+
+      // Handle pagination
+      if (enablePagination) {
+        setHasMore(projectsData.length === pageSize);
+        setCurrentPage(page);
+      }
+
+      setDataLoaded(true);
+      isInitializedRef.current = true;
+
+    } catch (error: any) {
+      if (requestIdRef.current === requestId && isMountedRef.current) {
+        if (
+          error.message?.includes("401") ||
+          error.message?.includes("Unauthorized")
+        ) {
+          toast.error("Authentication required. Please log in again.");
+        } else {
+          toast.error(
+            `Failed to load ${contextType === 'workspace' ? 'workspace' : 'organization'} projects`
+          );
+        }
+      }
+    }
+  }, [
+    contextType,
+    contextId,
+    isAuthenticated,
+    selectedStatuses,
+    selectedPriorities,
+    debouncedSearchQuery,
+    enablePagination,
+    pageSize,
+    workspace,
+  ]);
+
+  // Check user access
+  useEffect(() => {
+    if (contextId) {
+      const accessType = contextType === 'workspace' ? 'workspace' : 'organization';
+      const accessId = contextType === 'workspace' && workspace ? workspace.id : contextId;
+      
+      if (contextType === 'workspace' && !workspace) return;
+      
+      getUserAccess({ name: accessType, id: accessId })
+        .then((data) => {
+          setHasAccess(data?.canChange);
+        })
+        .catch((error) => {
+          console.error("Error fetching user access:", error);
+        });
+    }
+  }, [contextId, contextType, workspace]);
+
+  // Effect for initial data load and context changes
+  useEffect(() => {
+    const contextKey = `${contextType}/${contextId}`;
+    if (currentContextRef.current !== contextKey) {
+      isInitializedRef.current = false;
+      setDataLoaded(false);
+      setWorkspace(null);
+      // Clear filters when context changes
+      setSelectedStatuses([]);
+      setSelectedPriorities([]);
+      setSearchInput("");
+      setCurrentPage(1);
+    }
+
+    if (contextId && !dataLoaded) {
+      const timeoutId = setTimeout(() => {
+        fetchData(1, true);
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [contextId, contextType, dataLoaded]);
+
+  // Effect for filter/search changes - always call API
+  useEffect(() => {
+    if (contextId && dataLoaded) {
+      setCurrentPage(1);
+      fetchData(1, true);
+    }
+  }, [
+    selectedStatuses,
+    selectedPriorities,
+    debouncedSearchQuery,
+    contextId,
+    dataLoaded,
+  ]);
+
+  // Effect for pagination
+  useEffect(() => {
+    if (enablePagination && currentPage > 1 && dataLoaded) {
+      fetchData(currentPage, false);
+    }
+  }, [currentPage, enablePagination, dataLoaded]);
+
+  // Cleanup effect
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      isInitializedRef.current = false;
+      currentContextRef.current = "";
+      requestIdRef.current = "";
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Event handlers
+  const retryFetch = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    clearError();
+    isInitializedRef.current = false;
+    currentContextRef.current = "";
+    requestIdRef.current = "";
+    setDataLoaded(false);
+    setWorkspace(null);
+    setCurrentPage(1);
+
+    fetchData(1, true);
+  }, [fetchData, clearError]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+    setCurrentPage(1);
+  }, []);
+
+  const handleProjectCreated = useCallback(async () => {
+    try {
+      // Use context refresh method
+      await refreshProjects();
+      // Then refetch with current filters
+      await fetchData(1, true);
+      toast.success("Project created successfully!");
+    } catch (error) {
+      console.error("Error refreshing projects after creation:", error);
+      toast.error("Project created but failed to refresh list");
+    }
+  }, [refreshProjects, fetchData]);
+
+  const loadMore = () => {
+    if (hasMore && !isLoading && enablePagination) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  // Calculate active filters
+  const totalActiveFilters = selectedStatuses.length + selectedPriorities.length;
+
+  // Loading state
+  if (isLoading && projects.length === 0) {
+    return <Loader />;
+  }
+
+  // Error state
+  if (error) {
+    return <ErrorState error={error} onRetry={retryFetch} />;
+  }
+
+  // Updated title to include workspace name when available
+  const displayTitle = contextType === 'workspace' && workspace 
+    ? `${workspace.name} Projects` 
+    : title;
+
+  return (
+    <div className="dashboard-container">
+      <div className="space-y-6 text-md">
+        <PageHeader
+          icon={<HiViewBoards className="size-20px" />}
+          title={displayTitle}
+          description={description}
+          actions={
+            <>
+              {/* Search Input - Always shown */}
+              <div className="relative max-w-xs w-full">
+                <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+                <Input
+                  type="text"
+                  placeholder="Search projects..."
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  className="pl-10 rounded-md border border-[var(--border)]"
+                />
+                {searchInput && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
+                  >
+                    <HiXMark size={16} />
+                  </button>
+                )}
+                {isLoading && searchInput && (
+                  <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin h-4 w-4 border-2 border-[var(--primary)] border-t-transparent rounded-full" />
+                  </div>
+                )}
+              </div>
+
+              {/* Filter Controls - Always shown */}
+              <FilterDropdown
+                sections={filterSections}
+                title="Advanced Filters"
+                activeFiltersCount={totalActiveFilters}
+                onClearAllFilters={clearAllFilters}
+                placeholder="Filter projects..."
+                dropdownWidth="w-56"
+                showApplyButton={false}
+              />
+
+              {/* Primary Action */}
+              {hasAccess && (
+                <ActionButton
+                  primary
+                  showPlusIcon
+                  onClick={() => setIsNewProjectModalOpen(true)}
+                >
+                  Create Project
+                </ActionButton>
+              )}
+            </>
+          }
+        />
+
+        <NewProjectModal
+          isOpen={isNewProjectModalOpen}
+          onClose={() => setIsNewProjectModalOpen(false)}
+          workspaceSlug={contextType === 'workspace' ? workspaceSlug : undefined}
+          onProjectCreated={handleProjectCreated}
+          initialData={
+            contextType === 'organization'
+              ? { organizationId: contextId }
+              : undefined
+          }
+        />
+
+        {/* Loading indicator for background operations */}
+        {isLoading && projects.length > 0 && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin h-5 w-5 border-2 border-[var(--primary)] border-t-transparent rounded-full" />
+          </div>
+        )}
+
+        {/* Projects Grid - Use context projects */}
+        {projects.length === 0 ? (
+          searchInput || totalActiveFilters > 0 ? (
+            <EmptyState
+              icon={<HiSearch size={24} />}
+              title="No projects found"
+              description={`No projects match your current search${totalActiveFilters > 0 ? ' and filters' : ''}. Try adjusting your criteria.`}
+              action={
+                <ActionButton onClick={clearAllFilters}>Clear All</ActionButton>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={<HiFolder size={24} />}
+              title={emptyStateTitle}
+              description={emptyStateDescription}
+              action={
+                hasAccess && (
+                  <ActionButton
+                    primary
+                    showPlusIcon
+                    onClick={() => setIsNewProjectModalOpen(true)}
+                  >
+                    Create Project
+                  </ActionButton>
+                )
+              }
+            />
+          )
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-16">
+              {projects.map((project) => {
+                const statusText = formatStatus(project.status);
+
+                return (
+                  <EntityCard
+                    key={project.id}
+                    href={generateProjectLink(project, workspaceSlug)}
+                    leading={
+                      <div className="w-10 h-10 flex items-center justify-center text-[var(--primary-foreground)] font-semibold">
+                        <ProjectLeadingIcon project={project} />
+                      </div>
+                    }
+                    heading={project.name}
+                    subheading={project.key || project.slug}
+                    description={project.description}
+                    footer={
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-4">
+                          <span className="flex items-center gap-1">
+                            <HiClipboardDocumentList size={12} />
+                            {project._count?.tasks || 0} tasks
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <HiCalendarDays size={12} />
+                            {formatDate(project.updatedAt)}
+                          </span>
+                        </div>
+                        <DynamicBadge label={statusText} size="sm" />
+                      </div>
+                    }
+                  />
+                );
+              })}
+            </div>
+
+            {/* Load More Button (for pagination) */}
+            {enablePagination && hasMore && (
+              <div className="flex justify-center">
+                <Button
+                  onClick={loadMore}
+                  disabled={isLoading}
+                  variant="outline"
+                  className="group relative min-w-[140px] h-10 border-[var(--border)] bg-[var(--background)] hover:bg-[var(--muted)] transition-all duration-200 disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2">
+                    {isLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+                        <span>Loading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Load More</span>
+                        <HiChevronDown className="w-4 h-4 transition-transform group-hover:translate-y-0.5" />
+                      </>
+                    )}
+                  </div>
+                </Button>
+              </div>
+            )}
+
+            {/* Footer Counter */}
+            {projects.length > 0 && (
+              <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full min-h-[48px] flex items-center justify-center pb-4 pointer-events-none">
+                <p className="text-sm text-[var(--muted-foreground)] pointer-events-auto">
+                  Showing {projects.length} project{projects.length !== 1 ? "s" : ""}
+                  {searchInput && ` matching "${searchInput}"`}
+                  {totalActiveFilters > 0 && ` with ${totalActiveFilters} filter${totalActiveFilters !== 1 ? 's' : ''} applied`}
+                  {(searchInput || totalActiveFilters > 0) && (
+                    <button
+                      onClick={clearAllFilters}
+                      className="ml-2 text-[var(--primary)] hover:underline"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ProjectsContent;

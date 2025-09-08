@@ -159,3 +159,29 @@ export interface GetWorkspaceActivityParams {
   page?: number;
   entityType?:string;
 }
+
+export enum WorkspaceChartType {
+  PROJECT_STATUS = 'project-status',
+  TASK_PRIORITY = 'task-priority',
+  KPI_METRICS = 'kpi-metrics',
+  TASK_TYPE = 'task-type',
+  SPRINT_STATUS = 'sprint-status',
+  MONTHLY_COMPLETION = 'monthly-completion'
+}
+export interface WorkspaceChartDataResponse {
+  [key: string]: any;
+}
+
+export interface WorkspaceKPIMetrics {
+  totalProjects: number;
+  activeProjects: number;
+  completedProjects: number;
+  totalTasks: number;
+  overdueTasks: number;
+  completionRate: number;
+}
+
+export interface MonthlyTaskCompletion {
+  month: string;
+  count: number;
+}

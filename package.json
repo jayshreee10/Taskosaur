@@ -35,6 +35,7 @@
         "be:prisma:reset": "node taskosaur.js be:npm run prisma:reset",
         "be:prisma": "node taskosaur.js be:npm run prisma",
         "be:seed:core": "node taskosaur.js be:npm run seed:core",
+        "be:seed:admin": "node taskosaur.js be:npm run seed:core admin",
         "be:install": "cd backend && npm install",
         "fe:install": "cd frontend && npm install",
         "fe:dev": "node taskosaur.js fe:npm run dev",

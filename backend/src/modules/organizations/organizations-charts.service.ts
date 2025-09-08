@@ -1,46 +1,163 @@
 import {
   Injectable,
-  ForbiddenException,
-  NotFoundException,
+  BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AccessControlService } from 'src/common/access-control.utils';
+import { ChartDataResponse, ChartType } from './dto/get-charts-query.dto';
 
-type Role = 'OWNER' | 'MANAGER' | 'MEMBER' | 'VIEWER';
+
+
+export interface KPIMetrics {
+  totalWorkspaces: number;
+  activeWorkspaces: number;
+  totalProjects: number;
+  activeProjects: number;
+  completedProjects: number;
+  totalMembers: number;
+  totalTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  totalBugs: number;
+  resolvedBugs: number;
+  activeSprints: number;
+  projectCompletionRate: number;
+  taskCompletionRate: number;
+  bugResolutionRate: number;
+  overallProductivity: number;
+}
+
+export interface QualityMetrics {
+  totalBugs: number;
+  resolvedBugs: number;
+  criticalBugs: number;
+  resolvedCriticalBugs: number;
+  bugResolutionRate: number;
+  criticalBugResolutionRate: number;
+}
+
+export interface WorkspaceProjectCount {
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  projectCount: number;
+}
+
+export interface MemberWorkload {
+  memberId: string;
+  memberName: string;
+  activeTasks: number;
+  reportedTasks: number;
+}
 
 @Injectable()
 export class OrganizationChartsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(OrganizationChartsService.name);
 
-  private async getOrgAccess(
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accessControl: AccessControlService,
+  ) { }
+
+  /**
+   * Get multiple chart data types in a single request
+   */
+  async getMultipleChartData(
     orgId: string,
     userId: string,
-  ): Promise<{ isElevated: boolean; role: Role }> {
-    const org = await this.prisma.organization.findUnique({
-      where: { id: orgId },
-      select: { ownerId: true },
-    });
-    if (!org) throw new NotFoundException('Organization not found');
+    chartTypes: ChartType[],
+  ): Promise<ChartDataResponse> {
+    this.logger.log(
+      `Fetching chart data for organization ${orgId}, types: ${chartTypes.join(', ')}`,
+    );
 
-    if (org.ownerId === userId) {
-      return { isElevated: true, role: 'OWNER' };
+    try {
+
+      // Execute all chart requests in parallel for better performance
+      const chartPromises = chartTypes.map(async (type) => {
+        try {
+          const data = await this.getSingleChartData(orgId, userId, type);
+          return { type, data, error: null };
+        } catch (error) {
+          this.logger.error(
+            `Failed to fetch chart data for type ${type}: ${error.message}`,
+            error.stack,
+          );
+          return { type, data: null, error: error.message };
+        }
+      });
+
+      const chartResults = await Promise.all(chartPromises);
+
+      // Build response object
+      const results: ChartDataResponse = {};
+      chartResults.forEach(({ type, data, error }) => {
+        results[type] = error ? { error } : data;
+      });
+
+      this.logger.log(
+        `Successfully fetched chart data for ${chartTypes.length} chart types`,
+      );
+
+      return results;
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch chart data for organization ${orgId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    const member = await this.prisma.organizationMember.findUnique({
-      where: { userId_organizationId: { userId, organizationId: orgId } },
-      select: { role: true },
-    });
-
-    if (!member)
-      throw new ForbiddenException('Not a member of this organization');
-
-    const isElevated = member.role === 'MANAGER' || member.role === 'OWNER';
-    return { isElevated, role: member.role as Role };
   }
 
-  // Reusable scoped where fragments when not elevated
-  // - Projects: user must be a member
-  // - Workspaces: user must be a member
-  // - Tasks: assigned to or reported by the user
+  /**
+   * Get single chart data based on type
+   */
+  private async getSingleChartData(
+    orgId: string,
+    userId: string,
+    chartType: ChartType,
+  ): Promise<any> {
+    switch (chartType) {
+      case ChartType.KPI_METRICS:
+        return this.organizationKPIMetrics(orgId, userId);
+      case ChartType.PROJECT_PORTFOLIO:
+        return this.organizationProjectPortfolio(orgId, userId);
+      case ChartType.TEAM_UTILIZATION:
+        return this.organizationTeamUtilization(orgId, userId);
+      case ChartType.TASK_DISTRIBUTION:
+        return this.organizationTaskDistribution(orgId, userId);
+      case ChartType.TASK_TYPE:
+        return this.organizationTaskTypeDistribution(orgId, userId);
+      case ChartType.SPRINT_METRICS:
+        return this.organizationSprintMetrics(orgId, userId);
+      case ChartType.QUALITY_METRICS:
+        return this.organizationQualityMetrics(orgId, userId);
+      case ChartType.WORKSPACE_PROJECT_COUNT:
+        return this.organizationWorkspaceProjectCount(orgId, userId);
+      case ChartType.MEMBER_WORKLOAD:
+        return this.organizationMemberWorkload(orgId, userId);
+      case ChartType.RESOURCE_ALLOCATION:
+        return this.organizationResourceAllocation(orgId, userId);
+      default:
+        throw new BadRequestException(`Unsupported chart type: ${chartType}`);
+    }
+  }
+
+  /**
+   * Helper method to calculate percentage with proper rounding
+   */
+  private calculatePercentage(numerator: number, denominator: number): number {
+    if (denominator === 0) return 0;
+    return Math.round((numerator / denominator) * 100 * 100) / 100;
+  }
+
+  /**
+   * Reusable scoped where fragments when not elevated
+   * - Projects: user must be a member
+   * - Workspaces: user must be a member
+   * - Tasks: assigned to or reported by the user
+   */
   private userScopedWhere(orgId: string, userId: string) {
     return {
       workspaceForUser: {
@@ -68,9 +185,11 @@ export class OrganizationChartsService {
     };
   }
 
-  // 1) KPI Metrics
-  async organizationKPIMetrics(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+  /**
+   * 1) KPI Metrics
+   */
+  async organizationKPIMetrics(orgId: string, userId: string): Promise<KPIMetrics> {
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const now = new Date();
 
     if (isElevated) {
@@ -167,13 +286,10 @@ export class OrganizationChartsService {
         totalBugs,
         resolvedBugs,
         activeSprints,
-        projectCompletionRate:
-          totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0,
-        taskCompletionRate:
-          totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
-        bugResolutionRate: totalBugs > 0 ? (resolvedBugs / totalBugs) * 100 : 0,
-        overallProductivity:
-          totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
+        projectCompletionRate: this.calculatePercentage(completedProjects, totalProjects),
+        taskCompletionRate: this.calculatePercentage(completedTasks, totalTasks),
+        bugResolutionRate: this.calculatePercentage(resolvedBugs, totalBugs),
+        overallProductivity: this.calculatePercentage(completedTasks, totalTasks),
       };
     }
 
@@ -232,26 +348,25 @@ export class OrganizationChartsService {
       totalProjects,
       activeProjects,
       completedProjects,
-      totalMembers: 1,
+      totalMembers: 1, // User scope shows only current user
       totalTasks,
       completedTasks,
       overdueTasks,
       totalBugs,
       resolvedBugs,
       activeSprints,
-      projectCompletionRate:
-        totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0,
-      taskCompletionRate:
-        totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
-      bugResolutionRate: totalBugs > 0 ? (resolvedBugs / totalBugs) * 100 : 0,
-      overallProductivity:
-        totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
+      projectCompletionRate: this.calculatePercentage(completedProjects, totalProjects),
+      taskCompletionRate: this.calculatePercentage(completedTasks, totalTasks),
+      bugResolutionRate: this.calculatePercentage(resolvedBugs, totalBugs),
+      overallProductivity: this.calculatePercentage(completedTasks, totalTasks),
     };
   }
 
-  // 2) Project Portfolio
+  /**
+   * 2) Project Portfolio
+   */
   async organizationProjectPortfolio(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const base = { workspace: { organizationId: orgId }, archive: false };
     const where = isElevated
       ? base
@@ -264,9 +379,12 @@ export class OrganizationChartsService {
     });
   }
 
-  // 3) Team Utilization (roles distribution)
+  /**
+   * 3) Team Utilization (roles distribution)
+   */
   async organizationTeamUtilization(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
+
     if (isElevated) {
       return this.prisma.organizationMember.groupBy({
         by: ['role'],
@@ -274,16 +392,20 @@ export class OrganizationChartsService {
         _count: { role: true },
       });
     }
+
     const me = await this.prisma.organizationMember.findUnique({
       where: { userId_organizationId: { userId, organizationId: orgId } },
       select: { role: true },
     });
+
     return me ? [{ role: me.role, _count: { role: 1 } }] : [];
   }
 
-  // 4) Task Distribution by Priority
+  /**
+   * 4) Task Distribution by Priority
+   */
   async organizationTaskDistribution(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const base = {
       project: { workspace: { organizationId: orgId }, archive: false },
     };
@@ -298,9 +420,11 @@ export class OrganizationChartsService {
     });
   }
 
-  // 5) Task Type Distribution
+  /**
+   * 5) Task Type Distribution
+   */
   async organizationTaskTypeDistribution(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const base = {
       project: { workspace: { organizationId: orgId }, archive: false },
     };
@@ -315,9 +439,11 @@ export class OrganizationChartsService {
     });
   }
 
-  // 6) Sprint Metrics
+  /**
+   * 6) Sprint Metrics
+   */
   async organizationSprintMetrics(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const base = {
       archive: false,
       project: { workspace: { organizationId: orgId }, archive: false },
@@ -325,9 +451,9 @@ export class OrganizationChartsService {
     const where = isElevated
       ? base
       : {
-          ...base,
-          project: { ...base.project, members: { some: { userId } } },
-        };
+        ...base,
+        project: { ...base.project, members: { some: { userId } } },
+      };
 
     return this.prisma.sprint.groupBy({
       by: ['status'],
@@ -336,9 +462,11 @@ export class OrganizationChartsService {
     });
   }
 
-  // 7) Quality Metrics (bugs)
-  async organizationQualityMetrics(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+  /**
+   * 7) Quality Metrics (bugs)
+   */
+  async organizationQualityMetrics(orgId: string, userId: string): Promise<QualityMetrics> {
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const base = {
       project: { workspace: { organizationId: orgId }, archive: false },
       type: 'BUG' as const,
@@ -370,22 +498,23 @@ export class OrganizationChartsService {
       resolvedBugs,
       criticalBugs,
       resolvedCriticalBugs,
-      bugResolutionRate: totalBugs > 0 ? (resolvedBugs / totalBugs) * 100 : 0,
-      criticalBugResolutionRate:
-        criticalBugs > 0 ? (resolvedCriticalBugs / criticalBugs) * 100 : 0,
+      bugResolutionRate: this.calculatePercentage(resolvedBugs, totalBugs),
+      criticalBugResolutionRate: this.calculatePercentage(resolvedCriticalBugs, criticalBugs),
     };
   }
 
-  // 8) Workspace Project Count
-  async organizationWorkspaceProjectCount(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+  /**
+   * 8) Workspace Project Count
+   */
+  async organizationWorkspaceProjectCount(orgId: string, userId: string): Promise<WorkspaceProjectCount[]> {
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const workspaceWhere = isElevated
       ? { organizationId: orgId, archive: false }
       : {
-          organizationId: orgId,
-          archive: false,
-          members: { some: { userId } },
-        };
+        organizationId: orgId,
+        archive: false,
+        members: { some: { userId } },
+      };
 
     const workspaces = await this.prisma.workspace.findMany({
       where: workspaceWhere,
@@ -406,16 +535,18 @@ export class OrganizationChartsService {
     }));
   }
 
-  // 9) Member Workload Distribution
-  async organizationMemberWorkload(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+  /**
+   * 9) Member Workload Distribution
+   */
+  async organizationMemberWorkload(orgId: string, userId: string): Promise<MemberWorkload[]> {
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
 
     const userWhere = isElevated
       ? { organizationMembers: { some: { organizationId: orgId } } }
       : {
-          id: userId,
-          organizationMembers: { some: { organizationId: orgId } },
-        };
+        id: userId,
+        organizationMembers: { some: { organizationId: orgId } },
+      };
 
     const members = await this.prisma.user.findMany({
       where: userWhere,
@@ -450,15 +581,17 @@ export class OrganizationChartsService {
 
     return members.map((m) => ({
       memberId: m.id,
-      memberName: `${m.firstName} ${m.lastName}`,
+      memberName: `${m.firstName || ''} ${m.lastName || ''}`.trim() || 'Unknown User',
       activeTasks: m._count.assignedTasks,
       reportedTasks: m._count.reportedTasks,
     }));
   }
 
-  // 10) Resource Allocation Matrix
+  /**
+   * 10) Resource Allocation Matrix
+   */
   async organizationResourceAllocation(orgId: string, userId: string) {
-    const { isElevated } = await this.getOrgAccess(orgId, userId);
+    const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
     const where = isElevated
       ? { workspace: { organizationId: orgId } }
       : { workspace: { organizationId: orgId, members: { some: { userId } } } };

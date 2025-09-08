@@ -16,13 +16,13 @@ interface TaskTypeChartProps {
 }
 
 export function TaskTypeChart({ data }: TaskTypeChartProps) {
-  const chartData = data.map(item => ({
+  const chartData = data?.map(item => ({
     name: chartConfig[item.type]?.label || item.type,
     value: item._count.type,
     fill: chartConfig[item.type]?.color || "#8B5CF6"
   }))
 
-  const totalTasks = chartData.reduce((sum, item) => sum + item.value, 0)
+  const totalTasks = chartData?.reduce((sum, item) => sum + item.value, 0)
 
   return (
     <ChartWrapper
@@ -44,7 +44,7 @@ export function TaskTypeChart({ data }: TaskTypeChartProps) {
             label={({ name, value }) => `${name}: ${value}`}
             labelLine={false}
           >
-            {chartData.map((entry, index) => (
+            {chartData?.map((entry, index) => (
               <Cell 
                 key={`cell-${index}`} 
                 fill={entry.fill}

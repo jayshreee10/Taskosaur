@@ -64,3 +64,43 @@ export interface ProjectStats {
   totalMembers: number;
   completionRate: number;
 }
+export enum ProjectChartType {
+  TASK_STATUS = 'task-status',
+  TASK_TYPE = 'task-type',
+  KPI_METRICS = 'kpi-metrics',
+  TASK_PRIORITY = 'task-priority',
+  SPRINT_VELOCITY = 'sprint-velocity'
+}
+export interface ProjectChartDataResponse {
+  [key: string]: any;
+}
+
+export interface ProjectKPIMetrics {
+  totalTasks: number;
+  completedTasks: number;
+  activeSprints: number;
+  totalBugs: number;
+  resolvedBugs: number;
+  completionRate: number;
+  bugResolutionRate: number;
+}
+
+export interface TaskStatusFlow {
+  statusId: string;
+  count: number;
+  status: {
+    id: string;
+    name: string;
+    color: string;
+    category: string;
+    position: number;
+  };
+}
+
+export interface SprintVelocity {
+  id: string;
+  name: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  velocity: number;
+}

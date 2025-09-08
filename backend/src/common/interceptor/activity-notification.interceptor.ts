@@ -95,7 +95,6 @@ export class ActivityNotificationInterceptor implements NestInterceptor {
           );
       }
     }
-    console.log('Logging activity with config:', entityIdName, entityId, newValue);
     await this.activityLogService.logActivity({
       type: config.type,
       description: config.description,

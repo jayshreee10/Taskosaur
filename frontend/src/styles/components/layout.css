@@ -2,7 +2,16 @@
 
 /* Header Styles */
 .header-container {
-  @apply sticky top-0 z-40 w-full shadow-sm bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80;
+  @apply sticky top-0 z-40 shadow-sm bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80;
+  transition: margin-right 300ms ease-in-out;
+  margin-right: 0;
+}
+
+@media (min-width: 1280px) {
+  body.chat-open .header-container {
+    margin-right: 400px !important;
+    transition: margin-right 300ms ease-in-out;
+  }
 }
 
 .header-content {
@@ -27,7 +36,7 @@
 
 /* Header Create Button */
 .header-create-button {
-  @apply h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md flex items-center gap-2;
+  @apply h-9 px-4 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium rounded-md hidden md:flex items-center gap-2;
 }
 
 /* Header Dropdown Styles */
@@ -66,8 +75,6 @@
 .header-dropdown-item-description {
   @apply text-xs text-[var(--muted-foreground)];
 }
-
-
 
 .breadcrumb-item {
   @apply hover:text-[var(--foreground)] transition-colors;
@@ -175,10 +182,8 @@
   @apply sticky top-0 z-30 w-full px-[0.5rem] pt-3 pb-0  bg-[var(--background)]/100;
 }
 
-
 .breadcrumb-nav {
   @apply inline-flex p-0 items-center uppercase;
-         
 }
 
 .breadcrumb-item {
@@ -382,7 +387,7 @@
 }
 
 .layout-sidebar-toggle-button {
-  @apply fixed top-4 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--sidebar)] border border-[var(--sidebar-border)] text-[var(--sidebar-foreground)] shadow-lg md:hidden hover:bg-[var(--hover-bg)] transition-colors;
+  @apply fixed top-3 left-4 z-50 w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--sidebar)] border border-[var(--sidebar-border)] text-[var(--sidebar-foreground)] shadow-lg md:hidden hover:bg-[var(--hover-bg)] transition-colors;
   /* Add smooth slide-in animation */
   /* transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); */
 }
@@ -472,8 +477,7 @@
 }
 
 .layout-sidebar-mini-nav-link {
-  @apply w-8 h-8 flex items-center justify-center rounded-lg;
-  /* transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); */
+  @apply w-8 h-8 flex items-center justify-center rounded-lg relative;
 }
 
 .layout-sidebar-mini-nav-link:hover {
@@ -554,20 +558,9 @@
   @apply space-y-1 mb-6;
 }
 
-.layout-sidebar-nav-item {
-  /* No specific styles - just a container */
-}
-
 .layout-sidebar-nav-link {
-  @apply flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium;
-  /* Enhanced smooth transitions */
-  /* transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); */
-  position: relative;
+  @apply flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium relative;
 }
-
-/* .layout-sidebar-nav-link:hover {
-  transform: translateX(2px);
-} */
 
 .layout-sidebar-nav-link-active {
   @apply bg-[var(--sidebar-accent)] text-[var(--sidebar-accent-foreground)];

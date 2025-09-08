@@ -257,7 +257,7 @@ function OrganizationManagePageContent() {
   const canManage =
     getCurrentUserRole() === OrganizationRole.SUPER_ADMIN ||
     organization.ownerId === currentUser?.id;
-
+  console.log("Can Manage Organization:", getCurrentUserRole());
   if (!canManage) {
     return <AccessDenied onBack={handleBackToOrganizations} />;
   }

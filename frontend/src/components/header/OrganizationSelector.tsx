@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useOrganization } from "@/contexts/organization-context";
 import { setCurrentOrganizationId } from "@/utils/hierarchyContext";
@@ -34,100 +34,110 @@ export default function OrganizationSelector({
   const [isFetchingOnOpen, setIsFetchingOnOpen] = useState(false);
 
   const currentUser: User | null = getCurrentUser() ?? null;
-  const previousOrgId = useRef<string | null>(null);
 
-  /* util */
-  const getInitials = (name?: string) =>
-    name?.charAt(0)?.toUpperCase() || "?";
+  // Utility function
+  const getInitials = (name?: string) => name?.charAt(0)?.toUpperCase() || "?";
 
-  /* fetch orgs - initial load */
+  // Set current organization and persist to localStorage
+  const setAndPersistOrganization = (org: Organization) => {
+    setCurrentOrganization(org);
+    localStorage.setItem("currentOrganizationId", org.id);
+    setCurrentOrganizationId(org.id);
+    window.dispatchEvent(new CustomEvent("organizationChanged"));
+    onOrganizationChange?.(org);
+  };
+
+  // Initial fetch on component mount with refresh logic
   useEffect(() => {
     if (!currentUser?.id) return;
 
     const fetchOrganizations = async () => {
       setIsLoading(true);
       try {
+        const savedOrgId = localStorage.getItem("currentOrganizationId");
+        console.log(savedOrgId);
         const orgs: Organization[] =
           (await getUserOrganizations(currentUser.id)) ?? [];
         setOrganizations(orgs);
 
-        const savedOrgId = localStorage.getItem("currentOrganizationId");
-        let selected: Organization | null = null;
+        if (orgs.length === 0) {
+          setIsLoading(false);
+          return;
+        }
 
+        // On refresh, check if a current orgId exists in local storage
+        let selectedOrg: Organization;
+        console.log(savedOrgId);
         if (savedOrgId) {
-          // First try to find the saved organization in the response
-          selected = orgs.find((o) => o.id === savedOrgId);
-        }
-        
-        // If saved org wasn't found or there was no saved org, default to first org
-        if (!selected && orgs.length > 0) {
-          selected = orgs[0];
-          // Update localStorage with the new org
-          localStorage.setItem("currentOrganizationId", selected.id);
+          // Try to find a matching organization from the list
+          const matchingOrg = orgs.find((org) => org.id === savedOrgId);
+
+          if (matchingOrg) {
+            // If a match is found, set that as the current org
+            selectedOrg = matchingOrg;
+          } else {
+            // If no match is found, set the first org as default
+            selectedOrg = orgs[0];
+          }
+        } else {
+          // If no orgId exists in local storage, set the first org as default
+          selectedOrg = orgs[0];
         }
 
-        if (selected) {
-          setCurrentOrganization(selected);
-          if (previousOrgId.current !== selected.id) {
-            previousOrgId.current = selected.id;
-            localStorage.setItem("currentOrganizationId", selected.id);
-            setCurrentOrganizationId(selected.id);
-            window.dispatchEvent(new CustomEvent("organizationChanged"));
-          }
-        }
-      } catch (e) {
-        console.error("Error fetching organizations:", e);
+        // Set the selected organization
+        setAndPersistOrganization(selectedOrg);
+      } catch (error) {
+        console.error("Error fetching organizations:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchOrganizations();
-  }, [currentUser?.id, getUserOrganizations]);
+  }, [currentUser?.id]);
 
-  /* fetch orgs when dropdown opens */
+  // Fetch organizations when dropdown opens (for fresh data)
   const fetchOrganizationsOnOpen = async () => {
     if (!currentUser?.id) return;
-    
+
     setIsFetchingOnOpen(true);
     try {
       const orgs: Organization[] =
         (await getUserOrganizations(currentUser.id)) ?? [];
       setOrganizations(orgs);
 
-      // Update current organization if it exists in the new list
+      // Update current organization if it still exists in the fresh data
       const currentOrgId = localStorage.getItem("currentOrganizationId");
       if (currentOrgId) {
-        const updatedCurrentOrg = orgs.find((o) => o.id === currentOrgId);
-        if (updatedCurrentOrg) {
+        const updatedCurrentOrg = orgs.find((org) => org.id === currentOrgId);
+        if (
+          updatedCurrentOrg &&
+          updatedCurrentOrg.id !== currentOrganization?.id
+        ) {
           setCurrentOrganization(updatedCurrentOrg);
         }
       }
-    } catch (e) {
-      console.error("Error fetching organizations:", e);
+    } catch (error) {
+      console.error("Error fetching organizations:", error);
     } finally {
       setIsFetchingOnOpen(false);
     }
   };
 
-  /* handlers */
+  // Handle organization selection
   const handleOrganizationSelect = (org: Organization) => {
-    if (!org?.id) return;
-    if (currentOrganization?.id === org.id) return;
+    if (!org?.id || currentOrganization?.id === org.id) return;
 
-    setCurrentOrganization(org);
-    localStorage.setItem("currentOrganizationId", org.id);
-    setCurrentOrganizationId(org.id);
-    window.dispatchEvent(new CustomEvent("organizationChanged"));
-    onOrganizationChange?.(org);
+    setAndPersistOrganization(org);
 
     try {
       router.replace("/dashboard");
-    } catch (err) {
-      console.error("Router replace failed:", err);
+    } catch (error) {
+      console.error("Router replace failed:", error);
     }
   };
 
+  // Handle dropdown open/close
   const handleDropdownOpen = (open: boolean) => {
     setDropdownOpen(open);
     if (open) {
@@ -135,7 +145,7 @@ export default function OrganizationSelector({
     }
   };
 
-  /* UI */
+  // Loading state
   if (isLoading || !currentOrganization) {
     return (
       <div className="header-org-selector-loading">
@@ -154,11 +164,11 @@ export default function OrganizationSelector({
         <Button variant="ghost" className="header-org-selector-trigger">
           <Avatar className="header-org-selector-avatar">
             <AvatarFallback className="header-org-selector-avatar-fallback">
-              {getInitials(currentOrganization?.name)}
+              {getInitials(currentOrganization.name)}
             </AvatarFallback>
           </Avatar>
           <span className="header-org-selector-name">
-            {currentOrganization?.name || "Unknown Org"}
+            {currentOrganization.name}
           </span>
           <HiChevronDown className="header-org-selector-chevron" />
         </Button>
@@ -169,19 +179,19 @@ export default function OrganizationSelector({
         align="end"
         sideOffset={6}
       >
-        {/* Profile Header */}
+        {/* Current Organization Header */}
         <div className="header-org-profile-header">
           <Avatar className="header-org-profile-avatar">
             <AvatarFallback className="header-org-profile-avatar-fallback">
-              {getInitials(currentOrganization?.name)}
+              {getInitials(currentOrganization.name)}
             </AvatarFallback>
           </Avatar>
           <div className="header-org-profile-info">
             <div className="header-org-profile-name">
-              {currentOrganization?.name || "Organization"}
+              {currentOrganization.name}
             </div>
             <div className="header-org-profile-meta">
-              {currentOrganization?._count?.members ?? 0} members
+              {currentOrganization._count?.members ?? 0} members
               <Badge variant="secondary" className="header-org-profile-badge">
                 Org
               </Badge>
@@ -189,12 +199,14 @@ export default function OrganizationSelector({
           </div>
         </div>
 
-        {/* list */}
+        {/* Organizations List */}
         <div className="header-org-list-container">
           {isFetchingOnOpen ? (
             <div className="header-org-loading-state">
               <div className="header-org-loading-spinner" />
-              <p className="header-org-loading-text">Loading organizations...</p>
+              <p className="header-org-loading-text">
+                Loading organizations...
+              </p>
             </div>
           ) : organizations.length === 0 ? (
             <div className="header-org-empty-state">
@@ -210,28 +222,26 @@ export default function OrganizationSelector({
             <>
               {organizations.map((org) => (
                 <DropdownMenuItem
-                  key={org?.id}
+                  key={org.id}
                   onClick={() => handleOrganizationSelect(org)}
                   className={`header-org-item ${
-                    currentOrganization?.id === org?.id
+                    currentOrganization.id === org.id
                       ? "header-org-item-active"
                       : "header-org-item-inactive"
                   }`}
                 >
                   <Avatar className="header-org-item-avatar">
                     <AvatarFallback className="header-org-item-avatar-fallback">
-                      {getInitials(org?.name)}
+                      {getInitials(org.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="header-org-item-info">
-                    <p className="header-org-item-name">
-                      {org?.name || "Unnamed Org"}
-                    </p>
+                    <p className="header-org-item-name">{org.name}</p>
                     <p className="header-org-item-members">
-                      {org?._count?.members ?? 0} members
+                      {org._count?.members ?? 0} members
                     </p>
                   </div>
-                  {currentOrganization?.id === org?.id && (
+                  {currentOrganization.id === org.id && (
                     <HiCheck size={12} className="header-org-item-check" />
                   )}
                 </DropdownMenuItem>
@@ -243,8 +253,8 @@ export default function OrganizationSelector({
                   onClick={() => {
                     try {
                       router.push("/settings");
-                    } catch (err) {
-                      console.error("Router push failed:", err);
+                    } catch (error) {
+                      console.error("Router push failed:", error);
                     }
                   }}
                   className="header-org-manage-item"

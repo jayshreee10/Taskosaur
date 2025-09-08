@@ -56,19 +56,19 @@ const CustomizedAxisTick = ({ x, y, payload }: any) => {
 };
 
 export function SprintVelocityChart({ data }: SprintVelocityChartProps) {
-  const chartData = data.map(sprint => ({
+  const chartData = data?.map(sprint => ({
     sprint: sprint.name,
     velocity: sprint.tasks.reduce((acc, task) => acc + (task.storyPoints || 0), 0),
     date: new Date(sprint.createdAt).toLocaleDateString()
   }))
 
   // Calculate average velocity
-  const averageVelocity = chartData.length > 0 
+  const averageVelocity = chartData?.length > 0 
     ? chartData.reduce((sum, item) => sum + item.velocity, 0) / chartData.length 
     : 0;
 
   // Add average to each data point for the line
-  const chartDataWithAverage = chartData.map(item => ({
+  const chartDataWithAverage = chartData?.map(item => ({
     ...item,
     average: Math.round(averageVelocity)
   }));

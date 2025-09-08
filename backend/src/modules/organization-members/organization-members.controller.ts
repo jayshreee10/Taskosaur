@@ -28,7 +28,7 @@ import { Scope } from 'src/common/decorator/scope.decorator';
 export class OrganizationMembersController {
   constructor(
     private readonly organizationMembersService: OrganizationMembersService,
-  ) { }
+  ) {}
 
   @Post()
   create(@Body() createOrganizationMemberDto: CreateOrganizationMemberDto) {
@@ -51,6 +51,32 @@ export class OrganizationMembersController {
   @Get('slug')
   findAllByOrgSlug(@Query('slug') slug?: string) {
     return this.organizationMembersService.findAllByOrgSlug(slug);
+  }
+
+  @Patch(':id')
+  @Scope('ORGANIZATION', 'id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateOrganizationMemberDto: UpdateOrganizationMemberDto,
+    // TODO: Get requestUserId from JWT token when authentication is implemented
+    @Query('requestUserId') requestUserId: string,
+  ) {
+    return this.organizationMembersService.update(
+      id,
+      updateOrganizationMemberDto,
+      requestUserId,
+    );
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Scope('ORGANIZATION', 'id')
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    // TODO: Get requestUserId from JWT token when authentication is implemented
+    @Query('requestUserId') requestUserId: string,
+  ) {
+    return this.organizationMembersService.remove(id, requestUserId);
   }
 
   @Get('user/:userId/organizations')
@@ -80,31 +106,5 @@ export class OrganizationMembersController {
       userId,
       organizationId,
     );
-  }
-
-  @Patch(':id')
-  @Scope('ORGANIZATION', 'id')
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateOrganizationMemberDto: UpdateOrganizationMemberDto,
-    // TODO: Get requestUserId from JWT token when authentication is implemented
-    @Query('requestUserId') requestUserId: string,
-  ) {
-    return this.organizationMembersService.update(
-      id,
-      updateOrganizationMemberDto,
-      requestUserId,
-    );
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @Scope('ORGANIZATION', 'id')
-  remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    // TODO: Get requestUserId from JWT token when authentication is implemented
-    @Query('requestUserId') requestUserId: string,
-  ) {
-    return this.organizationMembersService.remove(id, requestUserId);
   }
 }

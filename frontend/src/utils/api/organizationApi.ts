@@ -10,6 +10,7 @@ import {
   OrganizationRole,
   OrganizationSettings,
   OrganizationStats,
+  UpdateMemberRoleData,
   Workflow,
 } from "@/types";
 
@@ -79,11 +80,10 @@ export const organizationApi = {
 
       const finalOrganizationData = {
         name: organizationData.name.trim(),
-        slug: slug,
         description: organizationData.description?.trim() || "",
-        website: organizationData.website?.trim() || "",
         ownerId: currentUser.id,
         settings: organizationData.settings || defaultSettings,
+        ...(organizationData.website?.trim() && { website: organizationData.website.trim() })
       };
 
       const response = await api.post<Organization>(
@@ -159,6 +159,44 @@ export const organizationApi = {
       return response.data;
     } catch (error) {
       console.error("Update organization error:", error);
+      throw error;
+    }
+  },
+
+  updatedOrganizationMemberRole: async (
+    memberId: string,
+    updateData: UpdateMemberRoleData,
+    requestUserId: string
+  ): Promise<OrganizationMember> => {
+    try {
+      const response = await api.patch<OrganizationMember>(
+        `/organization-members/${memberId}?requestUserId=${requestUserId}`,
+        {
+          role: updateData.role,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Update organization member role error:", error);
+      throw error;
+    }
+  },
+
+  removeOrganizationMember: async (
+    memberId: string,
+    requestUserId: string
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      await api.delete(
+        `/organization-members/${memberId}?requestUserId=${requestUserId}`
+      );
+
+      return {
+        success: true,
+        message: "Member removed from organization successfully",
+      };
+    } catch (error) {
+      console.error("Delete organization member error:", error);
       throw error;
     }
   },

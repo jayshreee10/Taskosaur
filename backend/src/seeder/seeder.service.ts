@@ -14,12 +14,14 @@ import { TaskCommentsSeederService } from './task-comments.seeder.service';
 import { TaskDependenciesSeederService } from './task-dependencies.seeder.service';
 import { TaskWatchersSeederService } from './task-watchers.seeder.service';
 import { TimeEntriesSeederService } from './time-entries.seeder.service';
+import { AdminSeederService } from './admin-seeder.service';
 
 @Injectable()
 export class SeederService {
   constructor(
     private prisma: PrismaService,
     private systemUserSeeder: SystemUserSeederService,
+    private adminSeeder: AdminSeederService,
     private usersSeeder: UsersSeederService,
     private organizationsSeeder: OrganizationsSeederService,
     private workspacesSeeder: WorkspacesSeederService,
@@ -33,7 +35,7 @@ export class SeederService {
     private taskDependenciesSeeder: TaskDependenciesSeederService,
     private taskWatchersSeeder: TaskWatchersSeederService,
     private timeEntriesSeeder: TimeEntriesSeederService,
-  ) {}
+  ) { }
 
   async seedCoreModules() {
     console.log('🌱 Starting core modules seeding...');
@@ -117,6 +119,21 @@ export class SeederService {
       throw error;
     }
   }
+  async adminSeedModules() {
+    console.log('🌱 Starting admin modules seeding...');
+
+    try {
+      // 0. Seed Admin User (must be first)
+      const adminUser = await this.adminSeeder.seed();
+      console.log('✅ Admin user seeded');
+      return {
+        adminUser,
+      };
+    } catch (error) {
+      console.error('❌ Error seeding core modules:', error);
+      throw error;
+    }
+  }
 
   async clearCoreModules() {
     console.log('🧹 Clearing core modules...');
@@ -167,7 +184,9 @@ export class SeederService {
 
       // Clear system user last (in case other operations depend on it)
       await this.systemUserSeeder.clear();
-      console.log('✅ System user cleared');
+      await this.adminSeeder.clear();
+
+      console.log('✅ Admin user cleared');
 
       console.log('🎉 Core modules cleared successfully!');
     } catch (error) {

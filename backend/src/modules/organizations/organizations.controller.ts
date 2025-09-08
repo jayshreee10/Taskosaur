@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Scope } from 'src/common/decorator/scope.decorator';
@@ -10,6 +10,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorator/roles.decorator';
 import { Role } from '@prisma/client';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { ChartDataResponse, ChartType, GetChartsQueryDto } from './dto/get-charts-query.dto';
 
 
 @ApiBearerAuth('JWT-auth')
@@ -87,85 +88,80 @@ export class OrganizationsController {
     return this.organizationsService.getOrganizationStats(id);
   }
 
+  @Get(':id/charts')
+  @ApiOperation({
+    summary: 'Get organization charts data',
+    description: 'Retrieve multiple chart data types for an organization in a single request'
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Organization UUID',
+    type: 'string',
+    format: 'uuid'
+  })
+  @ApiQuery({
+    name: 'types',
+    description: 'Chart types to retrieve (can specify multiple)',
+    enum: ChartType,
+    isArray: true,
+    style: 'form',
+    explode: true,
+    example: [ChartType.KPI_METRICS, ChartType.PROJECT_PORTFOLIO]
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Organization chart data retrieved successfully',
+    schema: {
+      type: 'object',
+      additionalProperties: true,
+      example: {
+        'kpi-metrics': {
+          totalWorkspaces: 5,
+          activeWorkspaces: 4,
+          totalProjects: 12,
+          projectCompletionRate: 75.5
+        },
+        'project-portfolio': [
+          { status: 'ACTIVE', _count: { status: 10 } },
+          { status: 'COMPLETED', _count: { status: 5 } }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid chart type or missing parameters'
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Insufficient permissions to access organization data'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Organization not found'
+  })
+  @Scope('ORGANIZATION', 'id')
+  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async getOrganizationCharts(
+    @Param('id', ParseUUIDPipe) organizationId: string,
+    @Query() query: GetChartsQueryDto,
+    @CurrentUser() user: any,
+  ): Promise<ChartDataResponse> {
+    try {
+      const chartRes = await this.orgChartsService.getMultipleChartData(
+        organizationId,
+        user.id,
+        query.types)
+      return chartRes;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to retrieve chart data');
+    }
+  }
   // --- charts (read) ---
-  @Get(':id/charts/kpi-metrics')
-  @ApiOperation({ summary: 'Get organization KPI metrics' })
-  @ApiResponse({ status: 200, description: 'Organization KPI metrics retrieved successfully' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getKPIMetrics(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationKPIMetrics(id, user.id);
-  }
 
-  @Get(':id/charts/project-portfolio')
-  @ApiOperation({ summary: 'Get project portfolio status' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getProjectPortfolio(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationProjectPortfolio(id, user.id);
-  }
 
-  @Get(':id/charts/team-utilization')
-  @ApiOperation({ summary: 'Get team utilization metrics' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTeamUtilization(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationTeamUtilization(id, user.id);
-  }
-
-  @Get(':id/charts/task-distribution')
-  @ApiOperation({ summary: 'Get task priority distribution' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTaskDistribution(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationTaskDistribution(id, user.id);
-  }
-
-  @Get(':id/charts/task-type')
-  @ApiOperation({ summary: 'Get task type distribution' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTaskTypeDistribution(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationTaskTypeDistribution(id, user.id);
-  }
-
-  @Get(':id/charts/sprint-metrics')
-  @ApiOperation({ summary: 'Get sprint status metrics' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getSprintMetrics(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationSprintMetrics(id, user.id);
-  }
-
-  @Get(':id/charts/quality-metrics')
-  @ApiOperation({ summary: 'Get quality metrics' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getQualityMetrics(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationQualityMetrics(id, user.id);
-  }
-
-  @Get(':id/charts/workspace-project-count')
-  @ApiOperation({ summary: 'Get project count per workspace' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getWorkspaceProjectCount(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationWorkspaceProjectCount(id, user.id);
-  }
-
-  @Get(':id/charts/member-workload')
-  @ApiOperation({ summary: 'Get member workload distribution' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getMemberWorkload(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationMemberWorkload(id, user.id);
-  }
-
-  @Get(':id/charts/resource-allocation')
-  @ApiOperation({ summary: 'Get resource allocation matrix' })
-  @Scope('ORGANIZATION', 'id')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getResourceAllocation(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user) {
-    return this.orgChartsService.organizationResourceAllocation(id, user.id);
-  }
 }

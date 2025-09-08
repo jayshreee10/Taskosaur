@@ -676,6 +676,7 @@ getTasksByProject: async (projectId: string, organizationId: string): Promise<Ta
     workspaceId?: string;
     parentTaskId?: string;
     statuses?: string[];
+    search?: string;
     priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
   }): Promise<Task[]> => {
     try {
@@ -706,6 +707,9 @@ getTasksByProject: async (projectId: string, organizationId: string): Promise<Ta
       }
       if (params.statuses && params.statuses.length > 0) {
         queryParams.append("statuses", params.statuses.join(","));
+      }
+      if (params.search) {
+        queryParams.append("search", params.search);
       }
       if (params.priorities && params.priorities.length > 0) {
         queryParams.append("priorities", params.priorities.join(","));

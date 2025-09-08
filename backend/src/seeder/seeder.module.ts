@@ -15,6 +15,7 @@ import { TaskCommentsSeederService } from './task-comments.seeder.service';
 import { TaskDependenciesSeederService } from './task-dependencies.seeder.service';
 import { TaskWatchersSeederService } from './task-watchers.seeder.service';
 import { TimeEntriesSeederService } from './time-entries.seeder.service';
+import { AdminSeederService } from './admin-seeder.service';
 
 @Module({
   imports: [PrismaModule],
@@ -34,6 +35,7 @@ import { TimeEntriesSeederService } from './time-entries.seeder.service';
     TaskDependenciesSeederService,
     TaskWatchersSeederService,
     TimeEntriesSeederService,
+    AdminSeederService
   ],
   exports: [SeederService],
 })

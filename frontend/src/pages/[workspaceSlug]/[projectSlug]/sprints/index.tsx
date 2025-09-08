@@ -68,7 +68,7 @@ function SprintsPageContent() {
 
   const findProjectBySlug = (projects: any[], slug: string) => {
     return projects.find(
-      (project) => generateProjectSlug(project.name) === slug
+      (project) => project.slug === slug
     );
   };
 
@@ -275,16 +275,7 @@ function SprintsPageContent() {
               Create your first sprint to start organizing your work into
               focused iterations.
             </p>
-            <Button
-              onClick={() => {
-                setEditingSprint(null);
-                setIsSprintModalOpen(true);
-              }}
-              className="h-10 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--primary-foreground)] shadow-sm hover:shadow-md transition-all duration-200 font-medium flex items-center gap-2"
-            >
-              <HiPlus className="w-4 h-4" />
-              Create Your First Sprint
-            </Button>
+          
           </div>
         )}
 

@@ -243,3 +243,62 @@ export interface OrganizationActivity {
   metadata?: Record<string, any>;
   createdAt: string;
 }
+export enum ChartType {
+  KPI_METRICS = 'kpi-metrics',
+  PROJECT_PORTFOLIO = 'project-portfolio',
+  TEAM_UTILIZATION = 'team-utilization',
+  TASK_DISTRIBUTION = 'task-distribution',
+  TASK_TYPE = 'task-type',
+  SPRINT_METRICS = 'sprint-metrics',
+  QUALITY_METRICS = 'quality-metrics',
+  WORKSPACE_PROJECT_COUNT = 'workspace-project-count',
+  MEMBER_WORKLOAD = 'member-workload',
+  RESOURCE_ALLOCATION = 'resource-allocation'
+}
+
+// Type definitions for better type safety
+export interface ChartDataResponse {
+  [key: string]: any;
+}
+
+export interface KPIMetrics {
+  totalWorkspaces: number;
+  activeWorkspaces: number;
+  totalProjects: number;
+  activeProjects: number;
+  completedProjects: number;
+  totalMembers: number;
+  totalTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  totalBugs: number;
+  resolvedBugs: number;
+  activeSprints: number;
+  projectCompletionRate: number;
+  taskCompletionRate: number;
+  bugResolutionRate: number;
+  overallProductivity: number;
+}
+
+export interface QualityMetrics {
+  totalBugs: number;
+  resolvedBugs: number;
+  criticalBugs: number;
+  resolvedCriticalBugs: number;
+  bugResolutionRate: number;
+  criticalBugResolutionRate: number;
+}
+
+export interface WorkspaceProjectCount {
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  projectCount: number;
+}
+
+export interface MemberWorkload {
+  memberId: string;
+  memberName: string;
+  activeTasks: number;
+  reportedTasks: number;
+}

@@ -22,12 +22,14 @@ import {
 } from "@/components/ui/dialog";
 import ConfirmationModal from "@/components/modals/ConfirmationModal";
 import { toast } from "sonner";
-import { HiPlus, HiUsers, HiTrash } from "react-icons/hi2";
+import { HiPlus, HiUsers } from "react-icons/hi2";
 import { HiMail } from "react-icons/hi";
 import { invitationApi } from "@/utils/api/invitationsApi";
 import { OrganizationMember, OrganizationRole } from "@/types";
 import Tooltip from "../common/ToolTip";
 import { X } from "lucide-react";
+import { useOrganization } from "@/contexts/organization-context";
+import { useAuth } from "@/contexts/auth-context";
 
 interface OrganizationMembersProps {
   organizationId: string;
@@ -42,6 +44,9 @@ export default function OrganizationMembers({
   currentUserRole,
   onMembersChange,
 }: OrganizationMembersProps) {
+  const { updatedOrganizationMemberRole, removeOrganizationMember } =
+    useOrganization();
+  const { getCurrentUser } = useAuth();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [memberToRemove, setMemberToRemove] =
     useState<OrganizationMember | null>(null);
@@ -90,7 +95,17 @@ export default function OrganizationMembers({
     memberId: string,
     newRole: OrganizationRole
   ) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      toast.error("User not authenticated");
+      return;
+    }
     try {
+      await updatedOrganizationMemberRole(
+        memberId,
+        { role: newRole as any },
+        currentUser.id
+      );
       setIsLoading(true);
       toast.success("Member role updated successfully");
       onMembersChange();
@@ -103,7 +118,16 @@ export default function OrganizationMembers({
   };
 
   const handleRemoveMember = async (member: OrganizationMember) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      toast.error("User not authenticated");
+      return;
+    }
     try {
+      await removeOrganizationMember(
+        member.id,
+        currentUser.id
+      );
       setIsLoading(true);
       toast.success("Member removed successfully");
       setMemberToRemove(null);

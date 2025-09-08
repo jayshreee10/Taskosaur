@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useTask } from "@/contexts/task-context";
+import TaskProvider, { useTask } from "@/contexts/task-context";
 
 import { useProjectContext } from "@/contexts/project-context";
 import { NewTaskModal } from "@/components/tasks/NewTaskModal";
@@ -27,7 +27,10 @@ import {
 } from "@/components/common/FilterDropdown";
 import { CheckSquare, Flame, Building2, Folder } from "lucide-react";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
-import SortIngManager, { SortOrder, SortField } from "@/components/tasks/SortIngManager";
+import SortIngManager, {
+  SortOrder,
+  SortField,
+} from "@/components/tasks/SortIngManager";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState<T>(value);
@@ -53,7 +56,11 @@ function TasksPageContent() {
   const { getAllTasks, getAllTaskStatuses, isLoading: taskLoading } = useTask();
   const { getWorkspacesByOrganization, isLoading: workspaceLoading } =
     useWorkspaceContext();
-  const { getProjectsByOrganization, isLoading: projectLoading, getTaskStatusByProject } = useProjectContext();
+  const {
+    getProjectsByOrganization,
+    isLoading: projectLoading,
+    getTaskStatusByProject,
+  } = useProjectContext();
   const { getCurrentUser, getUserAccess } = useAuth();
   const currentOrganizationId = TokenManager.getCurrentOrgId();
 
@@ -127,12 +134,14 @@ function TasksPageContent() {
     const fetchStatusesForProject = async () => {
       if (selectedProjects.length === 1) {
         try {
-         
           const statuses = await getTaskStatusByProject(selectedProjects[0]);
           setAvailableStatuses(statuses || []);
           setStatusFilterEnabled(true);
         } catch (error) {
-          console.error('Failed to fetch statuses for selected project:', error);
+          console.error(
+            "Failed to fetch statuses for selected project:",
+            error
+          );
           setAvailableStatuses([]);
           setStatusFilterEnabled(false);
         }
@@ -214,8 +223,6 @@ function TasksPageContent() {
         }),
       };
 
-      
-
       const allTasks = await getAllTasks(currentOrganizationId, params);
       const normalizedTasks = allTasks.map(normalizeTaskStatus);
 
@@ -293,8 +300,6 @@ function TasksPageContent() {
     setColumns((prev) => prev.filter((col) => col.id !== columnId));
   };
 
-
-
   const handleFilterDropdownOpen = useCallback(() => {
     if (hasValidUserAndOrg) {
       // No need to call loadTaskStatuses here
@@ -308,7 +313,9 @@ function TasksPageContent() {
           setProjects(projectsData || []);
         } catch (error) {
           setError(
-            error instanceof Error ? error.message : "Failed to load filter data"
+            error instanceof Error
+              ? error.message
+              : "Failed to load filter data"
           );
         }
       })();
@@ -488,7 +495,8 @@ function TasksPageContent() {
         selectedIds: selectedWorkspaces,
         searchable: true,
         onToggle: toggleWorkspace,
-        onSelectAll: () => setSelectedWorkspaces(workspaceFilters.map((w) => w.id)),
+        onSelectAll: () =>
+          setSelectedWorkspaces(workspaceFilters.map((w) => w.id)),
         onClearAll: () => setSelectedWorkspaces([]),
       }),
       createSection({
@@ -510,8 +518,12 @@ function TasksPageContent() {
         selectedIds: selectedStatuses,
         searchable: false,
         onToggle: statusFilterEnabled ? toggleStatus : undefined,
-        onSelectAll: statusFilterEnabled ? () => setSelectedStatuses(statusFilters.map((s) => s.id)) : undefined,
-        onClearAll: statusFilterEnabled ? () => setSelectedStatuses([]) : undefined,
+        onSelectAll: statusFilterEnabled
+          ? () => setSelectedStatuses(statusFilters.map((s) => s.id))
+          : undefined,
+        onClearAll: statusFilterEnabled
+          ? () => setSelectedStatuses([])
+          : undefined,
         disabled: !statusFilterEnabled,
       }),
       createSection({
@@ -522,7 +534,8 @@ function TasksPageContent() {
         selectedIds: selectedPriorities,
         searchable: false,
         onToggle: togglePriority,
-        onSelectAll: () => setSelectedPriorities(priorityFilters.map((p) => p.id)),
+        onSelectAll: () =>
+          setSelectedPriorities(priorityFilters.map((p) => p.id)),
         onClearAll: () => setSelectedPriorities([]),
       }),
     ],
@@ -539,7 +552,7 @@ function TasksPageContent() {
       toggleProject,
       toggleStatus,
       togglePriority,
-      statusFilterEnabled
+      statusFilterEnabled,
     ]
   );
 
@@ -569,7 +582,11 @@ function TasksPageContent() {
       let aValue = a[sortField];
       let bValue = b[sortField];
       // Handle date fields
-      if (["createdAt", "updatedAt", "completedAt", "timeline"].includes(sortField)) {
+      if (
+        ["createdAt", "updatedAt", "completedAt", "timeline"].includes(
+          sortField
+        )
+      ) {
         aValue = aValue ? new Date(aValue).getTime() : 0;
         bValue = bValue ? new Date(bValue).getTime() : 0;
       }
@@ -617,7 +634,12 @@ function TasksPageContent() {
         return <div>Kanban Is only available on Project Level.</div>;
       default:
         return (
-          <TaskListView tasks={sortedTasks} projects={projects} columns={columns} showAddTaskRow={false}/>
+          <TaskListView
+            tasks={sortedTasks}
+            projects={projects}
+            columns={columns}
+            showAddTaskRow={false}
+          />
         );
     }
   };
@@ -630,7 +652,7 @@ function TasksPageContent() {
       {/* Sticky PageHeader */}
       <div className="sticky top-0 z-50">
         <PageHeader
-          icon={<HiClipboardList className="size-20px" />} 
+          icon={<HiClipboardList className="size-20px" />}
           title="My Tasks"
           description="Manage and track all your assigned tasks in one place."
           actions={
@@ -717,7 +739,6 @@ function TasksPageContent() {
               {currentView === "list" && (
                 <div className="flex items-center gap-2">
                   <SortIngManager
-                    
                     sortField={sortField}
                     sortOrder={sortOrder}
                     onSortFieldChange={setSortField}
@@ -762,5 +783,9 @@ function TasksPageContent() {
 }
 
 export default function TasksPage() {
-  return <TasksPageContent />;
+  return (
+    <TaskProvider>
+      <TasksPageContent />
+    </TaskProvider>
+  );
 }

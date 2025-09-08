@@ -16,13 +16,14 @@ interface TaskTypeChartProps {
 }
 
 export function TaskTypeChart({ data }: TaskTypeChartProps) {
-  const chartData = data.map(item => ({
+  const safeData = Array.isArray(data) ? data : [];
+  const chartData = safeData.map(item => ({
     name: chartConfig[item.type as keyof typeof chartConfig]?.label || item.type,
     value: item._count.type,
     color: chartConfig[item.type as keyof typeof chartConfig]?.color || "#8B5CF6"
-  }))
+  }));
 
-  // Sort data by task type for consistent ordering
+  
   const typeOrder = ["STORY", "TASK", "BUG", "FEATURE", "EPIC"];
   const sortedChartData = [...chartData].sort((a, b) => {
     return typeOrder.indexOf(a.name.toUpperCase()) - typeOrder.indexOf(b.name.toUpperCase());
@@ -58,7 +59,7 @@ export function TaskTypeChart({ data }: TaskTypeChartProps) {
             cursor={{ fill: 'rgba(0, 0, 0, 0.00)' }}
           />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-            {sortedChartData.map((entry, index) => (
+            {sortedChartData?.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Bar>

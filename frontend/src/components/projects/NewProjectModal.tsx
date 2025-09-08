@@ -270,17 +270,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     };
 
     await createProject(projectData);
-
-    // Call onProjectCreated callback if provided
-    if (onProjectCreated) {
-      try {
-        await onProjectCreated();
-      } catch (error) {
-        console.error("Failed to refresh projects list:", error);
-        // Continue with success flow even if refresh fails
-      }
-    }
-
     toast.success(`Project "${formData.name}" created successfully!`);
     handleClose();
     document.body.style.pointerEvents = "auto";

@@ -236,7 +236,7 @@ export default function TaskLabels({
             </div>
           </form>
         </div>
-      ) : hasAccess && labels.length > 0 ? (
+      ) : hasAccess ? (
         <ActionButton
           variant="outline"
           onClick={() => setIsAddingLabel(true)}

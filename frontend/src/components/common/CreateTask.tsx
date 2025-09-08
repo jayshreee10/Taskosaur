@@ -382,7 +382,7 @@ export default function CreateTask({
                   onChange={(e) =>
                     handleFormDataChange("dueDate", e.target.value)
                   }
-                  min={getToday()} // 👈 disable past dates
+                  min={getToday()}
                   className="w-full border-[var(--border)] bg-[var(--background)]"
                 />
               </div>

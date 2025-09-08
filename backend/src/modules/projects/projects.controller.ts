@@ -11,8 +11,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,12 +25,14 @@ import { LogActivity } from 'src/common/decorator/log-activity.decorator';
 import { Role } from '@prisma/client';
 import { Roles } from 'src/common/decorator/roles.decorator';
 import { Scope } from 'src/common/decorator/scope.decorator';
+import { ProjectChartsService } from './project-charts.service';
+import { GetProjectChartsQueryDto, ProjectChartDataResponse, ProjectChartType } from './dto/get-project-charts-query.dto';
 
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(private readonly projectsService: ProjectsService, private readonly projectChartsService: ProjectChartsService) { }
 
   // Create project - requires MANAGER/OWNER at workspace level
   @Post()
@@ -46,8 +50,22 @@ export class ProjectsController {
   // List all projects - filtered by user access
   @Get()
   @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  findAll(@CurrentUser() user: any, @Query('workspaceId') workspaceId?: string) {
-    return this.projectsService.findAll(workspaceId, user.id);
+  findAll(
+    @CurrentUser() user: any,
+    @Query('workspaceId') workspaceId?: string,
+    @Query('status') status?: string,
+    @Query('priority') priority?: string,
+    @Query('search') search?: string,
+    @Query('page') page = '1',
+    @Query('pageSize') pageSize = '10',
+  ) {
+    return this.projectsService.findAll(workspaceId, user.id, {
+      status,
+      priority,
+      search,
+      page: Number(page),
+      pageSize: Number(pageSize),
+    });
   }
 
   @Get('/by-organization')
@@ -61,6 +79,8 @@ export class ProjectsController {
     @Query('priority') priority?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+
   ) {
     const filters = {
       organizationId,
@@ -69,6 +89,7 @@ export class ProjectsController {
       priority,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 10,
+      search: search
     };
     return this.projectsService.findByOrganizationId(filters, user.id);
   }
@@ -174,42 +195,72 @@ export class ProjectsController {
   }
 
   // Chart endpoints - require project access
-  @Get(':slug/charts/task-status')
+@Get(':slug/charts')
+  @ApiOperation({ 
+    summary: 'Get project charts data',
+    description: 'Retrieve multiple project chart data types in a single request'
+  })
+  @ApiParam({
+    name: 'slug',
+    description: 'Project slug',
+    type: 'string'
+  })
+  @ApiQuery({
+    name: 'types',
+    description: 'Chart types to retrieve (can specify multiple)',
+    enum: ProjectChartType,
+    isArray: true,
+    style: 'form',
+    explode: true,
+    example: [ProjectChartType.KPI_METRICS, ProjectChartType.TASK_STATUS]
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Project chart data retrieved successfully',
+    schema: {
+      type: 'object',
+      additionalProperties: true,
+      example: {
+        'kpi-metrics': {
+          totalTasks: 45,
+          completedTasks: 32,
+          completionRate: 71.11
+        },
+        'task-status': [
+          { statusId: '1', count: 12, status: { name: 'To Do' } },
+          { statusId: '2', count: 8, status: { name: 'In Progress' } }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid chart type or missing parameters'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Project not found'
+  })
   @Scope('PROJECT', 'slug')
   @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTaskStatusFlow(@Param('slug') slug: string, @CurrentUser() user: any) {
-    return this.projectsService.projectTaskStatusFlow(slug, user.id);
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async getProjectCharts(
+    @Param('slug') projectSlug: string,
+    @Query() query: GetProjectChartsQueryDto,
+    @CurrentUser() user: any,
+  ): Promise<ProjectChartDataResponse> {
+    return this.projectChartsService.getMultipleProjectChartData(
+      projectSlug,
+      user.id,
+      query.types,
+    );
   }
 
-  @Get(':slug/charts/task-type')
-  @Scope('PROJECT', 'slug')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTaskTypeDistribution(@Param('slug') slug: string, @CurrentUser() user: any) {
-    return this.projectsService.projectTaskTypeDistribution(slug, user.id);
-  }
-
-  @Get(':slug/charts/kpi-metrics')
-  @Scope('PROJECT', 'slug')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getKPIMetrics(@Param('slug') slug: string, @CurrentUser() user: any) {
-    return this.projectsService.projectKPIMetrics(slug, user.id);
-  }
-
-  @Get(':slug/charts/task-priority')
-  @Scope('PROJECT', 'slug')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getTaskPriorityDistribution(@Param('slug') slug: string, @CurrentUser() user: any) {
-    return this.projectsService.projectTaskPriorityDistribution(slug, user.id);
-  }
-
-  @Get(':slug/charts/sprint-velocity')
-  @Scope('PROJECT', 'slug')
-  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
-  getSprintVelocityTrend(@Param('slug') slug: string, @CurrentUser() user: any) {
-    return this.projectsService.projectSprintVelocityTrend(slug, user.id);
-  }
-
+  // Keep sprint burndown separate due to sprintId parameter
   @Get(':slug/charts/sprint-burndown/:sprintId')
+  @ApiOperation({ summary: 'Get sprint burndown data' })
+  @ApiParam({ name: 'slug', description: 'Project slug' })
+  @ApiParam({ name: 'sprintId', description: 'Sprint UUID' })
   @Scope('PROJECT', 'slug')
   @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
   getSprintBurndown(
@@ -217,7 +268,7 @@ export class ProjectsController {
     @Param('sprintId', ParseUUIDPipe) sprintId: string,
     @CurrentUser() user: any,
   ) {
-    return this.projectsService.projectSprintBurndown(sprintId, slug, user.id);
+    return this.projectChartsService.projectSprintBurndown(sprintId, slug, user.id);
   }
 
   // Get project by slug

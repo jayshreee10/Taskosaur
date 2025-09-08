@@ -19,7 +19,7 @@ export default function OrgProviders({ children }: CommonProvidersProps) {
           <ProjectProvider>
             <div className="min-h-screen bg-[var(--background)] ">
               <div className="flex-1 flex flex-col overflow-hidden">
-                {router.pathname !== "/intro" && <Header />}
+                {/* <Header /> */}
                 <div className="flex-1 overflow-y-auto">{children}</div>
               </div>
               <Toaster />

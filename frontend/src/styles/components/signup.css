@@ -10,7 +10,7 @@
 }
 
 .signup-form-panel {
-  @apply w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12;
+  @apply w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 h-screen overflow-y-auto;
 }
 
 .signup-form-wrapper {

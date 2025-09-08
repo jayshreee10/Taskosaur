@@ -19,6 +19,7 @@ import {
   CreateTaskStatusFromProjectDto,
   UpdateTaskStatusDto,
   TaskStatus,
+  ProjectChartType,
 } from "@/types";
 
 interface AnalyticsData {
@@ -47,9 +48,20 @@ interface ProjectContextType extends ProjectState {
   listProjects: () => Promise<Project[]>;
   createProject: (projectData: ProjectData) => Promise<Project>;
   getProjectById: (projectId: string) => Promise<Project>;
-  getProjectsByWorkspace: (workspaceId: string) => Promise<Project[]>;
-    getProjectBySlug: (slug: string) => Promise<Project>;
-  archiveProject: (projectId: string) => Promise<{ success: boolean; message: string }>;
+  getProjectsByWorkspace: (
+    workspaceId: string,
+    filters?: {
+      status?: string;
+      priority?: string;
+      page?: number;
+      pageSize?: number;
+      search?: string;
+    }
+  ) => Promise<Project[]>;
+  getProjectBySlug: (slug: string) => Promise<Project>;
+  archiveProject: (
+    projectId: string
+  ) => Promise<{ success: boolean; message: string }>;
   getProjectsByOrganization: (
     organizationId: string,
     filters?: {
@@ -58,6 +70,7 @@ interface ProjectContextType extends ProjectState {
       priority?: string;
       page?: number;
       pageSize?: number;
+      search?: string;
     }
   ) => Promise<Project[]>;
 
@@ -118,8 +131,6 @@ interface ProjectContextType extends ProjectState {
   fetchAnalyticsData: (organizationId: string) => Promise<void>;
   clearAnalyticsError: () => void;
 }
-
-
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
@@ -192,39 +203,47 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           refreshingAnalytics: true,
         }));
 
-        const requests = [
-          projectApi.getTaskStatusFlow(projectSlug),
-          projectApi.getTaskTypeDistribution(projectSlug),
-          projectApi.getKPIMetrics(projectSlug),
-          projectApi.getTaskPriorityDistribution(projectSlug),
-          projectApi.getSprintVelocityTrend(projectSlug),
-        ];
+        const results = await projectApi.getAllCharts(projectSlug);
 
-        const results = await Promise.allSettled(requests);
+        // Process each chart and handle individual errors
+        const processChartData = (data: any, chartName: string) => {
+          if (!data) {
+            console.warn(`No data received for ${chartName}`);
+            return null;
+          }
+          if (data.error) {
+            console.error(`Error loading ${chartName}:`, data.error);
+            return null;
+          }
+          return data;
+        };
 
-        // Check if any requests failed
-        const failedRequests = results.filter(
-          (result) => result.status === "rejected"
-        );
-
-        if (failedRequests.length > 0) {
-          console.error("Some requests failed:", failedRequests);
-        }
-
-        const [taskStatus, taskType, kpiMetrics, taskPriority, sprintVelocity] =
-          results.map((result) =>
-            result.status === "fulfilled" ? result.value : null
-          );
+        const analyticsData = {
+          taskStatus: processChartData(
+            results[ProjectChartType.TASK_STATUS],
+            "Task Status"
+          ),
+          taskType: processChartData(
+            results[ProjectChartType.TASK_TYPE],
+            "Task Type"
+          ),
+          kpiMetrics: processChartData(
+            results[ProjectChartType.KPI_METRICS],
+            "KPI Metrics"
+          ),
+          taskPriority: processChartData(
+            results[ProjectChartType.TASK_PRIORITY],
+            "Task Priority"
+          ),
+          sprintVelocity: processChartData(
+            results[ProjectChartType.SPRINT_VELOCITY],
+            "Sprint Velocity"
+          ),
+        };
 
         setProjectState((prev) => ({
           ...prev,
-          analyticsData: {
-            taskStatus,
-            taskType,
-            kpiMetrics,
-            taskPriority,
-            sprintVelocity,
-          },
+          analyticsData,
           analyticsLoading: false,
           refreshingAnalytics: false,
         }));
@@ -233,7 +252,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : "Failed to load organization analytics data";
+            : "Failed to load project analytics data";
 
         setProjectState((prev) => ({
           ...prev,
@@ -245,6 +264,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
     },
     []
   );
+
   // Memoized context value
   const contextValue = useMemo(
     () => ({
@@ -296,7 +316,10 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         return result;
       },
       getProjectBySlug: async (slug: string): Promise<Project> => {
-        const result = await handleApiOperation(() => projectApi.getProjectBySlug(slug), false);
+        const result = await handleApiOperation(
+          () => projectApi.getProjectBySlug(slug),
+          false
+        );
         // Optionally update currentProject if slug matches
         setProjectState((prev) => ({
           ...prev,
@@ -312,6 +335,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           priority?: string;
           page?: number;
           pageSize?: number;
+          search?: string;
         }
       ): Promise<Project[]> => {
         const result = await handleApiOperation(() =>
@@ -326,10 +350,17 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         return result;
       },
       getProjectsByWorkspace: async (
-        workspaceId: string
+        workspaceId: string,
+        filters?: {
+          status?: string;
+          priority?: string;
+          page?: number;
+          pageSize?: number;
+          search?: string;
+        }
       ): Promise<Project[]> => {
         const result = await handleApiOperation(() =>
-          projectApi.getProjectsByWorkspace(workspaceId)
+          projectApi.getProjectsByWorkspace(workspaceId, filters)
         );
 
         setProjectState((prev) => ({

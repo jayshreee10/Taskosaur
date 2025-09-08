@@ -104,7 +104,7 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, swaggerOptions);
   SwaggerModule.setup(swaggerConfig.path, app, document);
-
+  
   if (useUnixSocket) {
     // Ensure socket directory exists
     const socketDir = join(unixSocketPath, '..');

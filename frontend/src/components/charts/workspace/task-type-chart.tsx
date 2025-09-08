@@ -16,7 +16,7 @@ interface TaskTypeChartProps {
 }
 
 export function TaskTypeChart({ data }: TaskTypeChartProps) {
-  const chartData = data.map((item) => ({
+  const chartData = data?.map((item) => ({
     name:
       chartConfig[item.type as keyof typeof chartConfig]?.label || item.type,
     value: item._count.type,
@@ -73,7 +73,7 @@ export function TaskTypeChart({ data }: TaskTypeChartProps) {
             paddingAngle={2}
             dataKey="value"
           >
-            {chartData.map((entry, index) => (
+            {chartData?.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>

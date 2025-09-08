@@ -82,7 +82,7 @@ export class TaskAttachmentsController {
       storage: multer.diskStorage({
         destination: (req, file, cb) => {
           const taskId = req.params.taskId;
-          const uploadPath = process.env.UPLOAD_PATH || './uploads';
+          const uploadPath = process.env.UPLOAD_DEST || './uploads';
           const taskDir = path.join(uploadPath, taskId);
 
           // Create directory if it doesn't exist

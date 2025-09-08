@@ -126,6 +126,7 @@ export class TasksService {
     priorities?: string[],
     statuses?: string[],
     userId?: string,
+    search?: string,
   ): Promise<Task[]> {
     if (!userId) {
       throw new ForbiddenException('User context required');
@@ -212,6 +213,12 @@ export class TasksService {
       whereClause.statusId = { in: statuses };
     }
 
+    if (search && search?.trim()) {
+      whereClause.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     if (!isElevated) {
       whereClause.OR = [

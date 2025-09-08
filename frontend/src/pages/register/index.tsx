@@ -15,7 +15,6 @@ export default function SignUpPage() {
 
   return (
     <AuthRedirect redirectTo={redirectTo}>
-      <div className="min-h-screen bg-[var(--background)]">
         <div className="signup-container">
           {/* Left Content Section - Exactly 50% */}
           <div className="signup-content-panel">
@@ -31,7 +30,6 @@ export default function SignUpPage() {
             </div>
           </div>
         </div>
-      </div>
     </AuthRedirect>
   );
 }

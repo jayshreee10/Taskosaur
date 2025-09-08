@@ -40,11 +40,14 @@ export function EntityCard({
             </p>
           )}
         </div>
-        <div className="inline-flex items-center px-2 py-1 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] text-xs font-medium">
-          {role?.replace("_", " ")
-            .toLowerCase()
-            .replace(/\b\w/g, (l) => l.toUpperCase())}
-        </div>
+        {role && (
+          <div className="inline-flex items-center px-2 py-1 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] text-xs font-medium">
+            {role
+              ?.replace("_", " ")
+              .toLowerCase()
+              .replace(/\b\w/g, (l) => l.toUpperCase())}
+          </div>
+        )}
       </div>
 
       {/* Description */}

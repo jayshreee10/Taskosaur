@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { usePathname } from "next/navigation";
 import { getSidebarCollapsedState } from "@/utils/sidebarUtils";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import OrganizationSelector from "../header/OrganizationSelector";
@@ -9,13 +8,12 @@ import NotificationDropdown from "../header/NotificationDropdown";
 import { ModeToggle } from "../header/ModeToggle";
 import { useAuth } from "@/contexts/auth-context";
 import { useChatContext } from "@/contexts/chat-context";
-
+import { useRouter } from "next/router";
 import {
   HiPlus,
   HiChevronDown,
   HiCommandLine,
   HiRocketLaunch,
-  HiSparkles,
   HiChatBubbleLeftRight,
 } from "react-icons/hi2";
 import { Button } from "@/components/ui/button";
@@ -31,6 +29,7 @@ import NewWorkspaceDialog from "../workspace/NewWorkspaceDialogProps";
 import { NewTaskModal } from "@/components/tasks/NewTaskModal";
 
 export default function Header() {
+  const router = useRouter();
   const { getCurrentOrganizationId } = useWorkspaceContext();
   const { getUserAccess } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
@@ -39,7 +38,6 @@ export default function Header() {
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
   const [hasOrganizationAccess, setHasOrganizationAccess] = useState(false);
   const [isWorkspaceDialogOpen, setIsWorkspaceDialogOpen] = useState(false);
-  const pathname = usePathname();
   const { getCurrentUser, logout, checkOrganizationAndRedirect } = useAuth();
   const { getWorkspacesByOrganization } = useWorkspaceContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -59,7 +57,6 @@ export default function Header() {
     }
   }, []);
 
-
   useEffect(() => {
     if (!currentOrganizationId) return;
     getUserAccess({ name: "organization", id: currentOrganizationId })
@@ -78,7 +75,7 @@ export default function Header() {
 
       if (user?.id) {
         const redirectPath = await checkOrganizationAndRedirect();
-        setHasOrganizationAccess(redirectPath !== "/intro");
+        setHasOrganizationAccess(redirectPath !== "/organization");
       }
     };
 
@@ -88,7 +85,7 @@ export default function Header() {
   // Check AI enabled status
   useEffect(() => {
     const checkAIStatus = () => {
-      const aiEnabled = localStorage.getItem('aiEnabled') === 'true';
+      const aiEnabled = localStorage.getItem("aiEnabled") === "true";
       setIsAIEnabled(aiEnabled);
     };
 
@@ -100,13 +97,19 @@ export default function Header() {
       setIsAIEnabled(event.detail.aiEnabled);
     };
 
-    window.addEventListener('aiSettingsChanged', handleAISettingsChange as EventListener);
+    window.addEventListener(
+      "aiSettingsChanged",
+      handleAISettingsChange as EventListener
+    );
 
     return () => {
-      window.removeEventListener('aiSettingsChanged', handleAISettingsChange as EventListener);
+      window.removeEventListener(
+        "aiSettingsChanged",
+        handleAISettingsChange as EventListener
+      );
     };
   }, []);
-
+  const pathname = router.pathname;
   const pathParts = pathname?.split("/").filter(Boolean);
 
   const getContextLevel = () => {

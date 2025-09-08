@@ -25,6 +25,7 @@ import UserAvatar from "../ui/avatars/UserAvatar";
 import { Badge } from "../ui";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import TaskActivities from "./TaskActivities";
+import { TaskPriorities } from "@/utils/data/taskData";
 interface TaskDetailClientProps {
   task: any;
   taskId: string;
@@ -37,7 +38,7 @@ interface TaskDetailClientProps {
 
 const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
   <div className="flex items-center gap-2 mb-4">
-      <Icon size={16} className="text-[var(--primary)]" />
+    <Icon size={16} className="text-[var(--primary)]" />
     <h2 className="text-sm font-semibold text-[var(--foreground)]">{title}</h2>
   </div>
 );
@@ -109,8 +110,10 @@ export default function TaskDetailClient({
     dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
   });
 
-  const [assignee, setAssignee] = useState(task.assignee);
-  const [reporter, setReporter] = useState(task.reporter);
+  const [assignment, setAssignment] = useState({
+    assignee: task.assignee,
+    reporter: task.reporter,
+  });
 
   const [labels, setLabels] = useState(task.labels || task.tags || []);
   const [availableLabels, setAvailableLabels] = useState<any[]>([]);
@@ -128,9 +131,11 @@ export default function TaskDetailClient({
   const [hasAccess, setHasAccess] = useState(false);
   const [hasAccessLoaded, setHasAccessLoaded] = useState(false);
 
+  const today = new Date().toISOString().split("T")[0];
   // Exception: Assignee or reporter has access to all actions except Assignment section
   const isAssigneeOrReporter =
-    currentUser?.id === assignee?.id || currentUser?.id === reporter?.id;
+    currentUser?.id === assignment.assignee?.id ||
+    currentUser?.id === assignment.reporter?.id;
 
   const handleStatusChange = async (item: any) => {
     if (!item) return;
@@ -145,50 +150,6 @@ export default function TaskDetailClient({
       toast.success("Task status updated successfully.");
     } catch (error) {
       toast.error("Failed to update task status. Please try again.");
-    }
-  };
-
-  enum TaskPriority {
-    LOWEST = "LOWEST",
-    LOW = "LOW",
-    MEDIUM = "MEDIUM",
-    HIGH = "HIGH",
-    HIGHEST = "HIGHEST",
-  }
-
-  const getStatusConfig = (status: any) => {
-    const statusName = typeof status === "object" ? status?.name : status;
-    switch (statusName?.toLowerCase()) {
-      case "done":
-      case "completed":
-        return "#10B981";
-      case "in progress":
-      case "in_progress":
-        return "#3B82F6";
-      case "review":
-        return "#8B5CF6";
-      case "todo":
-      case "to do":
-        return "#364153";
-      default:
-        return "#6B7280";
-    }
-  };
-
-  const getPriorityConfig = (priority: any) => {
-    const priorityName =
-      typeof priority === "object" ? priority?.name : priority;
-    switch (priorityName?.toLowerCase()) {
-      case "highest":
-        return "#EF4444";
-      case "high":
-        return "#F97316";
-      case "medium":
-        return "#F59E0B";
-      case "low":
-        return "#10B981";
-      default:
-        return "#6B7280";
     }
   };
 
@@ -231,22 +192,30 @@ export default function TaskDetailClient({
     fetchProjectMembers();
   }, [task.projectId, task.project?.id]);
 
-  const generateProjectSlug = (projectName: string) => {
-    if (!projectName) return "";
+  const handleDueDateChange = async (newDueDate: string) => {
+    try {
+      const updateData: UpdateTaskRequest = {
+        dueDate: newDueDate
+          ? new Date(newDueDate + "T23:59:59.999Z").toISOString()
+          : undefined,
+      };
 
-    return projectName
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "");
+      await updateTask(taskId, updateData);
+      handleTaskFieldChange("dueDate", newDueDate);
+
+      // Update the task object's dueDate
+      task.dueDate = newDueDate
+        ? new Date(newDueDate + "T23:59:59.999Z").toISOString()
+        : null;
+
+      toast.success("Task due date updated successfully.");
+    } catch (error) {
+      toast.error("Failed to update task due date.");
+    }
   };
 
   const findProjectBySlug = (projects: any[], slug: string) => {
-    return projects.find(
-      (project) => generateProjectSlug(project.name) === slug
-    );
+    return projects.find((project) => project.slug === slug);
   };
 
   useEffect(() => {
@@ -349,7 +318,10 @@ export default function TaskDetailClient({
           name: folderName,
           id: folderId,
         });
-
+        console.log(
+          "hasAccess",
+          accessData?.canChange || isAssigneeOrReporter || false
+        );
         // Main logic: access from API, but override for assignee/reporter
         setHasAccess(accessData?.canChange || isAssigneeOrReporter || false);
         setHasAccessLoaded(true);
@@ -507,171 +479,6 @@ export default function TaskDetailClient({
     }
   };
 
-  const handleDeleteAttachment = (attachmentId: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!currentUser?.id) {
-        toast.error("You must be logged in to delete attachments.");
-        resolve();
-        return;
-      }
-
-      setConfirmModal({
-        isOpen: true,
-        title: "Delete Attachment",
-        message:
-          "Are you sure you want to delete this attachment? This action cannot be undone.",
-        type: "danger",
-        onConfirm: async () => {
-          try {
-            await deleteAttachment(attachmentId, currentUser.id);
-            const updatedAttachments = await getTaskAttachments(taskId);
-            setAttachments(updatedAttachments || []);
-            toast.success("Attachment deleted successfully.");
-          } catch (error) {
-            toast.error("Failed to delete attachment. Please try again.");
-          }
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-          resolve();
-        },
-      });
-    });
-  };
-
-  const handleEditTask = () => {
-    setIsEditingTask(true);
-  };
-
-  const handleSaveTaskEdit = async (
-    e?: React.FormEvent,
-    updatedDescription?: string
-  ) => {
-    e?.preventDefault();
-
-    const descriptionToSave = updatedDescription || editTaskData.description;
-
-    if (!editTaskData?.title?.trim()) {
-      toast.error("Task title cannot be empty.");
-      return;
-    }
-
-    try {
-      const updatedTask = await updateTask(taskId, {
-        title: editTaskData?.title?.trim(),
-        description: descriptionToSave?.trim(),
-        priority: editTaskData.priority || "MEDIUM",
-        startDate: task.startDate || new Date().toISOString(),
-        dueDate: editTaskData.dueDate
-          ? new Date(editTaskData.dueDate + "T23:59:59.999Z").toISOString()
-          : undefined,
-        remainingEstimate: task.remainingEstimate || 0,
-        assigneeId: assignee?.id || task.assigneeId,
-        reporterId: reporter?.id || task.reporterId,
-        statusId: task.status?.id || task.statusId,
-        projectId: task.projectId || task.project?.id,
-      });
-
-      Object.assign(task, updatedTask);
-      setIsEditingTask(false);
-      toast.success("Task updated successfully.");
-    } catch (error) {
-      toast.error("Failed to update the task. Please try again.");
-    }
-  };
-
-  const handleCheckboxSave = (newValue: string) => {
-    handleTaskFieldChange("description", newValue);
-    handleSaveTaskEdit(undefined, newValue);
-  };
-
-  const handleCancelTaskEdit = () => {
-    const hasChanges =
-      editTaskData.title !== task.title ||
-      editTaskData.description !== task.description ||
-      editTaskData.dueDate !== (task.dueDate ? task.dueDate.split("T")[0] : "");
-
-    if (hasChanges) {
-      setConfirmModal({
-        isOpen: true,
-        title: "Discard Changes",
-        message: "Are you sure you want to discard your changes?",
-        type: "info",
-        onConfirm: () => {
-          setEditTaskData({
-            title: task.title,
-            description: task.description,
-            priority:
-              typeof task.priority === "object"
-                ? task.priority?.name
-                : task.priority,
-            dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
-          });
-          setIsEditingTask(false);
-          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        },
-      });
-    } else {
-      setIsEditingTask(false);
-    }
-  };
-
-  const handleTaskFieldChange = (field: string, value: string) => {
-    setEditTaskData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleDeleteTask = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: "Delete Task",
-      message:
-        "Are you sure you want to delete this task? This action cannot be undone.",
-      type: "danger",
-      onConfirm: async () => {
-        try {
-          await deleteTask(taskId);
-          toast.success("Task deleted successfully.");
-
-          onTaskRefetch && onTaskRefetch();
-          if (open === "modal") {
-            onClose && onClose();
-          } else {
-            router.back();
-          }
-        } catch (error) {
-          toast.error("Failed to delete the task. Please try again.");
-        }
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-      },
-    });
-  };
-
-  const handleAssigneeChange = async (item: any) => {
-    try {
-      // Extract user ID from ProjectMember structure
-      const userId = item?.user?.id || item?.id || null;
-      await updateTask(taskId, {
-        assigneeId: userId,
-      });
-      setAssignee(item);
-      toast.success("Assignee updated successfully.");
-    } catch (error) {
-      toast.error("Failed to update assignee. Please try again.");
-    }
-  };
-
-  const handleReporterChange = async (item: any) => {
-    try {
-      // Extract user ID from ProjectMember structure
-      const userId = item?.user?.id || item?.id || null;
-      await updateTask(taskId, {
-        reporterId: userId,
-      });
-      setReporter(item);
-      toast.success("Reporter updated successfully.");
-    } catch (error) {
-      toast.error("Failed to update reporter. Please try again.");
-    }
-  };
-
   const handleDownloadAttachment = async (
     attachmentId: string,
     fileName: string
@@ -762,6 +569,188 @@ export default function TaskDetailClient({
     }
   };
 
+  const handleDeleteAttachment = (attachmentId: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!currentUser?.id) {
+        toast.error("You must be logged in to delete attachments.");
+        resolve();
+        return;
+      }
+
+      setConfirmModal({
+        isOpen: true,
+        title: "Delete Attachment",
+        message:
+          "Are you sure you want to delete this attachment? This action cannot be undone.",
+        type: "danger",
+        onConfirm: async () => {
+          try {
+            await deleteAttachment(attachmentId, currentUser.id);
+            const updatedAttachments = await getTaskAttachments(taskId);
+            setAttachments(updatedAttachments || []);
+            toast.success("Attachment deleted successfully.");
+          } catch (error) {
+            toast.error("Failed to delete attachment. Please try again.");
+          }
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          resolve();
+        },
+      });
+    });
+  };
+
+  const handleEditTask = () => {
+    setIsEditingTask(true);
+  };
+
+  const handleSaveTaskEdit = async (
+    e?: React.FormEvent,
+    updatedDescription?: string
+  ) => {
+    e?.preventDefault();
+
+    const descriptionToSave = updatedDescription || editTaskData.description;
+
+    if (!editTaskData?.title?.trim()) {
+      toast.error("Task title cannot be empty.");
+      return;
+    }
+
+    try {
+      const updatedTask = await updateTask(taskId, {
+        title: editTaskData?.title?.trim(),
+        description: descriptionToSave?.trim(),
+        priority: editTaskData.priority || "MEDIUM",
+        startDate: task.startDate || new Date().toISOString(),
+        dueDate: editTaskData.dueDate
+          ? new Date(editTaskData.dueDate + "T23:59:59.999Z").toISOString()
+          : undefined,
+        remainingEstimate: task.remainingEstimate || 0,
+        assigneeId: assignment.assignee?.id || task.assigneeId,
+        reporterId: assignment.reporter?.id || task.reporterId,
+        statusId: task.status?.id || task.statusId,
+        projectId: task.projectId || task.project?.id,
+      });
+
+      Object.assign(task, updatedTask);
+      setIsEditingTask(false);
+      toast.success("Task updated successfully.");
+    } catch (error) {
+      toast.error("Failed to update the task. Please try again.");
+    }
+  };
+
+  const handleCheckboxSave = (newValue: string) => {
+    handleTaskFieldChange("description", newValue);
+    handleSaveTaskEdit(undefined, newValue);
+  };
+
+  const handleCancelTaskEdit = () => {
+    const hasChanges =
+      editTaskData.title !== task.title ||
+      editTaskData.description !== task.description ||
+      editTaskData.dueDate !== (task.dueDate ? task.dueDate.split("T")[0] : "");
+
+    if (hasChanges) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Discard Changes",
+        message: "Are you sure you want to discard your changes?",
+        type: "info",
+        onConfirm: () => {
+          setEditTaskData({
+            title: task.title,
+            description: task.description,
+            priority:
+              typeof task.priority === "object"
+                ? task.priority?.name
+                : task.priority,
+            dueDate: task.dueDate ? task.dueDate.split("T")[0] : "",
+          });
+          setIsEditingTask(false);
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    } else {
+      setIsEditingTask(false);
+    }
+  };
+
+  const handleTaskFieldChange = (field: string, value: string) => {
+    setEditTaskData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDeleteTask = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Task",
+      message:
+        "Are you sure you want to delete this task? This action cannot be undone.",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteTask(taskId);
+          toast.success("Task deleted successfully.");
+
+          onTaskRefetch && onTaskRefetch();
+          if (open === "modal") {
+            onClose && onClose();
+          } else {
+            router.back();
+          }
+        } catch (error) {
+          toast.error("Failed to delete the task. Please try again.");
+        }
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  const handleAssignmentChange = async (
+    item: any,
+    type: "assignee" | "reporter"
+  ) => {
+    try {
+      const userId = item?.user?.id || item?.id || null;
+      const updateData =
+        type === "assignee" ? { assigneeId: userId } : { reporterId: userId };
+      await updateTask(taskId, updateData);
+      setAssignment((prev) => ({ ...prev, [type]: item }));
+
+      toast.success(
+        type === "assignee"
+          ? "Assignee updated successfully."
+          : "Reporter updated successfully."
+      );
+    } catch (error) {
+      toast.error(
+        type === "assignee"
+          ? "Failed to update assignee. Please try again."
+          : "Failed to update reporter. Please try again."
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (projectMembers.length > 0) {
+      let updatedAssignee = assignment.assignee;
+      let updatedReporter = assignment.reporter;
+      if (task.assigneeId) {
+        const foundAssignee = projectMembers.find(
+          (member) => member.id === task.assigneeId
+        );
+        if (foundAssignee) updatedAssignee = foundAssignee;
+      }
+      if (task.reporterId) {
+        const foundReporter = projectMembers.find(
+          (member) => member.id === task.reporterId
+        );
+        if (foundReporter) updatedReporter = foundReporter;
+      }
+      setAssignment({ assignee: updatedAssignee, reporter: updatedReporter });
+    }
+  }, [projectMembers, task.assigneeId, task.reporterId]);
+
   const detailUrl =
     workspaceSlug && projectSlug
       ? `/${workspaceSlug}/${projectSlug}/tasks/${task.id}`
@@ -769,66 +758,96 @@ export default function TaskDetailClient({
       ? `/${workspaceSlug}/tasks/${task.id}`
       : `/tasks/${task.id}`;
 
+  function getPriorityBgColor(priority: any): string {
+    if (typeof priority === "object") {
+      if (typeof priority.name === "string") {
+        const found = TaskPriorities.find(
+          (p) =>
+            p.name.toLowerCase() === priority.name.toLowerCase() ||
+            p.id === priority.name
+        );
+        return found?.color || "#6B7280";
+      }
+      return priority.name?.color || "#6B7280";
+    }
+
+    if (typeof priority === "string") {
+      const found = TaskPriorities.find(
+        (p) =>
+          p.name.toLowerCase() === priority.toLowerCase() || p.id === priority
+      );
+      return found?.color || "#6B7280";
+    }
+    return "#6B7280";
+  }
+
   return (
     <div className="dashboard-container pt-0">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-md font-bold text-[var(--foreground)]">
-                {task.title}
-              </h1>
-              <div className="flex items-center gap-2">
-                <DynamicBadge
-                  label={
-                    typeof task.status === "object"
-                      ? task.status?.name || "Unknown"
-                      : task.status
-                  }
-                  bgColor={getStatusConfig(task.status)}
-                  size="sm"
-                />
-                <DynamicBadge
-                  label={`${
-                    typeof task.priority === "object"
-                      ? task.priority?.name || "Unknown"
-                      : task.priority
-                  } Priority`}
-                  bgColor={getPriorityConfig(task.priority)}
-                  size="sm"
-                />
-                {open === "modal" && (
-                  <Tooltip content="Expand to full screen" position="right">
-                    <div onClick={() => router.push(detailUrl)}>
-                      <Maximize2 className="w-7 h-7 pl-2 cursor-pointer" />
-                    </div>
-                  </Tooltip>
-                )}
-              </div>
+          <div className="flex items-center gap-4">
+            <h1 className="text-md font-bold text-[var(--foreground)]">
+              {task.title}
+            </h1>
+            <div className="flex items-center gap-2">
+              <DynamicBadge
+                label={
+                  typeof task.status === "object"
+                    ? typeof task.status.name === "string"
+                      ? task.status.name
+                      : task.status.name?.name || "Unknown"
+                    : task.status || "Unknown"
+                }
+                bgColor={
+                  task.status?.color || task.status?.name?.color || "#6B7280"
+                }
+                size="sm"
+              />
+              <DynamicBadge
+                label={`${
+                  typeof task.priority === "object"
+                    ? typeof task.priority.name === "string"
+                      ? task.priority.name
+                      : task.priority.name?.name || "Unknown"
+                    : task.priority || "Unknown"
+                } Priority`}
+                bgColor={getPriorityBgColor(task.priority)}
+                size="sm"
+              />
+
+              {open === "modal" && (
+                <Tooltip content="Expand to full screen" position="right">
+                  <div onClick={() => router.push(detailUrl)}>
+                    <Maximize2 className="w-7 h-7 pl-2 cursor-pointer" />
+                  </div>
+                </Tooltip>
+              )}
             </div>
-            {task.createdBy === currentUser?.id && (
-              <div className=" flex gap-2">
-                <Tooltip content="Edit task" position="left">
-                  <ActionButton
-                    onClick={handleEditTask}
-                    variant="outline"
-                    secondary
-                    className="cursor-pointer justify-center px-3"
-                  >
-                    <HiPencil className="w-4 h-4" />
-                  </ActionButton>
-                </Tooltip>
-                <Tooltip content="Delete task" position="left">
-                  <ActionButton
-                    onClick={handleDeleteTask}
-                    variant="outline"
-                    className="justify-center cursor-pointer border-none bg-[var(--destructive)]/5 hover:bg-[var(--destructive)]/10 text-[var(--destructive)]"
-                  >
-                    <HiTrash className="w-4 h-4" />
-                  </ActionButton>
-                </Tooltip>
-              </div>
-            )}
           </div>
+          {task.createdBy === currentUser?.id && (
+            <div className=" flex gap-2">
+              <Tooltip content="Edit task" position="left">
+                <ActionButton
+                  onClick={handleEditTask}
+                  variant="outline"
+                  secondary
+                  className="cursor-pointer justify-center px-3"
+                >
+                  <HiPencil className="w-4 h-4" />
+                </ActionButton>
+              </Tooltip>
+              <Tooltip content="Delete task" position="left">
+                <ActionButton
+                  onClick={handleDeleteTask}
+                  variant="outline"
+                  className="justify-center cursor-pointer border-none bg-[var(--destructive)]/5 hover:bg-[var(--destructive)]/10 text-[var(--destructive)]"
+                >
+                  <HiTrash className="w-4 h-4" />
+                </ActionButton>
+              </Tooltip>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 ">
           <div className="lg:col-span-2 space-y-6">
@@ -932,19 +951,9 @@ export default function TaskDetailClient({
                           editTaskData.priority?.charAt(0).toUpperCase() +
                             editTaskData.priority?.slice(1).toLowerCase() ||
                           "Medium",
-                        color: getPriorityConfig(
-                          editTaskData.priority || "MEDIUM"
-                        ),
+                        color: task.priority?.color || "#F59E0B",
                       }}
-                      availableItems={["LOW", "MEDIUM", "HIGH", "HIGHEST"].map(
-                        (priority) => ({
-                          id: priority,
-                          name:
-                            priority.charAt(0) +
-                            priority.slice(1).toLowerCase(),
-                          color: getPriorityConfig(priority),
-                        })
-                      )}
+                      availableItems={TaskPriorities}
                       loading={false}
                       onItemSelect={async (item) => {
                         try {
@@ -1020,6 +1029,44 @@ export default function TaskDetailClient({
                     </Badge>
                   )}
                 </div>
+
+                <div>
+                  <Label className="text-sm mb-2 block">Due Date</Label>
+                  {hasAccess ? (
+                    <div className="relative">
+                      <Input
+                        type="date"
+                        value={editTaskData.dueDate}
+                        min={today}
+                        onChange={(e) => handleDueDateChange(e.target.value)}
+                        className="text-xs bg-[var(--background)] border-[var(--border)] w-full cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        placeholder="Select due date..."
+                      />
+                      {editTaskData.dueDate && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDueDateChange("");
+                          }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-xs z-10"
+                          title="Clear due date"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-[var(--muted)] border-[var(--border)] ml-auto flex-shrink-0"
+                    >
+                      {editTaskData.dueDate
+                        ? new Date(editTaskData.dueDate).toLocaleDateString()
+                        : "No due date"}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1030,12 +1077,14 @@ export default function TaskDetailClient({
                 <div>
                   <Label className="text-sm mb-2 block">Assignee</Label>
                   {/* Assignment section: Only allow if hasAccess and NOT assignee/reporter exception */}
-                  {hasAccess && !isAssigneeOrReporter ? (
+                  {hasAccess ? (
                     <DropdownAction
-                      currentItem={assignee}
+                      currentItem={assignment.assignee}
                       availableItems={projectMembers}
                       loading={loadingMembers}
-                      onItemSelect={handleAssigneeChange}
+                      onItemSelect={(item) =>
+                        handleAssignmentChange(item, "assignee")
+                      }
                       placeholder="Select assignee..."
                       showUnassign={true}
                       hideAvatar={false}
@@ -1060,19 +1109,19 @@ export default function TaskDetailClient({
                     />
                   ) : (
                     <div className="flex items-center gap-3">
-                      {assignee?.id ? (
+                      {assignment.assignee?.id ? (
                         <UserAvatar
                           user={{
-                            firstName: assignee.firstName || "",
-                            lastName: assignee.lastName || "",
-                            avatar: assignee.avatar,
+                            firstName: assignment.assignee.firstName || "",
+                            lastName: assignment.assignee.lastName || "",
+                            avatar: assignment.assignee.avatar,
                           }}
                           size="sm"
                         />
-                      ) : assignee?.color ? (
+                      ) : assignment.assignee?.color ? (
                         <div
                           className="w-6 h-6 rounded-full flex items-center justify-center"
-                          style={{ backgroundColor: assignee.color }}
+                          style={{ backgroundColor: assignment.assignee.color }}
                         >
                           <div className="w-3 h-3 bg-white rounded-full opacity-80" />
                         </div>
@@ -1083,10 +1132,11 @@ export default function TaskDetailClient({
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="text-xs flex items-start font-medium text-[var(--foreground)] truncate">
-                          {assignee?.firstName} {assignee?.lastName}
+                          {assignment.assignee?.firstName}{" "}
+                          {assignment.assignee?.lastName}
                         </div>
                         <div className="text-[12px] text-[var(--muted-foreground)] truncate">
-                          {assignee?.email}
+                          {assignment.assignee?.email}
                         </div>
                       </div>
                     </div>
@@ -1094,18 +1144,19 @@ export default function TaskDetailClient({
                 </div>
                 <div>
                   <Label className="text-sm mb-2 block">Reporter</Label>
-                  {hasAccess && !isAssigneeOrReporter ? (
+                  {hasAccess ? (
                     <DropdownAction
-                      currentItem={reporter}
+                      currentItem={assignment.reporter}
                       availableItems={projectMembers}
                       loading={loadingMembers}
-                      onItemSelect={handleReporterChange}
+                      onItemSelect={(item) =>
+                        handleAssignmentChange(item, "reporter")
+                      }
                       placeholder="Select reporter..."
                       showUnassign={true}
                       hideAvatar={false}
                       itemType="projectMember"
                       onDropdownOpen={async () => {
-                        // Reuse projectMembers data - only fetch if empty
                         if (projectMembers.length === 0) {
                           const projectId = task.projectId || task.project?.id;
                           if (projectId) {
@@ -1125,19 +1176,21 @@ export default function TaskDetailClient({
                     />
                   ) : (
                     <div className="flex items-center gap-3">
-                      {reporter?.id ? (
+                      {assignment.reporter?.id ? (
                         <UserAvatar
                           user={{
-                            firstName: reporter?.firstName || "",
-                            lastName: reporter?.lastName || "",
-                            avatar: reporter?.avatar,
+                            firstName: assignment.reporter?.firstName || "",
+                            lastName: assignment.reporter?.lastName || "",
+                            avatar: assignment.reporter?.avatar,
                           }}
                           size="sm"
                         />
-                      ) : reporter?.color ? (
+                      ) : assignment.reporter?.color ? (
                         <div
                           className="w-6 h-6 rounded-full flex items-center justify-center"
-                          style={{ backgroundColor: reporter?.color }}
+                          style={{
+                            backgroundColor: assignment.reporter?.color,
+                          }}
                         >
                           <div className="w-3 h-3 bg-white rounded-full opacity-80" />
                         </div>
@@ -1148,10 +1201,11 @@ export default function TaskDetailClient({
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="text-xs flex items-start font-medium text-[var(--foreground)] truncate">
-                          {reporter?.firstName} {reporter?.lastName}
+                          {assignment.reporter?.firstName}{" "}
+                          {assignment.reporter?.lastName}
                         </div>
                         <div className="text-[12px] text-[var(--muted-foreground)] truncate">
-                          {reporter?.email}
+                          {assignment.reporter?.email}
                         </div>
                       </div>
                     </div>
@@ -1172,11 +1226,9 @@ export default function TaskDetailClient({
               />
             </div>
 
-
             <div className="bg-[var(--card)] rounded-[var(--card-radius)] shadow-sm">
               <TaskActivities taskId={taskId} />
             </div>
-            
           </div>
         </div>
       </div>

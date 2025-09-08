@@ -19,17 +19,6 @@ export class CreateOrganizationDto {
   name: string;
 
   @ApiProperty({
-    description: 'Unique organization slug for URLs',
-    example: 'acme-corp',
-    pattern: '^[a-z0-9-]+$',
-    minLength: 2,
-    maxLength: 50,
-  })
-  @IsString()
-  @IsNotEmpty()
-  slug: string;
-
-  @ApiProperty({
     description: 'Organization description',
     example:
       'Leading technology company focused on innovative solutions for modern businesses.',

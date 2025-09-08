@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { toast } from "sonner";
 
 const OrganizationFormModal = ({
   showCreateForm,
@@ -53,10 +54,10 @@ const OrganizationFormModal = ({
 
       const newOrg = await createOrganization(organizationData);
       onSuccess(newOrg);
+      toast.success("Organization created successfully!")
     } catch (err) {
-      console.error("Error creating organization:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to create organization"
+        err?.message ? err?.message[0] : "Failed to create organization"
       );
     } finally {
       setIsSubmitting(false);
@@ -109,7 +110,7 @@ const OrganizationFormModal = ({
                 htmlFor="org-name"
                 className="text-sm font-medium text-[var(--foreground)]"
               >
-                Organization Name *
+                Organization Name<span className="text-red-400">*</span>
               </Label>
               <Input
                 id="org-name"

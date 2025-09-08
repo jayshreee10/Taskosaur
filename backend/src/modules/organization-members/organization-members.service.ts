@@ -15,7 +15,7 @@ import { UpdateOrganizationMemberDto } from './dto/update-organization-member.dt
 
 @Injectable()
 export class OrganizationMembersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(
     createOrganizationMemberDto: CreateOrganizationMemberDto,
@@ -381,41 +381,84 @@ export class OrganizationMembersService {
   }
 
   async getUserOrganizations(userId: string) {
-    const organizations = await this.prisma.organization.findMany({
-      where: {
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        avatar: true,
-        website: true,
-        ownerId: true,
-        createdAt: true,
-        _count: {
-          select: {
-            members: true,
-            workspaces: true,
-          },
-        },
-        members: {
-          where: { userId },
-          select: {
-            id: true,
-            role: true,
-            joinedAt: true,
-          },
-          take: 1,
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+    // 1. Get the user role
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
     });
 
-    // Transform to include user's role (owner takes precedence)
+    let organizations;
+
+    // 2. If SUPER_ADMIN → fetch all organizations
+    if (user?.role === 'SUPER_ADMIN') {
+      organizations = await this.prisma.organization.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          avatar: true,
+          website: true,
+          ownerId: true,
+          createdAt: true,
+          _count: {
+            select: {
+              members: true,
+              workspaces: true,
+            },
+          },
+          members: {
+            where: { userId },
+            select: {
+              id: true,
+              role: true,
+              joinedAt: true,
+            },
+            take: 1,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    } else {
+      // 3. Normal users → only organizations they own or belong to
+      organizations = await this.prisma.organization.findMany({
+        where: {
+          OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          avatar: true,
+          website: true,
+          ownerId: true,
+          createdAt: true,
+          _count: {
+            select: {
+              members: true,
+              workspaces: true,
+            },
+          },
+          members: {
+            where: { userId },
+            select: {
+              id: true,
+              role: true,
+              joinedAt: true,
+            },
+            take: 1,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    }
+
+    // 4. Transform response (SUPER_ADMIN gets role = SUPER_ADMIN)
     return organizations.map((org) => {
       const isOwner = org.ownerId === userId;
       const memberRecord = org.members[0];
@@ -428,12 +471,18 @@ export class OrganizationMembersService {
         avatar: org.avatar,
         website: org.website,
         _count: org._count,
-        userRole: isOwner ? 'OWNER' : memberRecord?.role || 'MEMBER',
+        userRole:
+          user?.role === 'SUPER_ADMIN'
+            ? 'SUPER_ADMIN'
+            : isOwner
+              ? 'OWNER'
+              : memberRecord?.role || 'MEMBER',
         joinedAt: memberRecord?.joinedAt || org.createdAt,
         isOwner,
       };
     });
   }
+
 
   async getOrganizationStats(organizationId: string): Promise<any> {
     const organization = await this.prisma.organization.findUnique({

@@ -58,14 +58,14 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 export function TaskPriorityChart({ data }: TaskPriorityChartProps) {
-  const chartData = data.map(item => ({
+  const chartData = data?.map(item => ({
     name: chartConfig[item.priority]?.label || item.priority,
     value: item._count.priority,
     fill: chartConfig[item.priority]?.color || "#8B5CF6"
-  }))
+  })) || [];
 
   // Calculate total for percentage display
-  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+  const total = chartData?.reduce((sum, item) => sum + item.value, 0);
 
   return (
     <ChartWrapper
@@ -88,7 +88,7 @@ export function TaskPriorityChart({ data }: TaskPriorityChartProps) {
             dataKey="value"
             paddingAngle={2}
           >
-            {chartData.map((entry, index) => (
+            {chartData?.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.fill} />
             ))}
           </Pie>

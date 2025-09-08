@@ -20,10 +20,12 @@ import {
 } from "@/components/common/FilterDropdown";
 import { CheckSquare, Flame, Folder } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
-import SortingManager, { SortOrder, SortField } from "@/components/tasks/SortIngManager";
-
-
-
+import SortingManager, {
+  SortOrder,
+  SortField,
+} from "@/components/tasks/SortIngManager";
+import { useWorkspaceContext } from "@/contexts/workspace-context";
+import { useProjectContext } from "@/contexts/project-context";
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -41,6 +43,8 @@ const SprintTasksTable = () => {
   const router = useRouter();
   const { sprintId, projectSlug, workspaceSlug } = router.query;
   const { getTasksBySprint, getTaskKanbanStatus } = useTask();
+  const workspaceApi = useWorkspaceContext();
+  const projectApi = useProjectContext();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [kanban, setKanban] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,6 +75,26 @@ const SprintTasksTable = () => {
   const debouncedSearchQuery = useDebounce(searchInput, 500);
   const currentOrganizationId = TokenManager.getCurrentOrgId();
   const { createSection } = useGenericFilters();
+  const [projectMembers, setProjectMembers] = useState<any[]>([]);
+  const [membersLoaded, setMembersLoaded] = useState(false);
+  const [availableTaskStatuses, setAvailableTaskStatuses] = useState<any[]>([]);
+  const [statusesLoaded, setStatusesLoaded] = useState(false);
+
+  const [project, setProject] = useState<any>(null);
+
+  // Load workspace and project by slug
+  useEffect(() => {
+    if (!workspaceSlug || !projectSlug || project) return;
+    const fetchProject = async () => {
+      try {
+        const proj = await projectApi.getProjectBySlug(projectSlug as string);
+        setProject(proj);
+      } catch (error) {
+        setProject(null);
+      }
+    };
+    fetchProject();
+  }, [workspaceSlug, projectSlug, projectApi, project]);
 
   const loadListData = useCallback(async () => {
     if (!sprintId) return;
@@ -137,6 +161,35 @@ const SprintTasksTable = () => {
     }
   }, [projectSlug]);
 
+  // Fetch project members
+  useEffect(() => {
+    if (!project?.id || membersLoaded) return;
+    const fetchMembers = async () => {
+      try {
+        const members = await projectApi.getProjectMembers(project.id);
+        setProjectMembers(members || []);
+        setMembersLoaded(true);
+      } catch (error) {
+        setProjectMembers([]);
+      }
+    };
+    fetchMembers();
+  }, [project?.id, membersLoaded, projectApi]);
+
+  // Fetch project statuses
+  useEffect(() => {
+    if (!project?.id || statusesLoaded) return;
+    const fetchStatuses = async () => {
+      try {
+        const statuses = await projectApi.getTaskStatusByProject(project.id);
+        setAvailableTaskStatuses(statuses || []);
+        setStatusesLoaded(true);
+      } catch (error) {
+        setAvailableTaskStatuses([]);
+      }
+    };
+    fetchStatuses();
+  }, [project?.id, statusesLoaded, projectApi]);
   useEffect(() => {
     loadListData();
   }, [loadListData]);
@@ -146,6 +199,13 @@ const SprintTasksTable = () => {
       loadKanbanData();
     }
   }, [currentView, loadKanbanData]);
+
+  // Fetch tasks on tab (view) change
+  useEffect(() => {
+    if ((currentView === "list" || currentView === "gantt")) {
+      loadListData();
+    }
+  }, [currentView, loadListData]);
 
   // Filter functions
   const toggleProject = useCallback((id: string) => {
@@ -265,6 +325,11 @@ const SprintTasksTable = () => {
     ]
   );
 
+  // Callback to refetch tasks after creation
+  const handleTaskRefetch = useCallback(async () => {
+    await loadListData();
+  }, [loadListData]);
+
   const handleAddColumn = (columnId: string) => {
     const columnConfigs: Record<
       string,
@@ -314,8 +379,12 @@ const SprintTasksTable = () => {
     return tasks.filter((task) => {
       const matchesSearch =
         !debouncedSearchQuery.trim() ||
-        task.title?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+        task.title
+          ?.toLowerCase()
+          .includes(debouncedSearchQuery.toLowerCase()) ||
+        task.description
+          ?.toLowerCase()
+          .includes(debouncedSearchQuery.toLowerCase());
 
       const matchesStatus =
         selectedStatuses.length === 0 ||
@@ -333,7 +402,13 @@ const SprintTasksTable = () => {
         matchesSearch && matchesStatus && matchesPriority && matchesProject
       );
     });
-  }, [tasks, debouncedSearchQuery, selectedStatuses, selectedPriorities, selectedProjects]);
+  }, [
+    tasks,
+    debouncedSearchQuery,
+    selectedStatuses,
+    selectedPriorities,
+    selectedProjects,
+  ]);
 
   // Sorting logic for filtered tasks
   const sortedTasks = useMemo(() => {
@@ -341,7 +416,11 @@ const SprintTasksTable = () => {
       let aValue = a[sortField];
       let bValue = b[sortField];
       // Handle date fields
-      if (["createdAt", "updatedAt", "completedAt", "timeline"].includes(sortField)) {
+      if (
+        ["createdAt", "updatedAt", "completedAt", "timeline"].includes(
+          sortField
+        )
+      ) {
         aValue = aValue ? new Date(aValue).getTime() : 0;
         bValue = bValue ? new Date(bValue).getTime() : 0;
       }
@@ -414,7 +493,16 @@ const SprintTasksTable = () => {
           />
         );
       default:
-        return <TaskListView tasks={sortedTasks} columns={columns} />;
+        return (
+          <TaskListView
+            tasks={sortedTasks}
+            columns={columns}
+            projectSlug={projectSlug as string}
+            projectMembers={projectMembers}
+            addTaskStatuses={availableTaskStatuses}
+            onTaskRefetch={handleTaskRefetch}
+          />
+        );
     }
   };
 
@@ -423,7 +511,6 @@ const SprintTasksTable = () => {
       {/* Sticky PageHeader */}
       <div className="sticky top-0 z-50">
         <PageHeader
-          icon={<HiClipboardDocumentList className="size-20px" />} 
           title="Sprint Tasks"
           description={`Manage and track all tasks in this sprint. ${filteredTasks.length} of ${tasks.length} tasks`}
           actions={
@@ -490,7 +577,7 @@ const SprintTasksTable = () => {
                   ))}
                 </div>
               )}
-              {currentView === "list" && (
+               {currentView === "list" && (
                 <div className="flex items-center gap-2">
                   <SortingManager
                     sortField={sortField}
@@ -507,15 +594,24 @@ const SprintTasksTable = () => {
                   />
                 </div>
               )}
+              {currentView === "kanban" && (
+                <div className="flex items-center gap-2">
+                  <ColumnManager
+                    currentView={currentView}
+                    availableColumns={columns}
+                    onAddColumn={handleAddColumn}
+                    onRemoveColumn={handleRemoveColumn}
+                    setKabBanSettingModal={setKabBanSettingModal}
+                  />
+                </div>
+              )}
             </>
           }
         />
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto rounded-md">
-        {renderContent()}
-      </div>
+      <div className="flex-1 overflow-y-auto rounded-md">{renderContent()}</div>
     </div>
   );
 };
