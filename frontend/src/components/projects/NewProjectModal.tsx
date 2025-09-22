@@ -68,9 +68,9 @@ export function NewProjectModal({
     name: "",
     description: "",
     workspace: null as any,
-    color: "#1a3b4d", 
+    color: "#3B82F6", 
     category: "operational", 
-    workflowId: "", // <-- add workflowId
+    workflowId: "",
   });
 
   const generateSlug = (name: string) => {
@@ -224,12 +224,12 @@ export function NewProjectModal({
         if (orgId) {
           const wf = await workflowsApi.getWorkflowsByOrganization(orgId);
           setWorkflows(wf || []);
-          // By default select the workflow with isDefault: true
+          
           const defaultWf = (wf || []).find(w => w.isDefault);
           if (defaultWf) {
             setFormData(prev => ({ ...prev, workflowId: defaultWf.id }));
           }
-          console.log("Fetched workflows:", wf);
+          // console.log("Fetched workflows:", wf);
         } else {
           setWorkflows([]);
           console.warn("No current organization ID found.");

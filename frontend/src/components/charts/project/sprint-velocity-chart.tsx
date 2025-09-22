@@ -78,7 +78,7 @@ export function SprintVelocityChart({ data }: SprintVelocityChartProps) {
       title="Sprint Velocity Trend"
       description="Story points completed per sprint"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <LineChart 

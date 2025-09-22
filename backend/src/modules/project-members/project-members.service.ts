@@ -167,8 +167,21 @@ export class ProjectMembersService {
     });
   }
 
-  async findAll(projectId?: string): Promise<ProjectMember[]> {
-    const whereClause = projectId ? { projectId } : {};
+  async findAll(projectId?: string, search?: string): Promise<ProjectMember[]> {
+    const whereClause: any = {};
+
+    if (projectId) {
+      whereClause.projectId = projectId;
+    }
+    if (search && search.trim()) {
+      whereClause.user = {
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      };
+    }
 
     return this.prisma.projectMember.findMany({
       where: whereClause,

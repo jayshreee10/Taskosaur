@@ -16,6 +16,7 @@ import { HiChevronDown, HiCheck, HiCog } from "react-icons/hi2";
 import { useAuth } from "@/contexts/auth-context";
 import { Building } from "lucide-react";
 import { Organization, User } from "@/types";
+import { mcpServer } from "@/lib/mcp-server";
 
 export default function OrganizationSelector({
   onOrganizationChange,
@@ -35,10 +36,10 @@ export default function OrganizationSelector({
 
   const currentUser: User | null = getCurrentUser() ?? null;
 
-  // Utility function
+  
   const getInitials = (name?: string) => name?.charAt(0)?.toUpperCase() || "?";
 
-  // Set current organization and persist to localStorage
+
   const setAndPersistOrganization = (org: Organization) => {
     setCurrentOrganization(org);
     localStorage.setItem("currentOrganizationId", org.id);
@@ -47,7 +48,7 @@ export default function OrganizationSelector({
     onOrganizationChange?.(org);
   };
 
-  // Initial fetch on component mount with refresh logic
+  
   useEffect(() => {
     if (!currentUser?.id) return;
 
@@ -55,7 +56,7 @@ export default function OrganizationSelector({
       setIsLoading(true);
       try {
         const savedOrgId = localStorage.getItem("currentOrganizationId");
-        console.log(savedOrgId);
+        
         const orgs: Organization[] =
           (await getUserOrganizations(currentUser.id)) ?? [];
         setOrganizations(orgs);
@@ -65,26 +66,26 @@ export default function OrganizationSelector({
           return;
         }
 
-        // On refresh, check if a current orgId exists in local storage
+       
         let selectedOrg: Organization;
-        console.log(savedOrgId);
+        
         if (savedOrgId) {
-          // Try to find a matching organization from the list
+          
           const matchingOrg = orgs.find((org) => org.id === savedOrgId);
 
           if (matchingOrg) {
-            // If a match is found, set that as the current org
+            
             selectedOrg = matchingOrg;
           } else {
-            // If no match is found, set the first org as default
+            
             selectedOrg = orgs[0];
           }
         } else {
-          // If no orgId exists in local storage, set the first org as default
+         
           selectedOrg = orgs[0];
         }
 
-        // Set the selected organization
+      
         setAndPersistOrganization(selectedOrg);
       } catch (error) {
         console.error("Error fetching organizations:", error);
@@ -96,7 +97,6 @@ export default function OrganizationSelector({
     fetchOrganizations();
   }, [currentUser?.id]);
 
-  // Fetch organizations when dropdown opens (for fresh data)
   const fetchOrganizationsOnOpen = async () => {
     if (!currentUser?.id) return;
 
@@ -106,7 +106,6 @@ export default function OrganizationSelector({
         (await getUserOrganizations(currentUser.id)) ?? [];
       setOrganizations(orgs);
 
-      // Update current organization if it still exists in the fresh data
       const currentOrgId = localStorage.getItem("currentOrganizationId");
       if (currentOrgId) {
         const updatedCurrentOrg = orgs.find((org) => org.id === currentOrgId);
@@ -132,8 +131,9 @@ export default function OrganizationSelector({
 
     try {
       router.replace("/dashboard");
-    } catch (error) {
-      console.error("Router replace failed:", error);
+      mcpServer.clearContext(); // Clear MCP context on org change
+    } catch (err) {
+      console.error("Router replace failed:", err);
     }
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { useAuth } from "@/contexts/auth-context";
@@ -20,8 +20,9 @@ import {
   HiEnvelope,
   HiChevronDown,
   HiCheck,
+  HiUserPlus,
+  HiXMark,
 } from "react-icons/hi2";
-import EmptyState from "@/components/common/EmptyState";
 import Loader from "@/components/common/Loader";
 import ErrorState from "@/components/common/ErrorState";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -29,6 +30,26 @@ import { Badge } from "@/components/ui";
 import { invitationApi } from "@/utils/api/invitationsApi";
 import { X } from "lucide-react";
 import InviteModal from "@/components/modals/InviteModal";
+import Tooltip from "@/components/common/ToolTip";
+import { roles } from "@/utils/data/projectData";
+import ConfirmationModal from "@/components/modals/ConfirmationModal";
+import { ProjectMember } from "@/types";
+
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 interface Member {
   id: string;
@@ -46,6 +67,22 @@ interface Workspace {
   slug: string;
   description?: string;
 }
+
+const EmptyState = ({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: any;
+  title: string;
+  description: string;
+}) => (
+  <div className="text-center py-8 flex flex-col items-center justify-center">
+    <Icon className="w-12 h-12 mx-auto text-[var(--muted-foreground)] mb-4" />
+    <p className="text-sm font-medium text-[var(--foreground)] mb-2">{title}</p>
+    <p className="text-xs text-[var(--muted-foreground)]">{description}</p>
+  </div>
+);
 
 function WorkspaceMembersContent() {
   const router = useRouter();
@@ -65,10 +102,13 @@ function WorkspaceMembersContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 1000);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [updatingMember, setUpdatingMember] = useState<string | null>(null);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<any>(null);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef<string>("");
@@ -80,39 +120,22 @@ function WorkspaceMembersContent() {
     isAuthenticated,
   });
 
-  const roles = [
-    {
-      id: "1",
-      name: "SUPER_ADMIN",
-      description: "Full access to all workspace resources",
-    },
-    {
-      id: "2",
-      name: "MANAGER",
-      description: "Can manage projects and members",
-    },
-    {
-      id: "3",
-      name: "MEMBER",
-      description: "Can access and work on projects",
-    },
-    {
-      id: "4",
-      name: "VIEWER",
-      description: "Can only view workspace content",
-    },
-  ];
+ 
 
+  const [data, setData] = useState(null);
   useEffect(() => {
     if (!workspace?.id) return;
     getUserAccess({ name: "workspace", id: workspace?.id })
       .then((data) => {
+        setData(data);
+        // console.log("Access data:", data?.role, data?.canChange);
         setHasAccess(data?.canChange);
       })
       .catch((error) => {
         console.error("Error fetching user access:", error);
       });
   }, [workspace]);
+  // console.log(hasAccess, "hasAccess");
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -130,9 +153,10 @@ function WorkspaceMembersContent() {
   };
 
   const getRoleLabel = (role: string) => {
-    const roleConfig = roles.find((r) => r.name === role);
-    return roleConfig?.name || role;
-  };
+  if (!Array.isArray(roles)) return role;
+  const roleConfig = roles.find((r) => r.name === role);
+  return roleConfig?.name || role;
+};
 
   // Get current user's role for permission checks
   const getCurrentUserRole = () => {
@@ -145,7 +169,11 @@ function WorkspaceMembersContent() {
 
   const canInviteMembers = () => {
     const userRole = getCurrentUserRole();
-    return userRole === "SUPER_ADMIN" || userRole === "MANAGER";
+    return (
+      userRole === "SUPER_ADMIN" ||
+      userRole === "MANAGER" ||
+      data?.role === "OWNER"
+    );
   };
 
   useEffect(() => {
@@ -156,18 +184,12 @@ function WorkspaceMembersContent() {
     };
   }, [getWorkspaceBySlug, getWorkspaceMembers, isAuthenticated]);
 
-  useEffect(() => {
-    const initializeData = async () => {
+  const fetchMembers = useCallback(
+    async (searchValue = "") => {
       const pageKey = `${workspaceSlug}/members`;
       const requestId = `${pageKey}-${Date.now()}-${Math.random()}`;
 
-      if (
-        !isMountedRef.current ||
-        (currentSlugRef.current === pageKey &&
-          isInitializedRef.current &&
-          workspace &&
-          members.length >= 0)
-      ) {
+      if (!isMountedRef.current) {
         return;
       }
 
@@ -182,11 +204,16 @@ function WorkspaceMembersContent() {
       if (!workspaceSlug || !contextFunctionsRef.current.isAuthenticated()) {
         setError("Authentication required");
         setLoading(false);
+        setSearchLoading(false);
         return;
       }
 
       try {
-        setLoading(true);
+        if (!workspace) {
+          setLoading(true);
+        } else {
+          setSearchLoading(true);
+        }
         setError(null);
 
         if (requestIdRef.current !== requestId || !isMountedRef.current) {
@@ -194,9 +221,10 @@ function WorkspaceMembersContent() {
         }
 
         const workspaceData =
-          await contextFunctionsRef.current.getWorkspaceBySlug(
+          workspace ||
+          (await contextFunctionsRef.current.getWorkspaceBySlug(
             workspaceSlug as string
-          );
+          ));
 
         if (requestIdRef.current !== requestId || !isMountedRef.current) {
           return;
@@ -205,14 +233,18 @@ function WorkspaceMembersContent() {
         if (!workspaceData) {
           setError("Workspace not found");
           setLoading(false);
+          setSearchLoading(false);
           return;
         }
 
-        setWorkspace(workspaceData);
+        if (!workspace) {
+          setWorkspace(workspaceData);
+        }
 
         const membersData =
           await contextFunctionsRef.current.getWorkspaceMembers(
-            workspaceData.id
+            workspaceData.id,
+            searchValue
           );
 
         if (requestIdRef.current !== requestId || !isMountedRef.current) {
@@ -242,7 +274,17 @@ function WorkspaceMembersContent() {
       } finally {
         if (requestIdRef.current === requestId && isMountedRef.current) {
           setLoading(false);
+          setSearchLoading(false);
         }
+      }
+    },
+    [workspaceSlug, workspace]
+  );
+
+  useEffect(() => {
+    const initializeData = async () => {
+      if (!isInitializedRef.current) {
+        await fetchMembers();
       }
     };
 
@@ -259,7 +301,13 @@ function WorkspaceMembersContent() {
     }, 50);
 
     return () => clearTimeout(timeoutId);
-  }, [workspaceSlug]);
+  }, [workspaceSlug, fetchMembers]);
+
+  useEffect(() => {
+    if (isInitializedRef.current) {
+      fetchMembers(debouncedSearchTerm);
+    }
+  }, [debouncedSearchTerm, fetchMembers]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -276,35 +324,21 @@ function WorkspaceMembersContent() {
     };
   }, []);
 
-  // Separate members into pending and others
-  const filteredMembers = members.filter((member) => {
-    const name = member.name || "";
-    const email = member.email || "";
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (name.toLowerCase().includes(searchLower) ||
-        email.toLowerCase().includes(searchLower)) &&
-      member.status?.toLowerCase() !== "pending"
-    );
-  });
+  const activeMembers = members.filter(
+    (member) => member.status?.toLowerCase() !== "pending"
+  );
 
-  const filteredPendingMembers = members.filter((member) => {
-    const name = member.name || "";
-    const email = member.email || "";
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (name.toLowerCase().includes(searchLower) ||
-        email.toLowerCase().includes(searchLower)) &&
-      member.status?.toLowerCase() === "pending"
-    );
-  });
+  const pendingMembers = members.filter(
+    (member) => member.status?.toLowerCase() === "pending"
+  );
 
   const refreshMembers = async () => {
     if (!workspace) return;
 
     try {
       const membersData = await contextFunctionsRef.current.getWorkspaceMembers(
-        workspace.id
+        workspace.id,
+        searchTerm
       );
 
       const processedMembers = (membersData || []).map((member: any) => ({
@@ -341,6 +375,16 @@ function WorkspaceMembersContent() {
     setLoading(true);
   };
 
+  function updateLocalStorageUser(newRole: string) {
+    const tampUser = localStorage.getItem("user");
+    const updateRole = JSON.parse(tampUser);
+    const finalUser = {
+      ...updateRole,
+      role: newRole
+    }
+    localStorage.setItem("user",JSON.stringify(finalUser));
+  }
+
   const handleRoleUpdate = async (memberId: string, newRole: string) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -356,6 +400,7 @@ function WorkspaceMembersContent() {
         currentUser.id
       );
       await refreshMembers();
+      updateLocalStorageUser(newRole); // Update the new role
       toast.success("Member role updated successfully");
     } catch (err) {
       const errorMessage = err.message || "Failed to update role";
@@ -365,47 +410,40 @@ function WorkspaceMembersContent() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
+  const handleRemoveMember = async (member: ProjectMember) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
       setError("User not authenticated");
       return;
     }
 
-    if (
-      !confirm(
-        "Are you sure you want to remove this member from the workspace?"
-      )
-    ) {
-      return;
-    }
-
     try {
-      setRemovingMember(memberId);
-      await removeMemberFromWorkspace(memberId, currentUser.id);
+      setRemovingMember(member?.id);
+      await removeMemberFromWorkspace(member?.id, currentUser.id);
       await refreshMembers();
+      setMemberToRemove(null);
       toast.success("Member removed successfully");
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to remove member";
+      const errorMessage = err.message
+        ? err.message
+        : "Failed to remove member";
       setError(errorMessage);
+      setMemberToRemove(null);
       toast.error(errorMessage);
     } finally {
       setRemovingMember(null);
     }
   };
 
-  // FIXED: Updated handleInvite to use standardized invitation API
   const handleInvite = async (email: string, role: string) => {
     if (!workspace) {
       toast.error("Workspace not found");
       throw new Error("Workspace not found");
     }
 
-    // Validate form data using the standardized validation
     const validation = invitationApi.validateInvitationData({
       inviteeEmail: email,
-      workspaceId: workspace.id, // Use workspaceId instead of organizationId
+      workspaceId: workspace.id,
       role: role,
     });
 
@@ -415,17 +453,15 @@ function WorkspaceMembersContent() {
     }
 
     try {
-      // Use the standardized invitation API that hits /api/invitations
       await invitationApi.createInvitation({
         inviteeEmail: email,
-        workspaceId: workspace.id, // Use workspaceId for workspace invitations
+        workspaceId: workspace.id,
         role: role,
       });
 
       toast.success(`Invitation sent to ${email}`);
       await refreshMembers();
     } catch (error: any) {
-      // Enhanced error handling to match OrganizationMembers
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||
@@ -436,7 +472,6 @@ function WorkspaceMembersContent() {
     }
   };
 
-  // Wrapper function to handle loading state
   const handleInviteWithLoading = async (email: string, role: string) => {
     setInviteLoading(true);
     try {
@@ -458,7 +493,7 @@ function WorkspaceMembersContent() {
     return <Loader text="fetching your member details" />;
   }
 
-  if (error) {
+  if (error && !members.length) {
     return (
       <div className="min-h-screen bg-[var(--background)]">
         <ErrorState
@@ -507,21 +542,20 @@ function WorkspaceMembersContent() {
         }
       />
 
-      {/* Main Content - Optimized Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* Members List */}
         <div className="lg:col-span-2">
           <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
             <CardHeader className="px-4 py-0">
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
                   <HiUsers className="w-5 h-5 text-[var(--muted-foreground)]" />
-                  Members ({filteredMembers.length})
+                  Members ({activeMembers.length})
                 </CardTitle>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <HiMagnifyingGlass className="w-4 h-4 text-[var(--muted-foreground)]" />
                   </div>
+
                   <Input
                     type="text"
                     value={searchTerm}
@@ -529,12 +563,26 @@ function WorkspaceMembersContent() {
                     className="pl-10 h-9 w-64 border-input bg-background text-[var(--foreground)]"
                     placeholder="Search members..."
                   />
+
+                  {searchLoading && (
+                    <div className="absolute inset-y-0 right-10 pr-3 flex items-center">
+                      <div className="w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+
+                  {searchTerm && !searchLoading && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
+                    >
+                      <HiXMark size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
 
             <CardContent className="p-0">
-              {/* Table Header */}
               <div className="px-4 py-3 bg-[var(--muted)]/30 border-b border-[var(--border)]">
                 <div className="grid grid-cols-12 gap-3 text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide">
                   <div className="col-span-4">Member</div>
@@ -546,20 +594,23 @@ function WorkspaceMembersContent() {
               </div>
 
               {/* Table Content */}
-              {filteredMembers.length === 0 && !loading ? (
-                <div className="p-4">
-                  <EmptyState
-                    searchQuery={
-                      searchTerm
-                        ? "No members found matching your search"
-                        : "No members found in this workspace"
-                    }
-                    priorityFilter="all"
-                  />
-                </div>
+              {activeMembers.length === 0 && !loading ? (
+                <EmptyState
+                  icon={HiUserPlus}
+                  title={
+                    searchTerm
+                      ? "No members found matching your search"
+                      : "No members found in this workspace"
+                  }
+                  description={
+                    searchTerm
+                      ? "Try adjusting your search terms"
+                      : "Start by inviting team members to collaborate on this project"
+                  }
+                />
               ) : (
                 <div className="divide-y divide-[var(--border)]">
-                  {filteredMembers.map((member) => (
+                  {activeMembers.map((member) => (
                     <div
                       key={member.id}
                       className="px-4 py-3 hover:bg-[var(--accent)]/30 transition-colors"
@@ -654,17 +705,23 @@ function WorkspaceMembersContent() {
 
                         {/* Action */}
                         <div className="col-span-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRemoveMember(member.id)}
-                            disabled={
-                              removingMember === member.id || !hasAccess
-                            }
-                            className="h-7 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
+                          <Tooltip
+                            content="Remove Member"
+                            position="top"
+                            color="danger"
                           >
-                            <X className="w-3 h-3" />
-                          </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setMemberToRemove(member)}
+                              disabled={
+                                removingMember === member.id || !hasAccess
+                              }
+                              className="h-7 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </Tooltip>
                         </div>
                       </div>
                     </div>
@@ -675,18 +732,18 @@ function WorkspaceMembersContent() {
           </Card>
         </div>
 
-        {/* Pending Invitations - Matching Table Design */}
+        {/* Pending Invitations*/}
         <div className="lg:col-span-1">
           <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm">
             <CardHeader className="px-4 py-0">
               <CardTitle className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
                 <HiEnvelope className="w-5 h-5 text-[var(--muted-foreground)]" />
-                Pending Invitations ({filteredPendingMembers.length})
+                Pending Invitations ({pendingMembers.length})
               </CardTitle>
             </CardHeader>
 
             <CardContent className="p-0">
-              {filteredPendingMembers.length === 0 ? (
+              {pendingMembers.length === 0 ? (
                 <div className="p-4">
                   <div className="text-center py-8">
                     <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-[var(--muted)] flex items-center justify-center">
@@ -713,7 +770,7 @@ function WorkspaceMembersContent() {
 
                   {/* Pending Members List */}
                   <div className="divide-y divide-[var(--border)]">
-                    {filteredPendingMembers.map((member) => (
+                    {pendingMembers.map((member) => (
                       <div
                         key={member.id}
                         className="px-4 py-3 hover:bg-[var(--accent)]/30 transition-colors"
@@ -774,13 +831,24 @@ function WorkspaceMembersContent() {
         </div>
       </div>
 
-      {/* Invite Modal with standardized invitation API */}
       <InviteModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         onInvite={handleInviteWithLoading}
         availableRoles={roles}
       />
+
+      {memberToRemove && (
+        <ConfirmationModal
+          isOpen={true}
+          onClose={() => setMemberToRemove(null)}
+          onConfirm={() => handleRemoveMember(memberToRemove)}
+          title="Remove Member"
+          message="Are you sure you want to remove this member from the Workspace?"
+          confirmText="Remove"
+          cancelText="Cancel"
+        />
+      )}
     </div>
   );
 }

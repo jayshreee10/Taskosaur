@@ -85,7 +85,7 @@ export function TaskStatusChart({ data }: TaskStatusChartProps) {
       title="Task Status Flow"
       description="Current task distribution by status"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>

@@ -26,7 +26,7 @@ export function SprintMetricsChart({ data }: SprintMetricsChartProps) {
       title="Sprint Status Overview"
       description="Current sprint distribution across projects"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <AreaChart data={chartData}>
         <XAxis dataKey="status" />

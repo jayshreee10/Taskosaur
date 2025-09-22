@@ -38,7 +38,11 @@ export class ActivityNotificationInterceptor implements NestInterceptor {
     const organizationId =
       request.user?.currentOrganizationId ||
       request.headers['x-organization-id'];
-    const originalData = request.body;
+    const originalData = {
+      ...request.body,
+      ...request.params,
+      ...request.query,
+    };
 
     return next.handle().pipe(
       tap(async (result) => {
@@ -81,12 +85,12 @@ export class ActivityNotificationInterceptor implements NestInterceptor {
     entityIdName?: string
   ) {
     let finalOrganizationId = organizationId;
- const entityId =
-        (entityIdName ? newValue?.[entityIdName] : undefined) ||
-        newValue?.id ||
-        oldValue?.id;
+    const entityId =
+      (entityIdName ? newValue?.[entityIdName] : undefined) ||
+      newValue?.id ||
+      oldValue?.id;
     if (!finalOrganizationId) {
-     
+
       if (entityId) {
         finalOrganizationId =
           await this.activityLogService.getOrganizationIdFromEntity(

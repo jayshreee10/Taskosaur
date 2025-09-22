@@ -1,7 +1,5 @@
-;
-
 import React, { useState, useEffect } from 'react';
-import { Task, Sprint, SprintStatus } from '@/types';
+import { Task, Sprint } from '@/types';
 
 interface SprintProgressProps {
   selectedSprint?: string | null;
@@ -207,15 +205,6 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
     return diffDays;
   };
 
-  const getSprintDuration = () => {
-    if (!currentSprint) return 0;
-    const startDate = new Date(currentSprint.startDate);
-    const endDate = new Date(currentSprint.endDate);
-    const diffTime = endDate.getTime() - startDate.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
   const getSprintProgress = () => {
     if (!currentSprint || !currentDate) return 0;
     const startDate = new Date(currentSprint.startDate);
@@ -256,7 +245,6 @@ export default function SprintProgress({ selectedSprint }: SprintProgressProps) 
   const timePercentage = getTimePercentage();
   const statusCounts = getTasksByStatus();
   const daysRemaining = getDaysRemaining();
-  // const sprintDuration = getSprintDuration();
   const sprintProgress = getSprintProgress();
 
   return (

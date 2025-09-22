@@ -2,13 +2,16 @@ import axios, {
   AxiosResponse,
   AxiosError,
   InternalAxiosRequestConfig,
+  AxiosRequestConfig,
 } from "axios";
 import Cookies from "js-cookie";
 
-// Types for API responses
+// Enhanced interfaces
 interface AuthTokenResponse {
   access_token: string;
   refresh_token?: string;
+  expires_in?: number;
+  user?: any;
 }
 
 interface ApiErrorResponse {
@@ -16,261 +19,539 @@ interface ApiErrorResponse {
   error?: string;
   code?: string;
   details?: any;
+  statusCode?: number;
 }
 
 interface ApiError {
   message: string;
   status?: number;
   code?: string;
+  isNetworkError?: boolean;
+  isTimeoutError?: boolean;
 }
 
-// Custom error class
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+  _retryCount?: number;
+  _skipErrorHandling?: boolean;
+}
+
+// Custom error classes
 class ApiAuthError extends Error {
-  constructor(message: string, public status?: number) {
+  constructor(
+    message: string,
+    public status?: number,
+    public code?: string
+  ) {
     super(message);
     this.name = "ApiAuthError";
   }
 }
 
-// Type guard function
-const isApiErrorResponse = (data: any): data is ApiErrorResponse => {
-  return data && typeof data === "object";
+class ApiNetworkError extends Error {
+  constructor(message: string, public originalError?: any) {
+    super(message);
+    this.name = "ApiNetworkError";
+  }
+}
+
+class ApiTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiTimeoutError";
+  }
+}
+
+// Constants
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_BASE = 1000;
+
+// Global state management
+let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
+let failedQueue: Array<{
+  resolve: (value: any) => void;
+  reject: (error: any) => void;
+}> = [];
+
+// Process failed queue when refresh completes
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+
+  failedQueue = [];
 };
 
-// Token management utilities with cookie support
+// Enhanced Token Manager
 const TokenManager = {
   getAccessToken: (): string | null => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("access_token");
+    try {
+      if (typeof window === "undefined") return null;
+      return localStorage.getItem("access_token");
+    } catch (error) {
+      console.warn("Failed to get access token:", error);
+      return null;
+    }
   },
 
   setAccessToken: (token: string): void => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("access_token", token);
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("access_token", token);
+        localStorage.setItem("token_timestamp", Date.now().toString());
+      }
+    } catch (error) {
+      console.error("Failed to set access token:", error);
     }
   },
 
   getRefreshToken: (): string | null => {
-    if (typeof window === "undefined") return null;
-    return Cookies.get("refresh_token") || null;
+    try {
+      if (typeof window === "undefined") return null;
+      return Cookies.get("refresh_token") || null;
+    } catch (error) {
+      console.warn("Failed to get refresh token:", error);
+      return null;
+    }
   },
-  getCurrentOrgId: (): string | null => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("currentOrganizationId");
-  },
+
   setRefreshToken: (token: string): void => {
-    if (typeof window !== "undefined") {
-      Cookies.set("refresh_token", token, {
-        expires: 30, // 30 days
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/",
-      });
+    try {
+      if (typeof window !== "undefined") {
+        Cookies.set("refresh_token", token, {
+          expires: 30, // 30 days
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          path: "/",
+          httpOnly: false, // Note: true would be more secure but requires server-side handling
+        });
+      }
+    } catch (error) {
+      console.error("Failed to set refresh token:", error);
+    }
+  },
+
+  getCurrentOrgId: (): string | null => {
+    try {
+      if (typeof window === "undefined") return null;
+      return localStorage.getItem("currentOrganizationId");
+    } catch (error) {
+      console.warn("Failed to get organization ID:", error);
+      return null;
+    }
+  },
+
+  setCurrentOrgId: (orgId: string): void => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("currentOrganizationId", orgId);
+      }
+    } catch (error) {
+      console.error("Failed to set organization ID:", error);
     }
   },
 
   clearTokens: (): void => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      Cookies.remove("refresh_token", { path: "/" });
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("token_timestamp");
+        localStorage.removeItem("currentOrganizationId");
+        Cookies.remove("refresh_token", { path: "/" });
+      }
+    } catch (error) {
+      console.error("Failed to clear tokens:", error);
     }
   },
 };
 
-// Enhanced error handling function
+const isApiErrorResponse = (data: any): data is ApiErrorResponse => {
+  return data && typeof data === "object";
+};
+
+const isAxiosError = (error: any): error is AxiosError => {
+  return error && error.isAxiosError === true;
+};
+
+// Enhanced error handling
 const handleApiError = (error: AxiosError): ApiError => {
   let message = "An unexpected error occurred";
   let code: string | undefined;
+  let isNetworkError = false;
+  let isTimeoutError = false;
 
-  if (error.response?.data) {
-    const data = error.response.data;
-
-    if (isApiErrorResponse(data)) {
-      message = data.message || data.error || message;
-      code = data.code;
-    } else if (typeof data === "string") {
-      message = data;
+  try {
+    // Network errors
+    if (error.code === "NETWORK_ERROR" || error.code === "ERR_NETWORK") {
+      isNetworkError = true;
+      message = "Network connection failed. Please check your internet connection.";
     }
-  } else if (error.message) {
-    message = error.message;
+    // Timeout errors
+    else if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+      isTimeoutError = true;
+      message = "Request timed out. Please try again.";
+    }
+    // Response errors
+    else if (error.response?.data) {
+      const data = error.response.data;
+
+      if (isApiErrorResponse(data)) {
+        message = data.message || data.error || message;
+        code = data.code;
+      } else if (typeof data === "string") {
+        message = data;
+      }
+    }
+    // Request errors
+    else if (error.request) {
+      isNetworkError = true;
+      message = "No response received from server. Please try again.";
+    }
+    // Other errors
+    else if (error.message) {
+      message = error.message;
+    }
+  } catch (parseError) {
+    console.error("Error parsing API error:", parseError);
+    message = "An unexpected error occurred";
   }
 
   return {
     message,
     status: error.response?.status,
     code,
+    isNetworkError,
+    isTimeoutError,
   };
 };
 
-// Create axios instance with environment variable
+// Safe redirect function
+const safeRedirect = (url: string): void => {
+  try {
+    if (typeof window !== "undefined") {
+      const currentPath = window.location.pathname;
+      const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password"];
+
+      // Don't redirect if already on a public page
+      if (!publicPaths.some(path => currentPath.startsWith(path))) {
+        // Use replace to avoid back button issues
+        window.location.replace(url);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to redirect:", error);
+  }
+};
+
+// Refresh token function
+const refreshTokens = async (): Promise<string> => {
+  try {
+    const refreshToken = TokenManager.getRefreshToken();
+
+    if (!refreshToken) {
+      throw new ApiAuthError("No refresh token available", 401);
+    }
+
+    const response = await axios.post<AuthTokenResponse>(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api"}/auth/refresh`,
+      { refresh_token: refreshToken },
+      {
+        headers: { "Content-Type": "application/json" },
+        withCredentials: true,
+        timeout: 5000, // Shorter timeout for refresh requests
+      }
+    );
+
+    const { access_token, refresh_token: newRefreshToken } = response.data;
+
+    if (!access_token) {
+      throw new ApiAuthError("Invalid token response", 401);
+    }
+
+    TokenManager.setAccessToken(access_token);
+    if (newRefreshToken) {
+      TokenManager.setRefreshToken(newRefreshToken);
+    }
+
+    return access_token;
+  } catch (error) {
+    TokenManager.clearTokens();
+
+    if (isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        throw new ApiAuthError("Session expired. Please log in again.", 401);
+      } else if (error.code === "NETWORK_ERROR") {
+        throw new ApiNetworkError("Network error during token refresh");
+      }
+    }
+
+    throw new ApiAuthError("Failed to refresh authentication", 401);
+  }
+};
+
+// Create axios instance
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api",
-  timeout: 10000,
+  timeout: 30000, // 30 seconds
   headers: {
     "Content-Type": "application/json",
   },
   withCredentials: true,
 });
 
-// Request interceptor to add auth token
+// Request interceptor
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = TokenManager.getAccessToken();
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = TokenManager.getAccessToken();
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      const orgId = TokenManager.getCurrentOrgId();
+      if (orgId && config.headers) {
+        config.headers['X-Organization-ID'] = orgId;
+      }
+
+      return config;
+    } catch (error) {
+      console.error("Request interceptor error:", error);
+      return config;
     }
-    return config;
   },
   (error: AxiosError) => {
-    return Promise.reject(error);
+    console.error("Request interceptor error:", error);
+    return Promise.reject(handleApiError(error));
   }
 );
 
-// Response interceptor for token refresh
+// Response interceptor with comprehensive error handling
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    };
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refresh_token = TokenManager.getRefreshToken();
-
-        if (!refresh_token) {
-          return new ApiAuthError("No refresh token available", 401);
-        }
-
-        // Create refresh request
-        const refreshResponse = await axios.post<AuthTokenResponse>(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
-          {
-            refresh_token, // Send in body as expected by API
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-            withCredentials: true, // Include cookies if needed for other purposes
-          }
-        );
-
-        const { access_token, refresh_token: newRefreshToken } =
-          refreshResponse.data;
-
-        // Update stored tokens
-        TokenManager.setAccessToken(access_token);
-        if (newRefreshToken) {
-          TokenManager.setRefreshToken(newRefreshToken);
-        }
-
-        // Update the authorization header for the original request
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-        }
-
-        return api(originalRequest);
-      } catch (refreshError) {
-        console.error("Token refresh failed:", refreshError);
-        TokenManager.clearTokens();
-
-        if (typeof window !== "undefined") {
-          const currentPath = window.location.pathname;
-          if (
-            currentPath === "/login/" ||
-            currentPath === "/forgot-password/" ||
-            currentPath === "/reset-password/"
-          ) {
-            return;
-          }
-
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
-        }
-
-        return ;
-      }
+  (response: AxiosResponse) => {
+    // Reset retry count on successful response
+    if (response.config) {
+      (response.config as any)._retryCount = 0;
     }
+    return response;
+  },
+  async (error: AxiosError) => {
+    const originalRequest = error.config as ExtendedAxiosRequestConfig;
 
-    // Use the enhanced error handler
-    const apiError = handleApiError(error);
-    return Promise.reject(apiError);
+    try {
+      // Skip error handling for specific requests
+      if (originalRequest?._skipErrorHandling) {
+        return Promise.reject(handleApiError(error));
+      }
+
+      // Handle 401 errors (authentication)
+      if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+        originalRequest._retry = true;
+
+        // If already refreshing, add to queue
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          }).then(token => {
+            if (originalRequest.headers && token) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
+            return api(originalRequest);
+          }).catch(err => {
+            return Promise.reject(handleApiError(err));
+          });
+        }
+
+        // Start refresh process
+        isRefreshing = true;
+
+        try {
+          if (!refreshPromise) {
+            refreshPromise = refreshTokens();
+          }
+
+          const newToken = await refreshPromise;
+          processQueue(null, newToken);
+
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          }
+
+          return api(originalRequest);
+        } catch (refreshError) {
+          processQueue(refreshError, null);
+          safeRedirect("/login");
+          return Promise.reject(new ApiAuthError("Authentication failed. Please log in again.", 401));
+        } finally {
+          isRefreshing = false;
+          refreshPromise = null;
+        }
+      }
+
+      // Handle retry logic for network errors
+      const shouldRetry = (
+        error.code === "NETWORK_ERROR" ||
+        error.code === "ERR_NETWORK" ||
+        error.code === "ECONNABORTED" ||
+        (error.response?.status && error.response.status >= 500)
+      );
+
+      if (shouldRetry && originalRequest) {
+        const retryCount = (originalRequest._retryCount || 0) + 1;
+
+        if (retryCount <= MAX_RETRY_ATTEMPTS) {
+          originalRequest._retryCount = retryCount;
+
+          // Exponential backoff
+          const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount - 1);
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+
+          // console.log(`Retrying request (attempt ${retryCount}/${MAX_RETRY_ATTEMPTS})`);
+          return api(originalRequest);
+        }
+      }
+
+      // Handle other errors gracefully
+      const apiError = handleApiError(error);
+      return Promise.reject(apiError);
+    } catch (interceptorError) {
+      console.error("Response interceptor error:", interceptorError);
+      return Promise.reject({
+        message: "An unexpected error occurred",
+        status: 500
+      } as ApiError);
+    }
   }
 );
 
-// Utility functions for common API operations
+// Safe API utility functions
 export const apiUtils = {
   login: async (credentials: {
     email: string;
     password: string;
   }): Promise<AuthTokenResponse> => {
-    const response = await api.post<AuthTokenResponse>(
-      "/auth/login",
-      credentials
-    );
-    const { access_token, refresh_token } = response.data;
+    try {
+      const response = await api.post<AuthTokenResponse>("/auth/login", credentials);
+      const { access_token, refresh_token } = response.data;
 
-    TokenManager.setAccessToken(access_token);
-    if (refresh_token) {
-      TokenManager.setRefreshToken(refresh_token);
+      if (!access_token) {
+        throw new ApiAuthError("Invalid login response", 400);
+      }
+
+      TokenManager.setAccessToken(access_token);
+      if (refresh_token) {
+        TokenManager.setRefreshToken(refresh_token);
+      }
+
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error)) {
+        throw handleApiError(error);
+      }
+      throw new ApiAuthError("Login failed", 500);
     }
-
-    return response.data;
   },
 
   logout: async (): Promise<void> => {
     try {
-      await api.post("/auth/logout", {}, { withCredentials: true });
+      // Try to notify server of logout
+      await api.post("/auth/logout", {}, {
+        withCredentials: true,
+        timeout: 5000, // Short timeout for logout
+      });
     } catch (error) {
-      console.error("Logout error:", error);
+      console.warn("Logout API call failed:", error);
+      // Don't throw error, still clear tokens locally
     } finally {
       TokenManager.clearTokens();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      safeRedirect("/login");
     }
   },
 
   isAuthenticated: (): boolean => {
-    return !!TokenManager.getAccessToken();
+    try {
+      const token = TokenManager.getAccessToken();
+      return !!token;
+    } catch (error) {
+      console.error("Authentication check failed:", error);
+      return false;
+    }
   },
 
-  refresh_token: async (): Promise<string | null> => {
+  getCurrentUser: async (): Promise<any> => {
     try {
-      const refresh_token = TokenManager.getRefreshToken();
-      if (!refresh_token) return null;
+      const response = await api.get("/auth/me");
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 401) {
+        TokenManager.clearTokens();
+        safeRedirect("/login");
+      }
+      throw handleApiError(error as AxiosError);
+    }
+  },
 
-      const response = await axios.post<AuthTokenResponse>(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
-        { refresh_token: refresh_token },
-        {
-          withCredentials: true,
-          headers: {
-            Cookie: `refresh_token=${refresh_token}`,
-          },
-        }
-      );
+  // Safe API request wrapper
+  safeRequest: async <T = any>(
+    config: AxiosRequestConfig
+  ): Promise<{ data: T; error: null } | { data: null; error: ApiError }> => {
+    try {
+      const response = await api.request<T>(config);
+      return { data: response.data, error: null };
+    } catch (error) {
+      console.error("API request failed:", error);
 
-      const { access_token, refresh_token: newRefreshToken } = response.data;
-      TokenManager.setAccessToken(access_token);
-
-      if (newRefreshToken) {
-        TokenManager.setRefreshToken(newRefreshToken);
+      if (isAxiosError(error)) {
+        return { data: null, error: handleApiError(error) };
       }
 
-      return access_token;
-    } catch (error) {
-      console.error("Manual token refresh failed:", error);
-      TokenManager.clearTokens();
-      return null;
+      return {
+        data: null,
+        error: {
+          message: "An unexpected error occurred",
+          status: 500,
+        },
+      };
     }
   },
 };
 
+// Development logging
+if (process.env.NODE_ENV === 'development') {
+  api.interceptors.request.use(request => {
+    // console.log(`🚀 ${request.method?.toUpperCase()} ${request.url}`);
+    return request;
+  });
+
+  api.interceptors.response.use(
+    response => {
+      // console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+      return response;
+    },
+    error => {
+      // console.log(`❌ ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status || 'Network Error'}`);
+      return Promise.reject(error);
+    }
+  );
+}
+
 export default api;
-export { TokenManager, ApiAuthError };
-export type { AuthTokenResponse, ApiError, ApiErrorResponse };
+export {
+  TokenManager,
+  ApiAuthError,
+  ApiNetworkError,
+  ApiTimeoutError,
+  handleApiError,
+  safeRedirect
+};
+export type {
+  AuthTokenResponse,
+  ApiError,
+  ApiErrorResponse,
+  ExtendedAxiosRequestConfig
+};

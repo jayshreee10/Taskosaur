@@ -29,7 +29,7 @@ export function TaskTypeChart({ data }: TaskTypeChartProps) {
       title="Task Type Distribution"
       description={`${totalTasks} total tasks across organization`}
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>

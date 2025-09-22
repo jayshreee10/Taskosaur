@@ -74,7 +74,7 @@ export function MemberWorkloadChart({ data }: MemberWorkloadChartProps) {
       title="Member Workload Distribution"
       description="Active tasks vs reported tasks by member"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={400}>
         <AreaChart

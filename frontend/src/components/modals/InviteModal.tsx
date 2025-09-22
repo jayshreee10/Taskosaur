@@ -1,9 +1,21 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { invitationApi } from "@/utils/api/invitationsApi";
 import { HiMail } from "react-icons/hi";
 import { Button, Input, Label, Select } from "../ui";
-import { SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 const InviteModal = ({
   isOpen,
@@ -20,7 +32,6 @@ const InviteModal = ({
   const [role, setRole] = useState("MEMBER");
   const [inviting, setInviting] = useState(false);
 
-  // Add email validation display
   const isEmailValid = email ? invitationApi.validateEmail(email) : true;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,7 +75,8 @@ const InviteModal = ({
               htmlFor="invite-email"
               className="text-sm font-medium text-[var(--foreground)]"
             >
-              Email Address
+              Email Address{" "}
+              <span className="text-red-500">*</span>
             </Label>
             <Input
               id="invite-email"

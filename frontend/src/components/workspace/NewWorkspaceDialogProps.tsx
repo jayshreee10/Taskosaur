@@ -47,7 +47,6 @@ export default function NewWorkspaceDialog({
   triggerText = "New Workspace",
   triggerVariant = "default",
   onWorkspaceCreated,
-  refetchWorkspaces,
 }: NewWorkspaceDialogProps) {
   const workspaceContext = useWorkspaceContext();
   const { isAuthenticated } = useAuth();

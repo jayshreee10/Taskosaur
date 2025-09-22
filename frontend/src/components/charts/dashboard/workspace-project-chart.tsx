@@ -36,6 +36,7 @@ export function WorkspaceProjectChart({ data }: WorkspaceProjectChartProps) {
       title="Projects per Workspace"
       description="Project distribution across workspaces"
       config={chartConfig}
+      className="border-[var(--border)]"
     >
       <BarChart data={chartData}>
         <XAxis 

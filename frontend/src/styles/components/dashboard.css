@@ -65,7 +65,7 @@
 }
 
 .dashboard-stat-card-inner {
-  @apply bg-[var(--card)] rounded-md p-3 shadow-sm h-20 flex flex-col justify-between border-none;
+  @apply bg-[var(--card)] rounded-md py-3 h-20 flex flex-col justify-between border-none;
 }
 
 .dashboard-stat-content {

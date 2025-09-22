@@ -179,7 +179,7 @@ export interface OrganizationStats {
 export interface OrganizationSettings {
   general?: {
     name: string;
-    slug: string;
+    slug?: string;
     description?: string;
     avatar?: string;
     website?: string;

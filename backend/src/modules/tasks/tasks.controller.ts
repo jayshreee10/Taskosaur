@@ -46,7 +46,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tasks')
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(private readonly tasksService: TasksService) { }
 
   @Post()
   @Scope('PROJECT', 'projectId')
@@ -112,7 +112,19 @@ export class TasksController {
   @ApiQuery({
     name: 'search',
     required: false,
-    description: "Filter by search query"
+    description: "Filter by search query",
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Page size / limit (default: 20)',
+    example: 20,
   })
   @Scope('ORGANIZATION', 'organizationId')
   @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
@@ -126,6 +138,8 @@ export class TasksController {
     @Query('priorities') priorities?: string,
     @Query('statuses') statuses?: string,
     @Query('search') search?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
   ) {
     if (!organizationId) {
       throw new BadRequestException('Organization ID is required');
@@ -136,17 +150,99 @@ export class TasksController {
     const statusArray = statuses
       ? statuses.split(',').filter(Boolean)
       : undefined;
-    // Support multiple projectIds via comma-separated values
+
     let projectIdArray: string[] | undefined = undefined;
     if (projectId) {
       projectIdArray = projectId.split(',').filter(Boolean);
     }
-    // Support multiple workspaceIds via comma-separated values
+
     let workspaceIdArray: string[] | undefined = undefined;
     if (workspaceId) {
       workspaceIdArray = workspaceId.split(',').filter(Boolean);
     }
+
     return this.tasksService.findAll(
+      organizationId,
+      projectIdArray,
+      sprintId,
+      workspaceIdArray,
+      parentTaskId,
+      priorityArray,
+      statusArray,
+      user.id,
+      search,
+      Number(page),
+      Number(limit),
+    );
+  }
+
+  @Get('all-tasks')
+  @ApiOperation({ summary: 'Get all tasks with filters (no pagination)' })
+  @ApiQuery({
+    name: 'organizationId',
+    required: true,
+    description: 'Organization ID (required)',
+  })
+  @ApiQuery({
+    name: 'projectId',
+    required: false,
+    description: 'Filter by project ID',
+  })
+  @ApiQuery({
+    name: 'sprintId',
+    required: false,
+    description: 'Filter by sprint ID',
+  })
+  @ApiQuery({
+    name: 'workspaceId',
+    required: false,
+    description: 'Filter by workspace ID',
+  })
+  @ApiQuery({
+    name: 'parentTaskId',
+    required: false,
+    description: 'Filter by parent task ID',
+  })
+  @ApiQuery({
+    name: 'priorities',
+    required: false,
+    description: 'Filter by priorities (comma-separated)',
+    example: 'HIGH,MEDIUM',
+  })
+  @ApiQuery({
+    name: 'statuses',
+    required: false,
+    description: 'Filter by status IDs (comma-separated)',
+    example: 'status-1,status-2',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: "Filter by search query",
+  })
+  @Scope('ORGANIZATION', 'organizationId')
+  @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
+  getTasks(
+    @CurrentUser() user: any,
+    @Query('organizationId', ParseUUIDPipe) organizationId: string,
+    @Query('projectId') projectId?: string,
+    @Query('sprintId') sprintId?: string,
+    @Query('workspaceId') workspaceId?: string,
+    @Query('parentTaskId') parentTaskId?: string,
+    @Query('priorities') priorities?: string,
+    @Query('statuses') statuses?: string,
+    @Query('search') search?: string,
+  ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
+    const priorityArray = priorities ? priorities.split(',').filter(Boolean) : undefined;
+    const statusArray = statuses ? statuses.split(',').filter(Boolean) : undefined;
+    const projectIdArray = projectId ? projectId.split(',').filter(Boolean) : undefined;
+    const workspaceIdArray = workspaceId ? workspaceId.split(',').filter(Boolean) : undefined;
+
+    return this.tasksService.getTasks(
       organizationId,
       projectIdArray,
       sprintId,
@@ -159,10 +255,11 @@ export class TasksController {
     );
   }
 
+
   @Get('by-status')
   @ApiOperation({ summary: 'Get tasks grouped by status' })
   @ApiResponse({ status: 200, type: GetTasksByStatusResponseDto })
-  @Scope('PROJECT','slug')
+  @Scope('PROJECT', 'slug')
   @Roles(Role.VIEWER, Role.MEMBER, Role.MANAGER, Role.OWNER)
   async getTasksByStatus(
     @Query() query: TasksByStatusParams,

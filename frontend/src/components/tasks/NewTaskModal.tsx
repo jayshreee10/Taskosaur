@@ -4,7 +4,6 @@ import {
   HiBuildingOffice2,
   HiDocumentText,
   HiSparkles,
-  HiRocketLaunch,
   HiChevronDown,
   HiCheck,
   HiCalendar,
@@ -47,7 +46,6 @@ import { Button } from "../ui/button";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { useProject } from "@/contexts/project-context";
 import { useTask } from "@/contexts/task-context";
-import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { PRIORITY_OPTIONS, TASK_TYPE_OPTIONS } from "@/utils/data/taskData";
 interface FormData {
@@ -89,10 +87,10 @@ export function NewTaskModal({
     getCurrentOrganizationId,
     getWorkspaceBySlug,
   } = useWorkspace();
-  const { getProjectsByWorkspace, getProjectById, getTaskStatusByProject } =
+  const { getProjectsByWorkspace, getTaskStatusByProject } =
     useProject();
   const { createTask } = useTask();
-  const { getCurrentUser } = useAuth();
+  
 
   const [formData, setFormData] = useState<FormData>({
     title: "",
@@ -242,7 +240,7 @@ export function NewTaskModal({
     }
   }, [isOpen, workspaceSlug, projectSlug]);
 
-  // Load task statuses when project is selected or changed
+
   useEffect(() => {
     if (formData.project?.id) {
       loadTaskStatuses();

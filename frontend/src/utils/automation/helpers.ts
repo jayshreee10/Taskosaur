@@ -553,3 +553,41 @@ export async function retryWithBackoff<T>(
   
   throw lastError!;
 }
+
+export function normalizeDate(dateStr: string): string {
+    // Already in correct format
+    // yyyy-mm-dd or yyyy-dd-mm
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const clean = dateStr.replace(/\//g, "-");
+    const parts = clean.split("-").map(p => p.trim());
+    if (parts.length === 3) {
+        let year: string, month: string, day: string;
+
+        if (parts[0].length === 4) {
+            // yyyy-mm-dd
+            year = parts[0];
+            month = parts[1];
+            day = parts[2];
+        } else if (parts[2].length === 4) {
+            year = parts[2];
+            const first = parseInt(parts[0], 10);
+            const second = parseInt(parts[1], 10);
+            if (first > 12) {
+                day = parts[0];
+                month = parts[1];
+            } else {
+                if (second > 12) {
+                    day = parts[0];
+                    month = parts[1];
+                } else {
+                    day = parts[0];
+                    month = parts[1];
+                }
+            }
+        } else {
+            throw new Error(`Cannot determine year in: ${dateStr}`);
+        }
+        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+    throw new Error(`Invalid date format: ${dateStr}`);
+}

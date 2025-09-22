@@ -1,4 +1,5 @@
- import { CalendarDays, Type, Hash, User } from "lucide-react";
+import { CalendarDays, Clock, CheckCircle, Type, Star, Tag, Hash, ListChecks, FileText } from "lucide-react";
+
 
  
 export const TaskPriorities = [
@@ -42,25 +43,20 @@ export  const labelColors = [
 
 
 
+
+
 export const DEFAULT_SORT_FIELDS = [
-  // Date fields
-  { value: "createdAt", label: "Created Date", icon: CalendarDays, category: "date" },
+  { value: "createdAt", label: "Created Date", icon: Clock, category: "date" },
   { value: "updatedAt", label: "Updated Date", icon: CalendarDays, category: "date" },
   { value: "dueDate", label: "Due Date", icon: CalendarDays, category: "date" },
-  { value: "completedAt", label: "Completed Date", icon: CalendarDays, category: "date" },
-
-  // Text fields
+  { value: "completedAt", label: "Completed Date", icon: CheckCircle, category: "date" },
   { value: "title", label: "Task Title", icon: Type, category: "text" },
-  { value: "priority", label: "Priority", icon: Type, category: "text" },
-  { value: "status", label: "Status", icon: Type, category: "text" },
-
-  // Number fields
+  { value: "priority", label: "Priority", icon: Star, category: "text" },
+  { value: "status", label: "Status", icon: Tag, category: "text" },
   { value: "taskNumber", label: "Task Number", icon: Hash, category: "number" },
-  { value: "storyPoints", label: "Story Points", icon: Hash, category: "number" },
-  { value: "commentsCount", label: "Comments", icon: Hash, category: "number" },
-  { value: "attachmentsCount", label: "Attachments", icon: Hash, category: "number" },
-
-  // User fields
-  { value: "assignee", label: "Assignee", icon: User, category: "user" },
-  { value: "reporter", label: "Reporter", icon: User, category: "user" },
+  { value: "storyPoints", label: "Story Points", icon: ListChecks, category: "number" },
+  { value: "commentsCount", label: "Comments", icon: FileText, category: "number" },
+  // { value: "attachmentsCount", label: "Attachments", icon: Paperclip, category: "number" },
+  // { value: "assignee", label: "Assignee", icon: User, category: "user" },
+  // { value: "reporter", label: "Reporter", icon: User, category: "user" },
 ];

@@ -310,7 +310,7 @@
 
 
 .kanban-status-row-menu-delete {
-  @apply text-red-600;
+  @apply text-red-600 cursor-pointer hover:bg-[var(--muted)];
 }
 
 /* Add Status Row */

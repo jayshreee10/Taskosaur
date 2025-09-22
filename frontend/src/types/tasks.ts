@@ -55,7 +55,15 @@ export interface Task {
     attachments?: number;
   };
 }
+export interface PaginationResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
+export type PaginatedTaskResponse = PaginationResponse<Task>;
 export interface ColumnConfig {
   id: string;
   label: string;

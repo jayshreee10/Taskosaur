@@ -289,7 +289,7 @@ const CAPABILITIES_DATA: AutomationCapabilities = {
             { name: "projectSlug", type: "string", required: true }
           ],
           example: "I can take you to the tasks view of any project."
-        }
+        },
       ]
     },
     
@@ -316,6 +316,12 @@ const CAPABILITIES_DATA: AutomationCapabilities = {
           description: "Check if user is authenticated",
           parameters: [],
           example: "I can check your authentication status."
+        },
+        {
+          name: "navigateToDashboard",
+          description: "Navigate to the home page or dashboard page",
+          parameters: [],
+          example: "I can navigate you to Taskosaur dashboard."
         }
       ]
     },
@@ -347,9 +353,49 @@ const CAPABILITIES_DATA: AutomationCapabilities = {
           example: "I can perform multiple task operations like creating, updating, or deleting several tasks at once."
         }
       ]
+    },
+
+    inviteMember: {
+      category: "Member Management",
+      description: "Create, manage, and organize member within projects",
+      actions: [
+        {
+          name: "inviteMember",
+          description: "Invite a member who belongs to the current organization",
+          parameters: [
+            { name: "workspaceSlug", type: "string", required: true },
+            { name: "projectSlug", type: "string", required: true },
+            { name: "email", type: "string", required: true },
+            { name: "role", type: "string", required: true },
+          ],
+          example: "I can invite a member to any task."
+        },
+      ]
+    },
+
+    sprint: {
+      category: "Sprint Management",
+      description: "Create, manage, and organize sprint within projects",
+      actions: [
+        {
+          name: "createSprint",
+          description: "Create a new sprint within projects",
+          parameters: [
+            { name: "workspaceSlug", type: "string", required: true },
+            { name: "projectSlug", type: "string", required: true },
+            { name: "name", type: "string", required: true },
+            { name: "status", type: "string", required: true },
+            { name: "startDate", type: "string", required: true },
+            { name: "endDate", type: "string", required: true },
+            { name: "goalDescription", type: "string", required: false },
+          ],
+          example: "I can create a new sprint within the current project"
+        },
+      ]
     }
   },
   
+
   limitations: {
     general: [
       "I cannot access external systems or APIs outside of Taskosaur",

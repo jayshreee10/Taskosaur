@@ -16,14 +16,14 @@ import { TaskPriorities } from "@/utils/data/taskData";
 import { toast } from "sonner";
 import router from "next/router";
 import ActionButton from "./ActionButton";
+import { useProject } from "@/contexts/project-context";
+import { formatDateForApi, getTodayDate } from "@/utils/handleDateChange";
 
 interface CreateTaskProps {
   workspaceSlug?: string;
   projectSlug?: string;
   workspace: string | { id: string; name: string };
   projects: any[];
-  availableStatuses: any[];
-  getProjectMembers: (projectId: string) => Promise<any[]>;
 }
 
 const TaskSectionHeader = ({
@@ -38,18 +38,19 @@ const TaskSectionHeader = ({
     <h2 className="text-sm font-semibold text-[var(--foreground)]">{title}</h2>
   </div>
 );
-
 export default function CreateTask({
   projectSlug,
   workspace,
   projects,
-  availableStatuses,
-  getProjectMembers,
-}: Omit<CreateTaskProps, "createTask">) {
+
+}: CreateTaskProps) {
   const { createTask } = useTask();
+  const { getProjectMembers,getTaskStatusByProject } = useProject();
 
   const [selectedProject, setSelectedProject] = useState<any>(null);
-  const [projectMembers, setProjectMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [availableStatuses, setAvailableStatuses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -61,7 +62,7 @@ export default function CreateTask({
   const [assignee, setAssignee] = useState<any>(null);
   const [reporter, setReporter] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [projectLoading, setProjectLoading] = useState(false);
+
 
   const isFormValid = (): boolean => {
     const hasTitle = formData.title.trim().length > 0;
@@ -83,6 +84,69 @@ export default function CreateTask({
     setReporter(null);
   };
 
+  useEffect(() => {
+    const fetchProjectMembers = async (projectId: string) => {
+      if (!projectId || !getProjectMembers) return;
+
+      setMembersLoading(true);
+      try {
+        const fetchedMembers = await getProjectMembers(projectId);
+
+        const normalizedMembers = Array.isArray(fetchedMembers)
+          ? fetchedMembers.map((m) => ({
+              id: m.user?.id || m.id,
+              firstName: m.user?.firstName || "",
+              lastName: m.user?.lastName || "",
+              email: m.user?.email || "",
+
+              role: m.role,
+            }))
+          : [];
+
+        setMembers(normalizedMembers);
+      } catch (error) {
+        console.error("Failed to fetch project members:", error);
+        setMembers([]);
+        toast.error("Failed to load project members");
+      } finally {
+        setMembersLoading(false);
+      }
+    };
+
+     const fetchProjectStatuses = async (projectId: string) =>{
+      if (!projectId || !getTaskStatusByProject) return;
+
+      try {
+        const statuses = await getTaskStatusByProject(projectId);
+        setAvailableStatuses(statuses);
+      } catch (error) {
+        console.error("Failed to fetch project statuses:", error);
+        setAvailableStatuses([]);
+        toast.error("Failed to load project statuses");
+      }
+    };
+
+    if (selectedProject?.id) {
+      fetchProjectMembers(selectedProject.id);
+      fetchProjectStatuses(selectedProject.id);
+    } else {
+      setMembers([]);
+      setAvailableStatuses([]);
+    }
+  }, [selectedProject?.id]);
+
+  useEffect(() => {
+    if (projectSlug && projects.length > 0) {
+      const project = projects.find((p) => p.slug === projectSlug);
+      if (project && selectedProject?.id !== project.id) {
+        setSelectedProject(project);
+      }
+    } else if (projects.length === 1 && !selectedProject) {
+      setSelectedProject(projects[0]);
+    }
+      
+  }, [projectSlug, projects, selectedProject?.id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) return;
@@ -100,8 +164,8 @@ export default function CreateTask({
         type: formData.type as "TASK" | "BUG" | "EPIC" | "STORY" | "SUBTASK",
         startDate: new Date().toISOString(),
         dueDate: formData.dueDate
-          ? new Date(formData.dueDate + "T17:00:00.000Z").toISOString()
-          : new Date().toISOString(),
+  ? formatDateForApi(formData.dueDate)
+  : formatDateForApi(getTodayDate()),
         projectId: selectedProject.id,
         statusId: formData.status,
       };
@@ -111,7 +175,7 @@ export default function CreateTask({
 
       const newTask = await createTask(taskData);
 
-      toast.success("Task created successfully!");
+      toast.success(`Task named ${newTask.title} created successfully!`);
       router.back();
     } catch (error: any) {
       toast.error(error?.message || "Error creating task");
@@ -120,52 +184,6 @@ export default function CreateTask({
     }
   };
 
-  useEffect(() => {
-    const fetchProjectMembers = async () => {
-      if (selectedProject?.id) {
-        const members = await getProjectMembers(selectedProject.id);
-        const mappedMembers = Array.isArray(members)
-          ? members
-              .filter((m) => m.user)
-              .map((m) => ({
-                id: m.user.id,
-                firstName: m.user.firstName,
-                lastName: m.user.lastName,
-                email: m.user.email,
-                avatar: m.user.avatar,
-                role: m.role,
-              }))
-          : [];
-        setProjectMembers(mappedMembers);
-      } else {
-        setProjectMembers([]);
-      }
-    };
-    fetchProjectMembers();
-  }, [selectedProject]);
-
-  useEffect(() => {
-    if (projectSlug && projects.length > 0) {
-      const project = projects.find((p) => p.slug === projectSlug);
-      if (project && (!selectedProject || selectedProject.id !== project.id)) {
-        setSelectedProject(project);
-      }
-    }
-  }, [projectSlug, projects]);
-
-  useEffect(() => {
-    if (projectSlug && projects.length > 0 && !selectedProject) {
-      const project = projects.find((p) => p.slug === projectSlug);
-      if (project) {
-        setSelectedProject(project);
-      }
-    }
-  }, []);
-
-  const getToday = () => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
-  };
 
   return (
     <div className="dashboard-container">
@@ -185,7 +203,10 @@ export default function CreateTask({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Task Title *</Label>
+                  <Label htmlFor="title">
+                    Task Title{" "}
+                    <span className="projects-form-label-required">*</span>
+                  </Label>
                   <Input
                     id="title"
                     name="title"
@@ -213,29 +234,25 @@ export default function CreateTask({
                   editMode={true}
                 />
 
-                <div className="flex items-center justify-start gap-3 ">
-              <ActionButton
-                onClick={handleSubmit}
-                showPlusIcon
-                disabled={!isFormValid() || isSubmitting}
-                primary
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create Task"
-                )}
-              </ActionButton>
-            </div>
+                <div className="flex items-center justify-start gap-3 " id="submit-form-button">
+                  <ActionButton
+                    onClick={handleSubmit}
+                    showPlusIcon
+                    disabled={!isFormValid() || isSubmitting}
+                    primary
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Task"
+                    )}
+                  </ActionButton>
+                </div>
               </CardContent>
-
-              
             </Card>
-
-            
           </form>
         </div>
 
@@ -246,7 +263,10 @@ export default function CreateTask({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="workspace">Workspace *</Label>
+                <Label htmlFor="workspace">
+                  Workspace{" "}
+                  <span className="projects-form-label-required">*</span>
+                </Label>
                 <Input
                   id="workspace"
                   value={
@@ -264,7 +284,10 @@ export default function CreateTask({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="project">Project *</Label>
+                <Label htmlFor="project">
+                  Project{" "}
+                  <span className="projects-form-label-required">*</span>
+                </Label>
                 {projects.length === 1 && projects[0] ? (
                   <Input
                     id="project"
@@ -299,7 +322,9 @@ export default function CreateTask({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="status">Status *</Label>
+                <Label htmlFor="status">
+                  Status <span className="projects-form-label-required">*</span>
+                </Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value) =>
@@ -327,7 +352,10 @@ export default function CreateTask({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="priority">Priority *</Label>
+                <Label htmlFor="priority">
+                  Priority{" "}
+                  <span className="projects-form-label-required">*</span>
+                </Label>
                 <Select
                   value={formData.priority}
                   onValueChange={(value) =>
@@ -348,7 +376,10 @@ export default function CreateTask({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="type">Task Type *</Label>
+                <Label htmlFor="type">
+                  Task Type{" "}
+                  <span className="projects-form-label-required">*</span>
+                </Label>
                 <Select
                   value={formData.type || "TASK"}
                   onValueChange={(value) => handleFormDataChange("type", value)}
@@ -382,7 +413,7 @@ export default function CreateTask({
                   onChange={(e) =>
                     handleFormDataChange("dueDate", e.target.value)
                   }
-                  min={getToday()}
+                  min={getTodayDate()}
                   className="w-full border-[var(--border)] bg-[var(--background)]"
                 />
               </div>
@@ -394,51 +425,48 @@ export default function CreateTask({
               <TaskSectionHeader icon={HiUsers} title="Assignment" />
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Assignee *</Label>
-                <Select
-                  value={assignee?.id || ""}
-                  onValueChange={(userId) => {
-                    const user = projectMembers.find((m) => m.id === userId);
-                    setAssignee(user);
-                  }}
-                  disabled={!selectedProject?.id}
-                >
-                  <SelectTrigger className="w-full border-[var(--border)] bg-[var(--background)]">
-                    <SelectValue placeholder="Select assignee..." />
-                  </SelectTrigger>
-                  <SelectContent className="border-[var(--border)] bg-[var(--popover)]">
-                    {projectMembers.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.firstName} {member.lastName} ({member.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {membersLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin h-4 w-4 border-2 border-[var(--primary)] border-t-transparent rounded-full mx-auto mb-2" />
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    Loading project members...
+                  </p>
+                </div>
+              ) : members.length === 0 ? (
+                <p className="text-sm text-red-500 text-center">
+                  No project members found.
+                </p>
+              ) : (
+                <>
+                  <MemberSelect
+                    label="Assignee *"
+                    selectedMember={assignee}
+                    onChange={setAssignee}
+                    members={members}
+                    disabled={!selectedProject?.id || members.length === 0}
+                    placeholder={
+                      !selectedProject?.id
+                        ? "Select a project first"
+                        : "Select assignee..."
+                    }
+                  />
 
-              <div className="space-y-2">
-                <Label>Reporter</Label>
-                <Select
-                  value={reporter?.id || ""}
-                  onValueChange={(userId) => {
-                    const user = projectMembers.find((m) => m.id === userId);
-                    setReporter(user);
-                  }}
-                  disabled={!selectedProject?.id}
-                >
-                  <SelectTrigger className="w-full border-[var(--border)] bg-[var(--background)]">
-                    <SelectValue placeholder="Select reporter..." />
-                  </SelectTrigger>
-                  <SelectContent className="border-[var(--border)] bg-[var(--popover)]">
-                    {projectMembers.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.firstName} {member.lastName} ({member.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <MemberSelect
+                    label="Reporter"
+                    selectedMember={reporter}
+                    onChange={setReporter}
+                    members={members}
+                    disabled={!selectedProject?.id || members.length === 0}
+                    placeholder={
+                      !selectedProject?.id
+                        ? "Select a project first"
+                        : "Select reporter..."
+                    }
+                  />
+
+               
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -446,3 +474,42 @@ export default function CreateTask({
     </div>
   );
 }
+
+  const MemberSelect = ({
+    label,
+    selectedMember,
+    onChange,
+    members,
+    disabled,
+    placeholder,
+  }: {
+    label: string;
+    selectedMember: any;
+    onChange: (member: any) => void;
+    members: any[];
+    disabled: boolean;
+    placeholder: string;
+  }) => (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select
+        value={selectedMember?.id || ""}
+        onValueChange={(userId) => {
+          const user = members.find((m) => m.id === userId);
+          onChange(user);
+        }}
+        disabled={disabled}
+      >
+        <SelectTrigger className="w-full border-[var(--border)] bg-[var(--background)]">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent className="border-[var(--border)] bg-[var(--popover)]">
+          {members.map((member) => (
+            <SelectItem key={member.id} value={member.id}>
+              {member.firstName} {member.lastName} ({member.email})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );

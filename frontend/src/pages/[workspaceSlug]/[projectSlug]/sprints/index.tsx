@@ -41,9 +41,7 @@ function SprintsPageContent() {
   const [hasAccess, setHasAccess] = useState(false);
   const [isSprintModalOpen, setIsSprintModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [workspaceData, setWorkspaceData] = useState<any>(null);
 
-  // Load sprints on mount
   useEffect(() => {
     if (projectSlug) {
       listSprints({ slug: projectSlug as string });
@@ -54,17 +52,6 @@ function SprintsPageContent() {
     loadData();
   }, [workspaceSlug, projectSlug]);
 
-  const generateProjectSlug = (projectName: string) => {
-    if (!projectName) return "";
-
-    return projectName
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  };
 
   const findProjectBySlug = (projects: any[], slug: string) => {
     return projects.find(
@@ -92,7 +79,6 @@ function SprintsPageContent() {
       if (!workspace) {
         return;
       }
-      setWorkspaceData(workspace);
 
       const projects = await projectContext.getProjectsByWorkspace(
         workspace.id
@@ -119,11 +105,9 @@ function SprintsPageContent() {
       });
   }, [projectData?.id]);
 
-  // Handle create/update sprint
   const handleSaveSprint = async (data: any) => {
     try {
       if (editingSprint) {
-        // Remove projectId from update payload
         const { projectId, ...updateData } = data;
         await updateSprint(editingSprint.id, updateData);
       } else {
@@ -139,7 +123,6 @@ function SprintsPageContent() {
         await listSprints({ slug: projectSlug as string });
       }
 
-      // ✅ close modal after save
       setIsSprintModalOpen(false);
       setEditingSprint(null);
     } catch (error) {
@@ -148,7 +131,6 @@ function SprintsPageContent() {
     }
   };
 
-  // Handle delete sprint
   const handleDeleteSprint = async () => {
     if (!deletingSprint) return;
     setIsDeleting(true);
@@ -167,7 +149,6 @@ function SprintsPageContent() {
     }
   };
 
-  // Handle status changes
   const handleStatusChange = async (
     sprintId: string,
     action: "start" | "complete"
@@ -201,7 +182,7 @@ function SprintsPageContent() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="dashboard-container" automation-id="sprint-container">
       <div className="space-y-6">
         {/* Header */}
         <PageHeader

@@ -88,7 +88,7 @@ interface ProjectContextType extends ProjectState {
     inviteData: InviteMemberData
   ) => Promise<ProjectMember>;
   addMemberToProject: (memberData: AddMemberData) => Promise<ProjectMember>;
-  getProjectMembers: (projectId: string) => Promise<ProjectMember[]>;
+  getProjectMembers: (projectId: string, search?: string) => Promise<ProjectMember[]>;
   getOrganizationMembers: (
     organizationId: string
   ) => Promise<OrganizationMember[]>;
@@ -467,10 +467,11 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       },
 
       getProjectMembers: async (
-        projectId: string
+        projectId: string,
+        search?: string
       ): Promise<ProjectMember[]> => {
         const result = await handleApiOperation(
-          () => projectApi.getProjectMembers(projectId),
+          () => projectApi.getProjectMembers(projectId, search),
           false
         );
 

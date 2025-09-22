@@ -72,7 +72,7 @@ export function TaskPriorityChart({ data }: TaskPriorityChartProps) {
       title="Task Priority Distribution"
       description="Priority breakdown of project tasks"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>

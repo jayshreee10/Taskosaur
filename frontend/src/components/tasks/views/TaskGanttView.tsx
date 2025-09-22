@@ -1,5 +1,3 @@
-"use client";
-
 import {
   useState,
   useEffect,
@@ -18,12 +16,10 @@ import { TimelineHeader } from "@/components/gantt/TimelineHeader";
 
 const MINIMUM_ROWS = 9;
 
-// Main TaskGanttView Component
 export default function TaskGanttView({
   tasks,
   workspaceSlug,
   projectSlug,
-  onTaskUpdate,
   viewMode: externalViewMode,
   onViewModeChange,
 }: TaskGanttViewProps) {

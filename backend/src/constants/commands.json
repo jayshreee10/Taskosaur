@@ -119,6 +119,18 @@
     {
       "name": "bulkTaskOperations",
       "params": ["workspaceSlug", "projectSlug", "operations"]
+    },
+    {
+    "name": "navigateToDashboard",
+    "params":[]
+    },
+    {
+    "name": "inviteMember",
+    "params": ["workspaceSlug", "projectSlug", "email", "role"]
+    },
+    {
+      "name": "createSprint",
+      "params": ["workspaceSlug", "projectSlug", "name", "status", "startDate", "endDate", "goalDescription?"]
     }
   ]
 }

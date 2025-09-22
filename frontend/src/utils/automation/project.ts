@@ -207,24 +207,13 @@ export async function createProject(
     }
 
     if (!createButton) {
-      const allModalButtons = modalContainer.querySelectorAll('button');
-      console.error('Available buttons in modal:', Array.from(allModalButtons).map(b => ({
-        text: b.textContent?.trim(),
-        type: (b as HTMLButtonElement).type,
-        disabled: (b as HTMLButtonElement).disabled,
-        classes: b.className
-      })));
       throw new Error('Create project button not found in modal');
     }
     
     // Check if button is disabled but try anyway
     const isDisabled = createButton.disabled;
     if (isDisabled) {
-      console.warn('Create button appears disabled. Form values:', {
-        name: nameInput.value,
-        description: descriptionInput.value
-      });
-      console.warn('Attempting to click anyway...');
+      console.log('Attempting to click anyway...');
     }
 
     await simulateClick(createButton);
@@ -599,21 +588,11 @@ export async function editProject(
     try {
       await waitForElement('input#name, textarea#description', 5000);
     } catch (error) {
-      console.warn('Form elements not found, continuing anyway...');
-      console.log(error);
+      console.warn('Form elements not found, continuing anyway... \n', error);
     }
     
     // Additional wait for dynamic content
     await waitFor(1000);
-    
-    // Debug: Check if we're on the right page
-    console.log('Current URL:', window.location.href);
-    console.log('Page content check:', {
-      hasCards: document.querySelectorAll('[data-slot="card"]').length,
-      hasSettings: document.querySelector('h1')?.textContent?.includes('Settings'),
-      hasNameInput: !!document.querySelector('input#name'),
-      hasDescriptionInput: !!document.querySelector('textarea#description')
-    });
 
     // Update name if provided
     if (name) {
@@ -698,36 +677,6 @@ export async function editProject(
     }
 
     if (!saveButton) {
-      // Debug: log all buttons and form elements
-      const allButtons = document.querySelectorAll('button');
-      console.log('Available buttons:', Array.from(allButtons).map(b => ({
-        text: b.textContent?.trim(),
-        classes: b.className,
-        parent: b.parentElement?.className
-      })));
-      
-      // Also check if the form is properly loaded
-      console.log('Form elements check:', {
-        nameInput: document.querySelector('input#name')?.getAttribute('value'),
-        descriptionInput: document.querySelector('textarea#description')?.textContent,
-        statusSelect: (document.querySelector('select#status') as HTMLSelectElement)?.value,
-        allInputs: document.querySelectorAll('input').length,
-        allTextareas: document.querySelectorAll('textarea').length,
-        allSelects: document.querySelectorAll('select').length
-      });
-      
-      // Try to find any button that might be the save button
-      const possibleSaveButtons = Array.from(allButtons).filter(b => 
-        b.textContent?.toLowerCase().includes('save') || 
-        b.textContent?.toLowerCase().includes('update') ||
-        b.textContent?.toLowerCase().includes('submit')
-      );
-      
-      console.log('Possible save buttons:', possibleSaveButtons.map(b => ({
-        text: b.textContent?.trim(),
-        classes: b.className
-      })));
-      
       throw new Error('Save Changes button not found');
     }
 
@@ -821,6 +770,19 @@ export async function searchProjects(
     if (!allProjectsResult.success) {
       return allProjectsResult;
     }
+    // Try to use the search input if available
+      const searchInputContainer = document.querySelector('div[data-testid="project-search-input"]');
+      const searchInput = searchInputContainer?.querySelector('input[type="text"]') as HTMLInputElement | null;
+
+      if (searchInput) {
+        const valueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          "value"
+        )?.set;
+
+        valueSetter?.call(searchInput, query);
+        searchInput.dispatchEvent(new Event("input", { bubbles: true })); // notifies React onChange handler
+      }
 
     // Filter projects client-side (same as searchWorkspaces)
     const filteredProjects = allProjectsResult.data.projects.filter((project: any) => {

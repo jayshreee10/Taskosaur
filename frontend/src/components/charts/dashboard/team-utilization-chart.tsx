@@ -27,7 +27,7 @@ export function TeamUtilizationChart({ data }: TeamUtilizationChartProps) {
       title="Team Role Distribution"
       description="Organization member roles breakdown"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <RadarChart data={chartData}>

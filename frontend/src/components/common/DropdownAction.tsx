@@ -100,25 +100,25 @@ interface DropdownActionProps {
   showUnassign?: boolean;
   hideAvatar?: boolean;
   hideSubtext?: boolean;
-  
+
   // Optional data fetching function - called when dropdown opens
   onDropdownOpen?: () => Promise<void>;
-  
+
   // Type indicator to handle different display logic
-  itemType: 'user' | 'status' | 'projectMember';
+  itemType: "user" | "status" | "projectMember";
 }
 
 // Type guards to determine item type
 const isUser = (item: DropdownItem): item is User => {
-  return 'email' in item && !('user' in item) && !('name' in item);
+  return "email" in item && !("user" in item) && !("name" in item);
 };
 
 const isTaskStatus = (item: DropdownItem): item is TaskStatus => {
-  return 'name' in item && 'color' in item && !('user' in item);
+  return "name" in item && "color" in item && !("user" in item);
 };
 
 const isProjectMember = (item: DropdownItem): item is ProjectMember => {
-  return 'user' in item && 'role' in item && 'projectId' in item;
+  return "user" in item && "role" in item && "projectId" in item;
 };
 
 // Helper function to extract user data from ProjectMember
@@ -192,28 +192,36 @@ const getSearchText = (item: DropdownItem): string => {
   return "";
 };
 
-const ItemDisplay = ({ 
-  item, 
-  placeholder, 
+const ItemDisplay = ({
+  item,
+  placeholder,
   hideAvatar = false,
-  hideSubtext = false
-}: { 
-  item: DropdownItem | null; 
+  hideSubtext = false,
+}: {
+  item: DropdownItem | null;
   placeholder: string;
   hideAvatar?: boolean;
   hideSubtext?: boolean;
 }) => {
   if (!item) {
-    return <span className="text-sm text-[var(--muted-foreground)]">{placeholder}</span>;
+    return (
+      <span className="text-sm text-[var(--muted-foreground)] truncate block">
+        {placeholder}
+      </span>
+    );
   }
 
   const displayData = getDisplayData(item);
   if (!displayData) {
-    return <span className="text-sm text-[var(--muted-foreground)]">{placeholder}</span>;
+    return (
+      <span className="text-sm text-[var(--muted-foreground)] truncate block">
+        {placeholder}
+      </span>
+    );
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
       {!hideAvatar && (
         <>
           {displayData.user ? (
@@ -226,25 +234,25 @@ const ItemDisplay = ({
               size="sm"
             />
           ) : displayData.color ? (
-            <div 
-              className="w-6 h-6 rounded-full flex items-center justify-center"
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
               style={{ backgroundColor: displayData.color }}
             >
               <div className="w-3 h-3 bg-white rounded-full opacity-80" />
             </div>
           ) : (
-            <div className="w-6 h-6 bg-[var(--muted)] rounded-full flex items-center justify-center">
+            <div className="w-6 h-6 bg-[var(--muted)] rounded-full flex items-center justify-center shrink-0">
               <div className="w-3 h-3 bg-[var(--muted-foreground)] rounded-full opacity-60" />
             </div>
           )}
         </>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-xs flex items-start font-medium text-[var(--foreground)] truncate">
+        <div className="text-xs sm:text-sm font-medium text-[var(--foreground)] truncate">
           {displayData.name}
         </div>
         {!hideSubtext && (
-          <div className="text-[12px] text-[var(--muted-foreground)] truncate">
+          <div className="text-[11px] sm:text-[12px] text-[var(--muted-foreground)] truncate">
             {displayData.subtext}
           </div>
         )}
@@ -252,6 +260,7 @@ const ItemDisplay = ({
     </div>
   );
 };
+
 
 export default function DropdownAction({
   currentItem,
@@ -281,7 +290,7 @@ export default function DropdownAction({
 
   const handleOpenChange = async (open: boolean) => {
     setIsOpen(open);
-    
+
     if (open && onDropdownOpen) {
       setIsFetching(true);
       try {
@@ -292,7 +301,7 @@ export default function DropdownAction({
         setIsFetching(false);
       }
     }
-    
+
     if (!open) {
       setSearchQuery("");
     }
@@ -316,14 +325,23 @@ export default function DropdownAction({
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="w-full justify-between px-3 py-2 h-10 border-[var(--border)] hover:bg-[var(--accent)]"
+          className="w-full justify-between border-[var(--border)] hover:bg-[var(--accent)]
+           px-2 py-1.5 h-9 text-sm sm:px-3 sm:py-2 sm:h-10 sm:text-base"
         >
-          <ItemDisplay item={currentItem} placeholder={placeholder} hideAvatar={hideAvatar} hideSubtext={hideSubtext} />
-          <HiChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
+          <ItemDisplay
+            item={currentItem}
+            placeholder={placeholder}
+            hideAvatar={hideAvatar}
+            hideSubtext={hideSubtext}
+          />
+          <HiChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--muted-foreground)]" />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-72 overflow-y-auto bg-[var(--card)] border-none shadow-md p-1" align="start">
+      <DropdownMenuContent
+        className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-72 overflow-y-auto bg-[var(--card)] border-none shadow-md p-1"
+        align="start"
+      >
         {shouldShowSearch && (
           <>
             <div className="px-1 py-1 sticky top-0 bg-[var(--card)] z-10">
@@ -350,7 +368,9 @@ export default function DropdownAction({
               <div className="w-6 h-6 bg-[var(--destructive)]/10 rounded-full flex items-center justify-center">
                 <HiXMark className="w-3 h-3 text-[var(--destructive)]" />
               </div>
-              <span className="text-xs">{itemType === 'status' ? 'Clear Status' : 'Unassign'}</span>
+              <span className="text-xs">
+                {itemType === "status" ? "Clear Status" : "Unassign"}
+              </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="my-1" />
           </>
@@ -358,7 +378,13 @@ export default function DropdownAction({
 
         {isLoading ? (
           <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">
-            Loading {itemType === 'user' ? 'users' : itemType === 'status' ? 'statuses' : 'members'}...
+            Loading{" "}
+            {itemType === "user"
+              ? "users"
+              : itemType === "status"
+              ? "statuses"
+              : "members"}
+            ...
           </div>
         ) : filteredItems.length > 0 ? (
           filteredItems.map((item) => {
@@ -389,7 +415,7 @@ export default function DropdownAction({
                         size="sm"
                       />
                     ) : displayData.color ? (
-                      <div 
+                      <div
                         className="w-6 h-6 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: displayData.color }}
                       >
@@ -417,7 +443,13 @@ export default function DropdownAction({
           })
         ) : (
           <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">
-            No {itemType === 'user' ? 'users' : itemType === 'status' ? 'statuses' : 'members'} found.
+            No{" "}
+            {itemType === "user"
+              ? "users"
+              : itemType === "status"
+              ? "statuses"
+              : "members"}{" "}
+            found.
           </div>
         )}
       </DropdownMenuContent>

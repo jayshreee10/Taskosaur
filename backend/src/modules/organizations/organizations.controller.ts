@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -11,6 +11,7 @@ import { Roles } from 'src/common/decorator/roles.decorator';
 import { Role } from '@prisma/client';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { ChartDataResponse, ChartType, GetChartsQueryDto } from './dto/get-charts-query.dto';
+import { UniversalSearchService } from './universal-search.service';
 
 
 @ApiBearerAuth('JWT-auth')
@@ -20,6 +21,8 @@ export class OrganizationsController {
   constructor(
     private readonly organizationsService: OrganizationsService,
     private readonly orgChartsService: OrganizationChartsService,
+    private readonly searchService: UniversalSearchService,
+
   ) { }
 
   // Creating an organization: only authenticated user; no existing org scope yet.
@@ -38,7 +41,69 @@ export class OrganizationsController {
   findAll() {
     return this.organizationsService.findAll();
   }
-
+  
+  @Get('universal-search')
+  @ApiOperation({
+    summary: 'Universal search within organization',
+    description: 'Search across all entities within a specific organization with proper access control'
+  })
+  @ApiQuery({
+    name: 'q',
+    description: 'Search query string (minimum 2 characters)',
+    required: true,
+    type: String,
+    example: 'user authentication'
+  })
+  @ApiQuery({
+    name: 'organizationId',
+    description: 'UUID of the organization to search within',
+    required: true,
+    type: String,
+    example: '550e8400-e29b-41d4-a716-446655440000'
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Page number for pagination (starts from 1)',
+    required: false,
+    type: Number,
+    example: 1
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Number of results per page (max 100)',
+    required: false,
+    type: Number,
+    example: 20
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Search results retrieved successfully'
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid query parameters'
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User does not have access to the organization'
+  })
+  async search(
+    @Query('q') query: string,
+    @Query('organizationId') organizationId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+    @CurrentUser() user?: any
+  ) {
+    return this.searchService.search(
+      query,
+      organizationId,
+      user.id,
+      {
+        page: Math.max(1, page || 1),
+        limit: Math.min(100, Math.max(1, limit || 20))
+      }
+    );
+  }
   // Owner-only operations
   @Patch('archive/:id')
   @Roles(Role.OWNER)

@@ -277,7 +277,8 @@ export default function WorkflowEditor({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-[var(--foreground)]">
-                  Workflow Name *
+                  Workflow Name{" "}
+                  <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="name"

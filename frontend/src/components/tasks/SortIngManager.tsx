@@ -1,7 +1,5 @@
-"use client";
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,18 +8,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
-import { 
-  ArrowUpDown, 
-  ArrowUp, 
-  ArrowDown, 
-  RotateCcw,
-  CalendarDays,
-  Type
-} from "lucide-react";
-import {  HiCheckCircle } from "react-icons/hi2";
-import { AVAILABLE_COLUMN_TYPES } from "@/utils/taskColumnList";
-import { DEFAULT_SORT_FIELDS } from "@/utils/data/taskData";
+import { ArrowUpDown, ArrowUp, ArrowDown, RotateCcw } from "lucide-react";
+import { HiCheckCircle } from "react-icons/hi2";
 
+import { DEFAULT_SORT_FIELDS } from "@/utils/data/taskData";
+import Tooltip from "../common/ToolTip";
 export type SortOrder = "asc" | "desc";
 export type SortField = string;
 
@@ -41,32 +32,26 @@ interface SortingManagerProps {
   availableFields?: SortFieldConfig[];
 }
 
-
-
-
 const SortingManager: React.FC<SortingManagerProps> = ({
   sortField,
   sortOrder,
   onSortFieldChange,
   onSortOrderChange,
   onResetSort,
-   availableFields = DEFAULT_SORT_FIELDS,
+  availableFields = DEFAULT_SORT_FIELDS,
 }) => {
-  const currentField = availableFields.find(field => field.value === sortField);
-  const CurrentIcon = currentField?.icon || ArrowUpDown;
-  
   const groupedFields = availableFields.reduce((acc, field) => {
     const validCategories = ["date", "text", "number", "user"] as const;
-    const category: "date" | "text" | "number" | "user" = validCategories.includes(field.category as any)
-      ? field.category as "date" | "text" | "number" | "user"
-      : "text";
+    const category: "date" | "text" | "number" | "user" =
+      validCategories.includes(field.category as any)
+        ? (field.category as "date" | "text" | "number" | "user")
+        : "text";
     if (!acc[category]) {
       acc[category] = [];
     }
     acc[category].push(field as SortFieldConfig);
     return acc;
   }, {} as Record<"date" | "text" | "number" | "user", SortFieldConfig[]>);
-
 
   const handleSortOrderToggle = () => {
     onSortOrderChange(sortOrder === "asc" ? "desc" : "asc");
@@ -85,15 +70,6 @@ const SortingManager: React.FC<SortingManagerProps> = ({
     }
   };
 
-  const getFieldIcon = (fieldId: string) => {
-    // Use CalendarDays for date fields
-    if (["dueDate", "timeline", "date", "completedAt", "createdAt", "updatedAt"].includes(fieldId)) {
-      return CalendarDays;
-    }
-    const found = AVAILABLE_COLUMN_TYPES.find((col) => col.id === fieldId);
-    return found?.icon || Type;
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -103,7 +79,6 @@ const SortingManager: React.FC<SortingManagerProps> = ({
           className="border-[var(--border)] cursor-pointer flex items-center gap-2 min-w-[40px]"
         >
           <ArrowUpDown className="!w-[15px] !h-[15px] text-[var(--foreground)]" />
-
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -112,18 +87,19 @@ const SortingManager: React.FC<SortingManagerProps> = ({
       >
         <DropdownMenuLabel className="text-xs font-semibold flex justify-between items-center">
           <span>Sort Options</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs flex items-center gap-1"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleReset();
-            }}
-          >
-            <RotateCcw size={12} />
-            Reset
-          </Button>
+          <Tooltip content="Reset" position="top" color="primary">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReset();
+              }}
+            >
+              <RotateCcw size={12} />
+            </Button>
+          </Tooltip>
         </DropdownMenuLabel>
         <div className="px-2  text-xs text-[var(--muted-foreground)]">
           Choose how to sort your tasks
@@ -131,7 +107,9 @@ const SortingManager: React.FC<SortingManagerProps> = ({
         <DropdownMenuSeparator />
         {/* Sort Direction Controls */}
         <div className="px-2">
-          <div className="text-xs font-medium text-[var(--foreground)] mb-2">Direction</div>
+          <div className="text-xs font-medium text-[var(--foreground)] mb-2">
+            Direction
+          </div>
           <div className="flex gap-1">
             <Button
               variant={sortOrder === "asc" ? "default" : "outline"}
@@ -167,7 +145,7 @@ const SortingManager: React.FC<SortingManagerProps> = ({
           {Object.entries(groupedFields).map(([category, fields], idx) => (
             <div key={category}>
               {fields.map((field) => {
-                const Icon = getFieldIcon(field.value);
+                const Icon = field.icon;
                 const isActive = sortField === field.value;
                 return (
                   <DropdownMenuItem
@@ -187,7 +165,6 @@ const SortingManager: React.FC<SortingManagerProps> = ({
                       <span className="text-xs text-muted-foreground">
                         {field.label}
                       </span>
-                     
                     </div>
                     {isActive && (
                       <HiCheckCircle className="w-4 h-4 text-[var(--primary)] animate-in zoom-in-50 duration-200" />
@@ -202,7 +179,6 @@ const SortingManager: React.FC<SortingManagerProps> = ({
             </div>
           ))}
         </div>
-
       </DropdownMenuContent>
     </DropdownMenu>
   );

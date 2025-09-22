@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PriorityBadge } from "@/components/badges/PriorityBadge";
 import { HiPlus, HiCalendar } from "react-icons/hi";
-import { Role } from "@/utils/roles";
 import { useAuth } from "@/contexts/auth-context";
 
 interface SimpleTask {

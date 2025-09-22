@@ -50,7 +50,6 @@ try {
     fs.writeFileSync(nestCliPath, JSON.stringify(nestCli, null, 2));
   }
 
-  console.log(`Building with output directory: ${outDirAbsolute}`);
   execSync('nest build', { stdio: 'inherit' });
 
   // Create minimal package.json in output directory
@@ -135,7 +134,6 @@ try {
   let envSourcePath = null;
   if (fs.existsSync(repoRootEnvPath)) {
     envSourcePath = repoRootEnvPath;
-    console.log(`Processing .env from repository root`);
   } else if (fs.existsSync(backendEnvPath)) {
     envSourcePath = backendEnvPath;
     console.log(`Processing .env from backend directory`);
@@ -177,7 +175,6 @@ try {
   console.log(`Build completed successfully! Output: ${outDirAbsolute}`);
   console.log(`Created minimal package.json in ${outDirAbsolute}`);
   console.log(`\nTo run the application from ${outDirRelative}:`);
-  console.log(`  cd ${outDirRelative}`);
   console.log(`  npm install --production`);
   console.log(`  npm start`);
 } catch (error) {

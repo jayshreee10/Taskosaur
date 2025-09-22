@@ -1,5 +1,3 @@
-;
-
 import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useProjectContext } from "@/contexts/project-context";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
@@ -24,7 +22,6 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,10 +32,8 @@ import {
 import UserAvatar from "@/components/ui/avatars/UserAvatar";
 import { HiPlus } from "react-icons/hi2";
 import { HiTrash } from "react-icons/hi2";
-import { HiMail } from "react-icons/hi";
 import { HiUserPlus } from "react-icons/hi2";
 import { HiChevronDown } from "react-icons/hi2";
-import { HiEllipsisVertical } from "react-icons/hi2";
 import { HiCheck } from "react-icons/hi2";
 import { HiUsers } from "react-icons/hi2";
 
@@ -109,11 +104,9 @@ const MembersManagerComponent = memo(function MembersManager({
     type === "workspace" ? "MEMBER" : "DEVELOPER"
   );
   const [inviteEmail, setInviteEmail] = useState("");
-  const [editingMember, setEditingMember] = useState<string | null>(null);
   const [isFetchingMembers, setIsFetchingMembers] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
-  const [inviteLoading, setInviteLoading] = useState(false); // Add this state
-  const [inviteMessage, setInviteMessage] = useState<string | null>(null); // Add this state
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
 
   const lastFetchParamsRef = useRef<string>("");
   const mountedRef = useRef(true);
@@ -198,7 +191,6 @@ const MembersManagerComponent = memo(function MembersManager({
 
       if (mountedRef.current) {
         setMembers(normalized);
-        setHasInitialized(true);
         markFetchComplete(fetchKey, normalized);
       }
     } catch (error: any) {
@@ -331,7 +323,6 @@ const MembersManagerComponent = memo(function MembersManager({
       const fetchKey = `${type}-${entityId}-${organizationId}`;
       reset(fetchKey);
       lastFetchParamsRef.current = "";
-      setHasInitialized(false);
     };
   }, [reset, type, entityId, organizationId]);
 
@@ -392,20 +383,17 @@ const MembersManagerComponent = memo(function MembersManager({
       setInviteEmail("");
       setSelectedRole(type === "workspace" ? "MEMBER" : "DEVELOPER");
       
-      // Auto-close modal after 2 seconds
       setTimeout(() => {
         setShowInviteModal(false);
         setInviteMessage(null);
       }, 2000);
 
-      // Refresh members list
       await fetchMembers();
     } catch (error: any) {
       // Handle specific error messages from the backend
       const errorMessage = error?.response?.data?.message || error?.message;
       
       if (errorMessage) {
-        // Check for specific error types
           setInviteMessage(errorMessage+ ' for this ' + type);
      
       } else {
@@ -415,8 +403,6 @@ const MembersManagerComponent = memo(function MembersManager({
       setInviteLoading(false);
     }
   };
-
-  // Keep all other existing functions unchanged (handleRemoveMember, handleUpdateRole, etc.)...
 
   const handleRemoveMember = async (memberId: string) => {
     try {
@@ -459,7 +445,6 @@ const MembersManagerComponent = memo(function MembersManager({
       }
 
       await fetchMembers();
-      setEditingMember(null);
       setError(null);
     } catch (error: any) {
       setError(error?.message || `Failed to update ${type} member role`);

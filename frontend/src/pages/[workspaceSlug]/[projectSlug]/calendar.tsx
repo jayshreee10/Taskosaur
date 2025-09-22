@@ -120,17 +120,7 @@ function ProjectTasksCalendarPageContent() {
   const currentRouteRef = useRef<string>("");
   const isFirstRenderRef = useRef(true);
 
-  const generateProjectSlug = (projectName: string) => {
-    if (!projectName) return "";
 
-    return projectName
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  };
 
   const findProjectBySlug = (projects: any[], slug: string) => {
     return projects.find(
@@ -143,17 +133,17 @@ function ProjectTasksCalendarPageContent() {
   const handleTaskCreated = async () => {
     try {
       if (projectData?.id) {
-        const tasks = await taskContext.getTasksByProject(
-          projectData.id,
-          organizationId
+        const tasks = await taskContext.getCalendarTask(
+          organizationId,
+          { projectId: projectData.id }
         );
-        setProjectTasks(tasks || []);
+        setProjectTasks(Array.isArray(tasks) ? tasks : []);
       }
     } catch (error) {
       console.error("Error refreshing tasks:", error);
     }
   };
-
+// console.log("Project Tasks:", projectTasks);
   const loadData = async () => {
     try {
       setLoading(true);
@@ -197,9 +187,9 @@ function ProjectTasksCalendarPageContent() {
       }
       setProjectData(project);
 
-      const tasks = await taskContext.getTasksByProject(
-        project.id,
-        organizationId
+      const tasks = await taskContext.getCalendarTask(
+        organizationId,
+        { projectId: project.id }
       );
       setProjectTasks(tasks || []);
 

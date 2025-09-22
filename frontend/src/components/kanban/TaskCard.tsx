@@ -2,6 +2,7 @@ import React from "react";
 import { CardContent } from "@/components/ui/card";
 import { HiChatBubbleLeft, HiCalendarDays, HiPaperClip } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface KanbanTask {
   id: string;
@@ -38,6 +39,7 @@ interface TaskCardProps {
   isDragging: boolean;
   onDragStart: (task: KanbanTask, statusId: string) => void;
   onDragEnd: () => void;
+  onClick?: (task: KanbanTask) => void; // ✅ Added onClick prop
 }
 
 const getPriorityColor = (priority: string) => {
@@ -84,24 +86,41 @@ const TaskCard: React.FC<TaskCardProps> = ({
   statusId,
   isDragging,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  onClick // ✅ Destructure onClick prop
 }) => {
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
   const category = getCategoryFromDescription(task.description);
   const priorityColor = getPriorityColor(task.priority);
 
+  // ✅ Handle click with proper event handling
+  const handleClick = () => {
+    // Prevent click during drag operations
+    if (isDragging) return;
+    
+    // Call onClick if provided
+    if (onClick) {
+      onClick(task);
+    }
+  };
+
+  // ✅ Handle drag start with click prevention
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", "");
+    onDragStart(task, statusId);
+  };
+
   return (
     <div
       draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", "");
-        onDragStart(task, statusId);
-      }}
+      onDragStart={handleDragStart}
       onDragEnd={onDragEnd}
+      onClick={handleClick} // ✅ Added onClick handler
       className={cn(
         "rounded-lg border mb-3 cursor-move transition-all duration-200 hover:shadow-md h-[150px]",
-        isDragging && "opacity-50 rotate-1 shadow-lg"
+        isDragging && "opacity-50 rotate-1 shadow-lg",
+        onClick && "hover:cursor-pointer" // ✅ Show pointer cursor when clickable
       )}
       style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
     >
@@ -113,7 +132,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
         >
           {task.title}
         </h4>
-     
 
         {/* Category Tag */}
         <div className="mb-3">
@@ -168,10 +186,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 title={`${task.assignee.firstName} ${task.assignee.lastName}`}
               >
                 {task.assignee.avatar ? (
-                  <img 
+                  <Image 
                     src={task.assignee.avatar} 
                     alt={`${task.assignee.firstName} ${task.assignee.lastName}`}
                     className="w-full h-full rounded-full object-cover"
+                    height={100}
+                    width={100}
                   />
                 ) : (
                   getInitials(task.assignee.firstName, task.assignee.lastName)

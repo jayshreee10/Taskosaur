@@ -32,20 +32,46 @@ import {
   TasksResponse,
   TaskActivityType,
   ActivityApiResponse,
+  PaginatedTaskResponse,
 } from "@/types";
 interface TaskState {
   tasks: Task[];
   currentTask: Task | null;
+  subtTask: Task[];
   taskComments: TaskComment[];
   taskAttachments: TaskAttachment[];
   taskLabels: TaskLabel[];
   taskStatuses: TaskStatus[];
   isLoading: boolean;
   error: string | null;
+  taskResponse: PaginatedTaskResponse;
+  subtaskPagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  } | null;
 }
 
 interface TaskContextType extends TaskState {
-  getTaskStatusByProject: (params: { projectId: string }) => Promise<{ data: TaskStatus[] }>;
+  getCalendarTask: (
+    organizationId: string,
+    params?: {
+      workspaceId?: string;
+      projectId?: string;
+      sprintId?: string;
+      priorities?: string;
+      statuses?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) => Promise<Task[]>;
+  
+  getTaskStatusByProject: (params: {
+    projectId: string;
+  }) => Promise<{ data: TaskStatus[] }>;
+  
   getFilteredTasks: (params: {
     projectId?: string;
     sprintId?: string;
@@ -54,7 +80,7 @@ interface TaskContextType extends TaskState {
     statuses?: string[];
     search?: string;
     priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
-  }) => Promise<Task[]>;
+  }) => Promise<PaginatedTaskResponse>;
 
   updateTaskStatus: (taskId: string, statusId: string) => Promise<Task>;
   getTaskKanbanStatus: (params: {
@@ -77,7 +103,7 @@ interface TaskContextType extends TaskState {
       page?: number;
       limit?: number;
     }
-  ) => Promise<Task[]>;
+  ) => Promise<PaginatedTaskResponse>;
   getTasksByOrganization: (
     organizationId?: string,
     params?: GetTasksParams
@@ -86,19 +112,31 @@ interface TaskContextType extends TaskState {
     organizationId?: string,
     params?: GetTasksParams
   ) => Promise<TasksResponse>;
-  getTasksByProject: (projectId: string, organizationId: string) => Promise<Task[]>;
+  getTasksByProject: (
+    projectId: string,
+    organizationId: string
+  ) => Promise<Task[]>;
   getTasksBySprint: (
     organizationId: string,
     sprintId: string
   ) => Promise<Task[]>;
-  getSubtasksByParent: (parentTaskId: string) => Promise<Task[]>;
+  getSubtasksByParent: (
+    parentTaskId: string,
+    options?: { page?: number; limit?: number }
+  ) => Promise<PaginatedTaskResponse>;
   getTasksOnly: (projectId?: string) => Promise<Task[]>;
   getSubtasksOnly: (projectId?: string) => Promise<Task[]>;
   getTaskById: (taskId: string) => Promise<Task>;
   updateTask: (taskId: string, taskData: UpdateTaskRequest) => Promise<Task>;
   deleteTask: (taskId: string) => Promise<void>;
-  getTaskActivity: (taskId: string, pageNum: number) => Promise<ActivityApiResponse>;
-  getAllTaskStatuses: (params?: { workflowId?: string; organizationId?: string }) => Promise<TaskStatus[]>;
+  getTaskActivity: (
+    taskId: string,
+    pageNum: number
+  ) => Promise<ActivityApiResponse>;
+  getAllTaskStatuses: (params?: {
+    workflowId?: string;
+    organizationId?: string;
+  }) => Promise<TaskStatus[]>;
   getTasksByWorkspace: (workspaceId: string) => Promise<Task[]>;
 
   // Enhanced methods with automatic hierarchy context
@@ -165,6 +203,11 @@ interface TaskContextType extends TaskState {
   getTasksByStatus: (statusId: string) => Task[];
   getTasksByPriority: (priority: Task["priority"]) => Task[];
   isTaskOverdue: (task: Task) => boolean;
+  updateSubtask: (
+    subtaskId: string,
+    subtaskData: UpdateTaskRequest
+  ) => Promise<Task>;
+  deleteSubtask: (subtaskId: string) => Promise<void>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -185,12 +228,15 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const [taskState, setTaskState] = useState<TaskState>({
     tasks: [],
     currentTask: null,
+    subtTask: [],
     taskComments: [],
     taskAttachments: [],
     taskLabels: [],
     taskStatuses: [],
     isLoading: false,
     error: null,
+    taskResponse: null,
+    subtaskPagination: null,
   });
 
   // Helper to handle API operations with error handling
@@ -227,11 +273,16 @@ export function TaskProvider({ children }: TaskProviderProps) {
   const contextValue = useMemo(
     () => ({
       ...taskState,
-      getTaskStatusByProject: async (params: { projectId: string }): Promise<{ data: TaskStatus[] }> => {
+      getTaskStatusByProject: async (params: {
+        projectId: string;
+      }): Promise<{ data: TaskStatus[] }> => {
         if (!params.projectId) {
           throw new Error("No projectId provided for getTaskStatusByProject");
         }
-        return await handleApiOperation(() => taskApi.getTaskStatusByProject(params), false);
+        return await handleApiOperation(
+          () => taskApi.getTaskStatusByProject(params),
+          false
+        );
       },
 
       getFilteredTasks: async (params: {
@@ -242,7 +293,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
         statuses?: string[];
         search?: string;
         priorities?: ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[];
-      }): Promise<Task[]> => {
+      }): Promise<PaginatedTaskResponse> => {
         const organizationId =
           localStorage.getItem("currentOrganizationId") ||
           taskApi.getCurrentOrganization();
@@ -272,7 +323,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
         if (!params.parentTaskId) {
           setTaskState((prev) => ({
             ...prev,
-            tasks: result,
+            tasks: result.data,
           }));
         }
 
@@ -309,12 +360,82 @@ export function TaskProvider({ children }: TaskProviderProps) {
       createSubtask: async (
         subtaskData: CreateSubtaskRequest
       ): Promise<Task> => {
-        const result = await handleApiOperation(() =>
-          taskApi.createSubtask(subtaskData)
-        );
+        const result = await taskApi.createSubtask(subtaskData);
+        setTaskState((prev) => {
+          const updatedSubtasks = [...prev.subtTask, result];
+          const updatedCurrentTask =
+            prev.currentTask?.id === subtaskData.parentTaskId
+              ? {
+                  ...prev.currentTask,
+                  subtasks: [...(prev.currentTask?.childTasks || []), result],
+                }
+              : prev.currentTask;
+
+          return {
+            ...prev,
+            subtTask: updatedSubtasks,
+            currentTask: updatedCurrentTask,
+          };
+        });
+        return result;
+      },
+      updateSubtask: async (
+        subtaskId: string,
+        subtaskData: UpdateTaskRequest
+      ): Promise<Task> => {
+        const result = await taskApi.updateTask(subtaskId, subtaskData);
+
+        setTaskState((prev) => {
+          // Update subtask in subtTask array
+          const updatedSubtasks = prev.subtTask.map((subtask) =>
+            subtask.id === subtaskId ? { ...subtask, ...result } : subtask
+          );
+          const updatedCurrentTask = prev.currentTask?.childTasks?.some(
+            (child) => child.id === subtaskId
+          )
+            ? {
+                ...prev.currentTask,
+                childTasks: prev.currentTask.childTasks.map((child) =>
+                  child.id === subtaskId ? { ...child, ...result } : child
+                ),
+              }
+            : prev.currentTask;
+
+          return {
+            ...prev,
+            subtTask: updatedSubtasks,
+            currentTask: updatedCurrentTask,
+          };
+        });
+
         return result;
       },
 
+      deleteSubtask: async (subtaskId: string): Promise<void> => {
+        await taskApi.deleteTask(subtaskId);
+
+        setTaskState((prev) => {
+          const updatedSubtasks = prev.subtTask.filter(
+            (subtask) => subtask.id !== subtaskId
+          );
+          const updatedCurrentTask = prev.currentTask?.childTasks?.some(
+            (child) => child.id === subtaskId
+          )
+            ? {
+                ...prev.currentTask,
+                childTasks: prev.currentTask.childTasks.filter(
+                  (child) => child.id !== subtaskId
+                ),
+              }
+            : prev.currentTask;
+
+          return {
+            ...prev,
+            subtTask: updatedSubtasks,
+            currentTask: updatedCurrentTask,
+          };
+        });
+      },
       getAllTasks: async (
         organizationId: string,
         params?: {
@@ -322,24 +443,54 @@ export function TaskProvider({ children }: TaskProviderProps) {
           projectId?: string;
           priorities?: string;
           statuses?: string;
+          search?: string;
+          page?: number;
+          limit?: number;
         }
-      ): Promise<Task[]> => {
+      ): Promise<PaginatedTaskResponse> => {
         const result = await handleApiOperation(() =>
           taskApi.getAllTasks(organizationId, params)
         );
-
-        setTaskState((prev) => ({
-          ...prev,
-          tasks: result,
-        }));
-
+        setTaskState((prev) => {
+          const newState = {
+            ...prev,
+            tasks: result.data,
+            taskResponse: result,
+          };
+          return newState;
+        });
         return result;
       },
 
-      getTasksByProject: async (projectId: string , organizationId: string): Promise<Task[]> => {
+      getCalendarTask: async (
+        organizationId: string,
+        params?: {
+          workspaceId?: string;
+          projectId?: string;
+          sprintId?: string;
+          priorities?: string;
+          statuses?: string;
+          search?: string;
+          page?: number;
+          limit?: number;
+        }
+      ): Promise<Task[]> => {
+        if (!organizationId) {
+          throw new Error("organizationId is required for getCalendarTask");
+        }
+        const result = await handleApiOperation(
+          () => taskApi.getCalendarTask(organizationId, params),
+          false
+        );
+        return Array.isArray(result) ? result : [];
+      },
 
+      getTasksByProject: async (
+        projectId: string,
+        organizationId: string
+      ): Promise<Task[]> => {
         const result = await handleApiOperation(() =>
-          taskApi.getTasksByProject(projectId , organizationId)
+          taskApi.getTasksByProject(projectId, organizationId)
         );
         setTaskState((prev) => ({
           ...prev,
@@ -362,11 +513,26 @@ export function TaskProvider({ children }: TaskProviderProps) {
         return result;
       },
 
-      getSubtasksByParent: (parentTaskId: string): Promise<Task[]> =>
-        handleApiOperation(
-          () => taskApi.getSubtasksByParent(parentTaskId),
+      getSubtasksByParent: async (
+        parentTaskId: string,
+        options?: { page?: number; limit?: number }
+      ): Promise<PaginatedTaskResponse> => {
+        const result = await handleApiOperation(
+          () => taskApi.getSubtasksByParent(parentTaskId, options),
           false
-        ),
+        );
+        setTaskState((prev) => ({
+          ...prev,
+          subtTask: result.data,
+          subtaskPagination: {
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
+            totalPages: result.totalPages,
+          },
+        }));
+        return result;
+      },
 
       getTasksOnly: (projectId?: string): Promise<Task[]> =>
         handleApiOperation(() => taskApi.getTasksOnly(projectId), false),
@@ -383,8 +549,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
         // Update current task if it's the same ID
         setTaskState((prev) => ({
           ...prev,
-          currentTask:
-            prev.currentTask?.id === taskId ? result : prev.currentTask,
+          currentTask: result,
         }));
 
         return result;
@@ -398,20 +563,51 @@ export function TaskProvider({ children }: TaskProviderProps) {
           () => taskApi.updateTask(taskId, taskData),
           false
         );
-
-        // Update task in state
         setTaskState((prev) => ({
           ...prev,
           tasks: prev.tasks.map((task) =>
             task.id === taskId ? { ...task, ...result } : task
           ),
+          subtTask: prev.subtTask.map((subtask) =>
+            subtask.id === taskId ? { ...subtask, ...result } : subtask
+          ),
           currentTask:
             prev.currentTask?.id === taskId
               ? { ...prev.currentTask, ...result }
+              : prev.currentTask?.childTasks?.some(
+                  (child) => child.id === taskId
+                )
+              ? {
+                  ...prev.currentTask,
+                  childTasks: prev.currentTask.childTasks.map((child) =>
+                    child.id === taskId ? { ...child, ...result } : child
+                  ),
+                }
               : prev.currentTask,
         }));
 
         return result;
+      },
+      deleteTask: async (taskId: string): Promise<void> => {
+        await handleApiOperation(() => taskApi.deleteTask(taskId), false);
+        setTaskState((prev) => ({
+          ...prev,
+          tasks: prev.tasks.filter((task) => task.id !== taskId),
+          subtTask: prev.subtTask.filter((subtask) => subtask.id !== taskId),
+          currentTask:
+            prev.currentTask?.id === taskId
+              ? null
+              : prev.currentTask?.childTasks?.some(
+                  (child) => child.id === taskId
+                )
+              ? {
+                  ...prev.currentTask,
+                  childTasks: prev.currentTask.childTasks.filter(
+                    (child) => child.id !== taskId
+                  ),
+                }
+              : prev.currentTask,
+        }));
       },
 
       updateTaskStatus: async (
@@ -436,20 +632,14 @@ export function TaskProvider({ children }: TaskProviderProps) {
         return result;
       },
 
-      deleteTask: async (taskId: string): Promise<void> => {
-        await handleApiOperation(() => taskApi.deleteTask(taskId), false);
-
-        // Remove task from state
-        setTaskState((prev) => ({
-          ...prev,
-          tasks: prev.tasks.filter((task) => task.id !== taskId),
-          currentTask:
-            prev.currentTask?.id === taskId ? null : prev.currentTask,
-        }));
-      },
-
-      getTaskActivity: async (taskId: string, pageNum: number): Promise<ActivityApiResponse> => {
-        const result = await handleApiOperation(() => taskApi.getTaskActivity(taskId), false);
+      getTaskActivity: async (
+        taskId: string,
+        pageNum: number
+      ): Promise<ActivityApiResponse> => {
+        const result = await handleApiOperation(
+          () => taskApi.getTaskActivity(taskId),
+          false
+        );
 
         setTaskState((prev) => ({
           ...prev,
@@ -459,7 +649,10 @@ export function TaskProvider({ children }: TaskProviderProps) {
         return result;
       },
 
-      getAllTaskStatuses: async (params?: { workflowId?: string; organizationId?: string }): Promise<TaskStatus[]> => {
+      getAllTaskStatuses: async (params?: {
+        workflowId?: string;
+        organizationId?: string;
+      }): Promise<TaskStatus[]> => {
         const result = await handleApiOperation(
           () => taskApi.getAllTaskStatuses(params),
           false

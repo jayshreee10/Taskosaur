@@ -4,7 +4,6 @@ interface PageHeaderProps {
   icon?: ReactNode;
   title: string;
   description?: string;
-  /** Right-hand side (e.g. search box + primary button) */
   actions?: ReactNode;
   className?: string;
 }

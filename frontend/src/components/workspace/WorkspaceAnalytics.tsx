@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { PageHeader } from "../common/PageHeader";
 import {
   DashboardSettingsDropdown,
@@ -16,13 +16,13 @@ import { Widget, WorkspaceAnalyticsProps } from "@/types/analytics";
 
 import { TokenManager } from "@/lib/api";
 import { workspaceWidgets } from "@/utils/data/workspaceWidgets";
+import Tooltip from "../common/ToolTip";
 
 export function WorkspaceAnalytics({ workspaceSlug }: WorkspaceAnalyticsProps) {
   const {
     analyticsData,
     analyticsLoading,
     analyticsError,
-    refreshingAnalytics,
     fetchAnalyticsData,
     clearAnalyticsError,
   } = useWorkspace();
@@ -99,7 +99,7 @@ export function WorkspaceAnalytics({ workspaceSlug }: WorkspaceAnalyticsProps) {
 
   if (!analyticsData) {
     return (
-      <Alert>
+      <Alert className="flex items-center justify-between">
         <AlertDescription>
           No analytics data available for this organization.
         </AlertDescription>
@@ -107,7 +107,7 @@ export function WorkspaceAnalytics({ workspaceSlug }: WorkspaceAnalyticsProps) {
           onClick={handleFetchData}
           variant="outline"
           size="sm"
-          className="mt-2"
+          className="ml-4 shrink-0"
         >
           Load Data
         </Button>
@@ -120,7 +120,6 @@ export function WorkspaceAnalytics({ workspaceSlug }: WorkspaceAnalyticsProps) {
     .sort((a, b) => a.priority - b.priority);
 
   const visibleCount = widgets.filter((w) => w.visible).length;
-  const totalCount = widgets.length;
   const settingSections = [
     createWidgetsSection(widgets, toggleWidget, resetWidgets, () => {
       setWidgets((prev) =>
@@ -138,16 +137,22 @@ export function WorkspaceAnalytics({ workspaceSlug }: WorkspaceAnalyticsProps) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="workspace-content">
       <PageHeader
         title="Workspace Analytics"
         description="Insights into your workspace performance and metrics"
         actions={
           <div className="flex items-center gap-2">
-            <DashboardSettingsDropdown
-              sections={settingSections}
-              description="Customize your dashboard widgets"
-            />
+            <Tooltip
+              content="Dashboard Settings"
+              position="top"
+              color="primary"
+            >
+              <DashboardSettingsDropdown
+                sections={settingSections}
+                description="Customize your dashboard widgets"
+              />
+            </Tooltip>
           </div>
         }
       />
@@ -192,30 +197,30 @@ function AnalyticsSkeleton() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="dashboard-stat-card">
-            <Card className="dashboard-stat-card-inner">
-              <CardContent className="dashboard-stat-content space-y-1">
+            <div className="dashboard-stat-card-inner ">
+              <div className="dashboard-stat-content space-y-1">
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-6 w-12" />
                 <Skeleton className="h-3 w-24" />
                 <Skeleton className="h-5 w-16" />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i} className="analytics-chart-container">
-            <CardHeader>
+          <div key={i} className="analytics-chart-container">
+            <div>
               <Skeleton className="h-6 w-48" />
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div>
               <div className={`h-70 w-full flex items-center justify-center`}>
                 <Skeleton className="h-full w-full rounded-md" />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
     </div>

@@ -369,7 +369,7 @@ function ProjectSettingsContent() {
 
       <Card className="border-none bg-[var(--card)]">
         <CardContent className="p-6">
-          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 rounded-lg p-4">
+          <div className="bg-red-50 dark:bg-red-950/20 border-none  rounded-lg p-4">
             <div className="flex items-start gap-3">
               <HiExclamationTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -395,7 +395,7 @@ function ProjectSettingsContent() {
                     disabled={!hasAccess}
                   >
                     <HiExclamationTriangle className="w-4 h-4 mr-2" />
-                    Danger Zone
+                    Delete Project
                   </Button>
                 </DangerZoneModal>
               </div>

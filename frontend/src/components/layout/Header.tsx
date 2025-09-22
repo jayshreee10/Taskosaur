@@ -27,9 +27,13 @@ import {
 import { NewProjectModal } from "@/components/projects/NewProjectModal";
 import NewWorkspaceDialog from "../workspace/NewWorkspaceDialogProps";
 import { NewTaskModal } from "@/components/tasks/NewTaskModal";
+import Tooltip from "../common/ToolTip";
+import SearchManager from "../header/SearchManager";
 
 export default function Header() {
   const router = useRouter();
+
+  const { workspaceSlug, projectSlug } = router.query;
   const { getCurrentOrganizationId } = useWorkspaceContext();
   const { getUserAccess } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
@@ -198,14 +202,14 @@ export default function Header() {
 
   const contextLevel = getContextLevel();
 
-  const workspaceSlug =
+  const workspaceSlugFromUrl =
     contextLevel === "workspace" ||
     contextLevel === "workspace-nested" ||
     contextLevel === "project"
-      ? pathParts[0]
+      ? workspaceSlug
       : null;
 
-  const projectSlug = contextLevel === "project" ? pathParts[1] : null;
+  const projectSlugFromUrl = contextLevel === "project" ? projectSlug : null;
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -251,6 +255,26 @@ export default function Header() {
     }
   };
 
+  const headerOptions = [
+    {
+      content: "Notifications",
+      component: (
+        <NotificationDropdown
+          userId={currentUser?.id}
+          organizationId={getCurrentOrganizationId()}
+        />
+      ),
+    },
+    {
+      content: "Invitations",
+      component: <InvitationManager userId={currentUser?.id} />,
+    },
+    { content: "Toggle Theme", component: <ModeToggle /> },
+    {
+      content:"Search", component: <div className=""><SearchManager /></div>
+    }
+  ];
+
   return (
     <>
       <header className="header-container">
@@ -263,18 +287,21 @@ export default function Header() {
                   open={isDropdownOpen}
                   onOpenChange={setIsDropdownOpen}
                 >
-                  {hasAccess && (
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="default"
-                        className="header-create-button"
-                      >
-                        <HiPlus className="size-4" />
-                        <span className="hidden sm:inline">Create</span>
-                        <HiChevronDown className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  )}
+                  {hasAccess &&
+                    (contextLevel === "global" ||
+                      contextLevel === "workspace" ||
+                      contextLevel === "project") && (
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="default"
+                          className="header-create-button"
+                        >
+                          <HiPlus className="size-4" />
+                          <span className="hidden sm:inline">Create</span>
+                          <HiChevronDown className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    )}
 
                   <DropdownMenuContent
                     className="header-dropdown-content"
@@ -387,15 +414,19 @@ export default function Header() {
             <div className="header-center">
               {hasOrganizationAccess && <OrganizationSelector />}
             </div>
+
             {hasOrganizationAccess && (
               <>
-                <NotificationDropdown
-                  userId={currentUser?.id}
-                  organizationId={getCurrentOrganizationId()}
-                />
-                {hasAccess && <InvitationManager userId={currentUser?.id} />}
-
-                <ModeToggle />
+                {headerOptions.map(({ content, component }, idx) => (
+                  <Tooltip
+                    key={idx}
+                    content={content}
+                    position="bottom"
+                    color="primary"
+                  >
+                    {component}
+                  </Tooltip>
+                ))}
 
                 {toggleChat && isAIEnabled && (
                   <div className="relative">
@@ -452,8 +483,8 @@ export default function Header() {
           onClose={() => {
             setShowNewTaskModal(false);
           }}
-          workspaceSlug={workspaceSlug}
-          projectSlug={projectSlug}
+          workspaceSlug={workspaceSlugFromUrl as string}
+          projectSlug={projectSlugFromUrl as string}
         />
       )}
     </>

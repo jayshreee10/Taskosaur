@@ -587,4 +587,21 @@ export class WorkspacesService {
       count,
     }));
   }
+
+  async findAllSlugs(organization_id: string): Promise<string[]> {
+    if (organization_id === '' || organization_id === null || organization_id === undefined) return [];
+    const workspaces = await this.prisma.workspace.findMany({
+      where: { archive: false, organizationId: organization_id },
+      select: { slug: true },
+    });
+    return workspaces.map((w) => w.slug);
+  }
+
+  async getIdBySlug(slug: string): Promise<string | null> {
+    const workspace = await this.prisma.workspace.findFirst({
+      where: { slug },
+      select: { id: true },
+    });
+    return workspace ? workspace.id : null;
+  }
 }

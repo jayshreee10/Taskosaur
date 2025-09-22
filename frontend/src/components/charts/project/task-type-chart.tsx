@@ -34,7 +34,7 @@ export function TaskTypeChart({ data }: TaskTypeChartProps) {
       title="Task Type Distribution"
       description="Types of tasks in this project"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={350}>
         <BarChart 

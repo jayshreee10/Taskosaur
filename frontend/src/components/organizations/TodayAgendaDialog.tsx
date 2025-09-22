@@ -5,12 +5,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogClose,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CardContent } from "@/components/ui/card";
-import { Calendar, Clock, CheckCircle, Sparkles, X } from "lucide-react";
+import { Calendar, Clock, CheckCircle, Sparkles } from "lucide-react";
 import { Task } from "@/types";
 
 interface TodayAgendaDialogProps {
@@ -141,10 +139,7 @@ export function TodayAgendaDialog({
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-3">
                                 <div className="flex-1 min-w-0">
-                                  <p
-                                    className="text-sm font-medium truncate "
-                                     
-                                  >
+                                  <p className="text-sm font-medium truncate ">
                                     {task.title}
                                   </p>
                                   {task.description && (

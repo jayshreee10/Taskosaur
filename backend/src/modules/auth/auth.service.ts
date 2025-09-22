@@ -27,7 +27,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
 
   async validateUser(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
@@ -139,6 +139,7 @@ export class AuthService {
   async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       const decoded = this.jwtService.verify(refreshToken);
 
       // Type guard to ensure decoded payload has required properties
@@ -219,9 +220,6 @@ export class AuthService {
         resetToken: resetToken, // Pass the plain token (not hashed)
         resetUrl: resetUrl,
       });
-      console.log(
-        `Password reset requested for email: ${email} at ${new Date().toISOString()}`,
-      );
       return {
         message:
           'If an account with that email exists, a password reset link has been sent.',
@@ -384,11 +382,6 @@ export class AuthService {
           userName: validUser.firstName,
           resetTime: new Date().toLocaleString(),
         },
-      );
-
-      // Log successful password reset for security audit
-      console.log(
-        `Password successfully reset for user: ${validUser.email} at ${new Date().toISOString()}`,
       );
 
       return { message: 'Password has been successfully reset' };

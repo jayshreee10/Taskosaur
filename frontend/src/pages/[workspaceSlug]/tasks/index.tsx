@@ -9,7 +9,6 @@ import TaskListView from "@/components/tasks/views/TaskListView";
 import TaskGanttView from "@/components/tasks/views/TaskGanttView";
 import { HiXMark } from "react-icons/hi2";
 import { Input } from "@/components/ui/input";
-import { Task } from "@/contexts/task-context";
 import { ColumnConfig, Project, ViewMode } from "@/types";
 import ErrorState from "@/components/common/ErrorState";
 import EmptyState from "@/components/common/EmptyState";
@@ -20,31 +19,25 @@ import TabView from "@/components/tasks/TabView";
 import Loader from "@/components/common/Loader";
 import Pagination from "@/components/common/Pagination";
 import { ColumnManager } from "@/components/tasks/ColumnManager";
-import SortingManager, { SortField, SortOrder } from "@/components/tasks/SortIngManager"; 
+import SortingManager, {
+  SortField,
+  SortOrder,
+} from "@/components/tasks/SortIngManager";
 import {
   FilterDropdown,
   useGenericFilters,
 } from "@/components/common/FilterDropdown";
 import { CheckSquare, Flame, Folder } from "lucide-react";
 import { TaskPriorities } from "@/utils/data/taskData";
+import Tooltip from "@/components/common/ToolTip";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState<T>(value);
-
   useEffect(() => {
     const handler = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(handler);
   }, [value, delay]);
-
   return debounced;
-}
-
-interface PaginationInfo {
-  currentPage: number;
-  totalPages: number;
-  totalCount: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
 }
 
 interface Workspace {
@@ -56,18 +49,26 @@ interface Workspace {
 
 function WorkspaceTasksContent() {
   const [addTaskStatuses, setAddTaskStatuses] = useState<any[]>([]);
-
   const router = useRouter();
   const { workspaceSlug } = router.query;
   const { getWorkspaceBySlug, getWorkspaceMembers } = useWorkspace();
   const { getProjectsByWorkspace, getTaskStatusByProject } = useProject();
-  const { getFilteredTasks } = useTask();
-  const { isAuthenticated } = useAuth();
-
+  
+ 
+  const { 
+    getAllTasks, 
+    getCalendarTask, 
+    tasks, 
+    isLoading, 
+    error: contextError, 
+    taskResponse, 
+  } = useTask();
+  
+  const { isAuthenticated, getUserAccess } = useAuth();
+  
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [currentView, setCurrentView] = useState<"list" | "kanban" | "gantt">(
     () => {
@@ -85,15 +86,6 @@ function WorkspaceTasksContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isNewTaskModalOpen, setNewTaskModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    currentPage: 1,
-    totalPages: 0,
-    totalCount: 0,
-    hasNextPage: false,
-    hasPrevPage: false,
-  });
-  const { getUserAccess } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -101,11 +93,35 @@ function WorkspaceTasksContent() {
   const [availableStatuses, setAvailableStatuses] = useState<any[]>([]);
   const [statusFilterEnabled, setStatusFilterEnabled] = useState(false);
   const [availablePriorities] = useState(TaskPriorities);
-  const [filtersLoaded, setFiltersLoaded] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [ganttTasks, setGanttTasks] = useState<any[]>([]);
+
+  
+  const error = contextError || localError;
+
+  
+  const pagination = useMemo(() => {
+    if (!taskResponse) {
+      return {
+        currentPage: 1,
+        totalPages: 0,
+        totalCount: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      };
+    }
+
+    return {
+      currentPage: taskResponse.page,
+      totalPages: taskResponse.totalPages,
+      totalCount: taskResponse.total,
+      hasNextPage: taskResponse.page < taskResponse.totalPages,
+      hasPrevPage: taskResponse.page > 1,
+    };
+  }, [taskResponse]);
 
   useEffect(() => {
     if (workspace?.id && !projectsLoaded) {
@@ -133,32 +149,17 @@ function WorkspaceTasksContent() {
   const firstRenderRef = useRef(true);
   const debouncedSearchQuery = useDebounce(searchInput, 500);
   const hasValidAuth = !!isAuthenticated() && !!workspaceSlug;
-
   const { createSection } = useGenericFilters();
-
-  const normalizeTaskStatus = useCallback((task: Task) => {
-    const statusId =
-      task.statusId ||
-      (typeof task.status === "object" ? task.status?.id : task.status);
-    return {
-      ...task,
-      statusId: statusId,
-      normalizedStatusId: statusId,
-    };
-  }, []);
 
   const validateRequiredData = useCallback(() => {
     const issues = [];
-
     if (!workspace?.id) issues.push("Missing workspace ID");
     if (!workspace?.organizationId) issues.push("Missing organization ID");
-
     if (issues.length > 0) {
       console.error("Validation failed:", issues);
-      setError(`Missing required data: ${issues.join(", ")}`);
+      setLocalError(`Missing required data: ${issues.join(", ")}`);
       return false;
     }
-
     return true;
   }, [workspace?.id, workspace?.organizationId]);
 
@@ -176,10 +177,8 @@ function WorkspaceTasksContent() {
 
   const loadWorkspaceMembers = useCallback(async () => {
     if (!workspace?.id) return;
-
     try {
       const members = await getWorkspaceMembers(workspace.id);
-
       setWorkspaceMembers(members || []);
     } catch (error) {
       console.error("Failed to fetch workspace members:", error);
@@ -195,37 +194,31 @@ function WorkspaceTasksContent() {
 
   const loadInitialData = useCallback(async () => {
     if (!hasValidAuth) return;
-
     try {
-      setError(null);
-      setIsLoading(true);
-
+      setLocalError(null);
+      
       if (!isAuthenticated()) {
         router.push("/auth/login");
         return;
       }
-
+      
       const ws = await getWorkspaceBySlug(workspaceSlug as string);
       if (!ws) {
         throw new Error(`Workspace "${workspaceSlug}" not found`);
       }
-
       setWorkspace(ws);
-
       return { ws };
     } catch (error) {
       console.error("LoadInitialData error:", error);
-      setError(
+      setLocalError(
         error instanceof Error ? error.message : "Failed to load initial data"
       );
-    } finally {
-      setIsLoading(false);
     }
   }, [isAuthenticated, workspaceSlug, router]);
 
   const loadFilterData = useCallback(async () => {
     if (!workspace?.id) return;
-    if (filtersLoaded && projectsLoaded) return;
+    if (projectsLoaded) return;
     try {
       if (!projectsLoaded) {
         const projects = await getProjectsByWorkspace(workspace.id);
@@ -235,87 +228,79 @@ function WorkspaceTasksContent() {
     } catch (error) {
       console.error("Failed to load filter data:", error);
     }
-  }, [workspace?.id, filtersLoaded, projectsLoaded, getProjectsByWorkspace]);
+  }, [workspace?.id, projectsLoaded, getProjectsByWorkspace]);
 
-  const getFilterParams = useCallback(
-    () => ({
-      organizationId: workspace?.organizationId,
-      workspaceId: workspace?.id,
-      ...(selectedProjects.length > 0 && {
-        projectId: selectedProjects.join(","),
-      }),
-      statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
-      priorities:
-        selectedPriorities.length > 0
-          ? (selectedPriorities as ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[])
-          : undefined,
-      search: debouncedSearchQuery.trim() || undefined,
-    }),
-    [
-      workspace?.organizationId,
-      workspace?.id,
-      selectedProjects,
-      selectedStatuses,
-      selectedPriorities,
-      debouncedSearchQuery,
-    ]
-  );
-
+  
   const loadTasks = useCallback(async () => {
-    if (!workspace?.id || !workspace?.organizationId) {
+    if (!workspace?.organizationId) {
       return;
     }
-
+    
     if (!validateRequiredData()) {
       return;
     }
 
     try {
-      setError(null);
-      setIsLoading(true);
+      setLocalError(null);
+      
+      // Build parameters for getAllTasks
+      const params = {
+        workspaceId: workspace.id,
+        ...(selectedProjects.length > 0 && {
+          projectId: selectedProjects.join(","),
+        }),
+        ...(selectedStatuses.length > 0 && {
+          statuses: selectedStatuses.join(","),
+        }),
+        ...(selectedPriorities.length > 0 && {
+          priorities: selectedPriorities.join(","),
+        }),
+        ...(debouncedSearchQuery.trim() && {
+          search: debouncedSearchQuery.trim(),
+        }),
+        page: currentPage,
+        limit: pageSize,
+      };
 
-      const filterParams = getFilterParams();
-
-      const allTasks = await getFilteredTasks(filterParams);
-      const normalizedTasks = allTasks.map(normalizeTaskStatus);
-
-      const totalTasks = normalizedTasks.length;
-      const totalPages = Math.ceil(totalTasks / pageSize);
-      const startIndex = (currentPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedTasks = normalizedTasks.slice(startIndex, endIndex);
-
-      setTasks(paginatedTasks);
-      setPagination({
-        currentPage,
-        totalPages,
-        totalCount: totalTasks,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-      });
+      // Call getAllTasks - this will update tasks and taskResponse in context
+      await getAllTasks(workspace.organizationId, params);
+      
     } catch (error) {
       console.error("Failed to load tasks:", error);
-      setError(error instanceof Error ? error.message : "Failed to load tasks");
-    } finally {
-      setIsLoading(false);
+      setLocalError(error instanceof Error ? error.message : "Failed to load tasks");
     }
   }, [
-    workspace?.id,
     workspace?.organizationId,
+    workspace?.id,
     currentPage,
     pageSize,
     debouncedSearchQuery,
     selectedProjects,
     selectedStatuses,
     selectedPriorities,
-    normalizeTaskStatus,
     validateRequiredData,
-    getFilteredTasks,
+    getAllTasks,
   ]);
+
+  const loadGanttData = useCallback(async () => {
+    if (!workspace?.id) return;
+    try {
+      const data = await getCalendarTask(workspace.organizationId, { workspaceId: workspace.id });
+      setGanttTasks(data || []);
+    } catch (error) {
+      console.error("Failed to load Gantt data:", error);
+      setGanttTasks([]);
+    }
+  }, [workspace?.id, getCalendarTask]);
+
+  useEffect(() => {
+    if (currentView === "gantt" && workspace?.id) {
+      loadGanttData();
+    }
+  }, [currentView, workspace?.id]);
 
   useEffect(() => {
     if (!router.isReady) return;
-
     const currentRoute = `${workspaceSlug}`;
     if (routeRef.current !== currentRoute) {
       routeRef.current = currentRoute;
@@ -324,10 +309,10 @@ function WorkspaceTasksContent() {
   }, [router.isReady, workspaceSlug]);
 
   useEffect(() => {
-    if (workspace?.id && workspace.organizationId) {
+    if (workspace?.organizationId && workspace?.id) {
       loadTasks();
     }
-  }, [workspace?.id, workspace?.organizationId]);
+  }, [workspace?.organizationId, workspace?.id]);
 
   const previousFiltersRef = useRef({
     page: currentPage,
@@ -340,7 +325,6 @@ function WorkspaceTasksContent() {
 
   useEffect(() => {
     if (!workspace?.organizationId || !workspace?.id) return;
-
     const currentFilters = {
       page: currentPage,
       pageSize,
@@ -349,16 +333,13 @@ function WorkspaceTasksContent() {
       statuses: selectedStatuses.join(","),
       priorities: selectedPriorities.join(","),
     };
-
     const filtersChanged =
       JSON.stringify(currentFilters) !==
       JSON.stringify(previousFiltersRef.current);
     previousFiltersRef.current = currentFilters;
-
     if (!firstRenderRef.current && filtersChanged && validateRequiredData()) {
       loadTasks();
     }
-
     firstRenderRef.current = false;
   }, [
     workspace?.organizationId,
@@ -370,7 +351,6 @@ function WorkspaceTasksContent() {
     selectedStatuses,
     selectedPriorities,
     validateRequiredData,
-    loadTasks,
   ]);
 
   const projectFilters = useMemo(
@@ -455,7 +435,10 @@ function WorkspaceTasksContent() {
           setAvailableStatuses(statuses || []);
           setStatusFilterEnabled(true);
         } catch (error) {
-          console.error('Failed to fetch statuses for selected project:', error);
+          console.error(
+            "Failed to fetch statuses for selected project:",
+            error
+          );
           setAvailableStatuses([]);
           setStatusFilterEnabled(false);
         }
@@ -476,9 +459,9 @@ function WorkspaceTasksContent() {
         data: projectFilters,
         selectedIds: selectedProjects,
         searchable: true,
-        multiSelect: false, 
+        multiSelect: false,
         onToggle: toggleProject,
-        onSelectAll: undefined, 
+        onSelectAll: undefined,
         onClearAll: () => setSelectedProjects([]),
       }),
       createSection({
@@ -489,8 +472,12 @@ function WorkspaceTasksContent() {
         selectedIds: selectedStatuses,
         searchable: false,
         onToggle: statusFilterEnabled ? toggleStatus : undefined,
-        onSelectAll: statusFilterEnabled ? () => setSelectedStatuses(statusFilters.map((s) => s.id)) : undefined,
-        onClearAll: statusFilterEnabled ? () => setSelectedStatuses([]) : undefined,
+        onSelectAll: statusFilterEnabled
+          ? () => setSelectedStatuses(statusFilters.map((s) => s.id))
+          : undefined,
+        onClearAll: statusFilterEnabled
+          ? () => setSelectedStatuses([])
+          : undefined,
         disabled: !statusFilterEnabled,
       }),
       createSection({
@@ -501,11 +488,23 @@ function WorkspaceTasksContent() {
         selectedIds: selectedPriorities,
         searchable: false,
         onToggle: togglePriority,
-        onSelectAll: () => setSelectedPriorities(priorityFilters.map((p) => p.id)),
+        onSelectAll: () =>
+          setSelectedPriorities(priorityFilters.map((p) => p.id)),
         onClearAll: () => setSelectedPriorities([]),
       }),
     ],
-    [projectFilters, statusFilters, priorityFilters, selectedProjects, selectedStatuses, selectedPriorities, toggleProject, toggleStatus, togglePriority, statusFilterEnabled]
+    [
+      projectFilters,
+      statusFilters,
+      priorityFilters,
+      selectedProjects,
+      selectedStatuses,
+      selectedPriorities,
+      toggleProject,
+      toggleStatus,
+      togglePriority,
+      statusFilterEnabled,
+    ]
   );
 
   const totalActiveFilters =
@@ -543,20 +542,17 @@ function WorkspaceTasksContent() {
       attachmentsCount: { label: "Attachments", type: "number" },
       timeEntries: { label: "Time Entries", type: "number" },
     };
-
     const config = columnConfigs[columnId];
     if (!config) {
       console.warn(`Unknown column ID: ${columnId}`);
       return;
     }
-
     const newColumn: ColumnConfig = {
       id: columnId,
       label: config.label,
       type: config.type,
       visible: true,
     };
-
     setColumns((prev) => [...prev, newColumn]);
   };
 
@@ -582,7 +578,7 @@ function WorkspaceTasksContent() {
   }, [handleTaskRefetch]);
 
   const handleRetry = useCallback(() => {
-    setError(null);
+    setLocalError(null);
     loadInitialData();
     if (workspace?.organizationId && workspace?.id) {
       loadTasks();
@@ -602,11 +598,39 @@ function WorkspaceTasksContent() {
     setSearchInput("");
   }, []);
 
+  const sortedTasks = useMemo(() => {
+    const sorted = [...tasks].sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+      // Handle date fields
+      if (
+        ["createdAt", "updatedAt", "completedAt", "timeline"].includes(
+          sortField
+        )
+      ) {
+        aValue = aValue ? new Date(aValue).getTime() : 0;
+        bValue = bValue ? new Date(bValue).getTime() : 0;
+      }
+      // Handle string comparison
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortOrder === "asc"
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      // Handle number comparison
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
+      }
+      // Fallback
+      return 0;
+    });
+    return sorted;
+  }, [tasks, sortOrder, sortField]);
+
   const renderContent = () => {
     if (isLoading)
       return <Loader text="Fetching workspace tasks..." className="py-20" />;
-
-    if (!tasks.length) {
+    if (!sortedTasks.length && currentView !== "gantt") {
       return (
         <EmptyState
           searchQuery={debouncedSearchQuery}
@@ -614,7 +638,6 @@ function WorkspaceTasksContent() {
         />
       );
     }
-
     switch (currentView) {
       case "kanban":
         return (
@@ -627,7 +650,7 @@ function WorkspaceTasksContent() {
       case "gantt":
         return (
           <TaskGanttView
-            tasks={tasks}
+            tasks={ganttTasks}
             workspaceSlug={workspaceSlug as string}
             projectSlug="default-project"
             viewMode={ganttViewMode}
@@ -637,7 +660,7 @@ function WorkspaceTasksContent() {
       default:
         return (
           <TaskListView
-            tasks={tasks}
+            tasks={sortedTasks}
             workspaceSlug={workspaceSlug as string}
             projects={projects}
             projectsOfCurrentWorkspace={projects}
@@ -654,6 +677,7 @@ function WorkspaceTasksContent() {
     currentView === "list" && tasks.length > 0 && pagination.totalPages > 1;
 
   if (error) return <ErrorState error={error} onRetry={handleRetry} />;
+
   return (
     <div className="dashboard-container h-[86vh] flex flex-col space-y-3">
       {/* Sticky PageHeader */}
@@ -709,7 +733,7 @@ function WorkspaceTasksContent() {
                 isOpen={isNewTaskModalOpen}
                 onClose={() => {
                   setNewTaskModalOpen(false);
-                  setError(null);
+                  setLocalError(null);
                 }}
                 onTaskCreated={async () => {
                   try {
@@ -729,7 +753,6 @@ function WorkspaceTasksContent() {
           }
         />
       </div>
-
       {/* Sticky TabView */}
       <div className="sticky top-[64px] z-40">
         <TabView
@@ -761,40 +784,54 @@ function WorkspaceTasksContent() {
                   ))}
                 </div>
               )}
-                {currentView === "list" && (
-                              <div className="flex items-center gap-2">
-                                <SortingManager
-                                  sortField={sortField}
-                                  sortOrder={sortOrder}
-                                  onSortFieldChange={setSortField}
-                                  onSortOrderChange={setSortOrder}
-                                />
-                                <ColumnManager
-                                  currentView={currentView}
-                                  availableColumns={columns}
-                                  onAddColumn={handleAddColumn}
-                                  onRemoveColumn={handleRemoveColumn}
-                                  
-                                />
-                              </div>
-                            )}
-                            {currentView === "kanban" && (
-                              <div className="flex items-center gap-2">
-                                <ColumnManager
-                                  currentView={currentView}
-                                  availableColumns={columns}
-                                  onAddColumn={handleAddColumn}
-                                  onRemoveColumn={handleRemoveColumn}
-                                 
-                                />
-                              </div>
-                            )}
-           
+              {currentView === "list" && (
+                <div className="flex items-center gap-2">
+                  <Tooltip
+                    content="Sorting Manager"
+                    position="top"
+                    color="primary"
+                  >
+                    <SortingManager
+                      sortField={sortField}
+                      sortOrder={sortOrder}
+                      onSortFieldChange={setSortField}
+                      onSortOrderChange={setSortOrder}
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="Manage Columns"
+                    position="top"
+                    color="primary"
+                  >
+                    <ColumnManager
+                      currentView={currentView}
+                      availableColumns={columns}
+                      onAddColumn={handleAddColumn}
+                      onRemoveColumn={handleRemoveColumn}
+                    />
+                  </Tooltip>
+                </div>
+              )}
+              {currentView === "kanban" && (
+                <div className="flex items-center gap-2">
+                  <Tooltip
+                    content="Manage Columns"
+                    position="top"
+                    color="primary"
+                  >
+                    <ColumnManager
+                      currentView={currentView}
+                      availableColumns={columns}
+                      onAddColumn={handleAddColumn}
+                      onRemoveColumn={handleRemoveColumn}
+                    />
+                  </Tooltip>
+                </div>
+              )}
             </>
           }
         />
       </div>
-
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto rounded-md">
         {error ? (
@@ -803,7 +840,6 @@ function WorkspaceTasksContent() {
           renderContent()
         )}
       </div>
-
       {/* Sticky Pagination */}
       {showPagination && (
         <div className="sticky bottom-0 z-30 pt-2">

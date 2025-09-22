@@ -48,6 +48,7 @@ export function QualityMetricsChart({ data }: QualityMetricsChartProps) {
       title="Bug Resolution Quality"
       description={`${data.resolvedBugs}/${data.totalBugs} bugs resolved (${data.bugResolutionRate.toFixed(1)}%)`}
       config={chartConfig}
+      className="border-[var(--border)]"
     >
       <div className="relative">
         <PieChart>

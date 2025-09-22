@@ -1,11 +1,11 @@
-;
-
-import React from "react";
+import React, { useState } from "react";
 import { useTask } from "@/contexts/task-context";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import StatusColumn from "../kanban/StatusColumn";
 import StatusSettingsModal from "../kanban/StatusSettingsModal";
-
+import TaskDetailClient from "./TaskDetailClient";
+import { Task } from "@/types";
+import { CustomModal } from "../common/CustomeModal";
 interface TasksByStatus {
   statusId: string;
   statusName: string;
@@ -52,6 +52,8 @@ interface KanbanBoardProps {
   isLoading?: boolean;
   kabBanSettingModal?: boolean;
   setKabBanSettingModal?: (open: boolean) => void;
+  workspaceSlug?: string;
+  projectSlug?: string;
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -62,8 +64,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   isLoading = false,
   kabBanSettingModal,
   setKabBanSettingModal,
+  workspaceSlug,
+  projectSlug,
 }) => {
-  const { updateTaskStatus, createTask } = useTask();
+  const { updateTaskStatus, createTask, getTaskById, currentTask } = useTask();
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const {
     dragState,
@@ -114,7 +120,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const handleStatusUpdated = () => {
     onRefresh?.();
   };
-
+  const handleRowClick = async (task: Task) => {
+    await getTaskById(task.id);
+    setSelectedTask(task);
+    setIsEditModalOpen(true);
+  };
   if (isLoading) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -149,6 +159,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onTaskDragStart={handleDragStart}
             onTaskDragEnd={handleDragEnd}
             onCreateTask={handleCreateTask}
+            onTaskClick={handleRowClick}
           />
         ))}
       </div>
@@ -159,6 +170,30 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         projectId={projectId}
         onStatusUpdated={handleStatusUpdated}
       />
+      {isEditModalOpen && (
+        <CustomModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          animation="slide-right"
+          height="h-screen"
+          top="top-4"
+          zIndex="z-50"
+          width="w-full md:w-[80%] lg:w-[60%]"
+          position="items-start justify-end"
+          closeOnOverlayClick={true}
+        >
+          {selectedTask && (
+            <TaskDetailClient
+              task={currentTask}
+              open="modal"
+              workspaceSlug={workspaceSlug as string}
+              projectSlug={projectSlug as string}
+              taskId={selectedTask.id}
+              onClose={() => setIsEditModalOpen(false)}
+            />
+          )}
+        </CustomModal>
+      )}
     </>
   );
 };

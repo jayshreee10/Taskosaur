@@ -51,7 +51,7 @@ export function ProjectStatusChart({ data }: ProjectStatusChartProps) {
       title="Project Status Distribution"
       description="Current status breakdown of all projects"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>

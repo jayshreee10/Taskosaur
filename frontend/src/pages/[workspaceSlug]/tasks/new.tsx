@@ -6,7 +6,6 @@ import { HiExclamationTriangle } from "react-icons/hi2";
 import CreateTask from "@/components/common/CreateTask";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { useProject } from "@/contexts/project-context";
-import { useTask } from "@/contexts/task-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/router";
 
@@ -16,17 +15,14 @@ function NewTaskPageContent() {
   const { workspaceSlug } = router.query;
 
   const { getWorkspaceBySlug } = useWorkspace();
-  const { getProjectsByWorkspace, getProjectMembers } = useProject();
-  const { getAllTaskStatuses } = useTask();
+  const { getProjectsByWorkspace } = useProject();
   const { isAuthenticated } = useAuth();
 
   const [workspace, setWorkspace] = useState<any>(null);
   const [projects, setProjects] = useState<any[]>([]);
-  const [availableStatuses, setAvailableStatuses] = useState<any[]>([]);
 
   const isInitializedRef = useRef(false);
 
-  // Initialize data
   useEffect(() => {
     const fetchWorkspaceData = async () => {
       if (!isAuthenticated() || !workspaceSlug || isInitializedRef.current)
@@ -42,10 +38,7 @@ function NewTaskPageContent() {
         setWorkspace(ws);
         const projs = ws?.id ? await getProjectsByWorkspace(ws.id) : [];
         setProjects(projs);
-        const statuses = ws?.organizationId
-          ? await getAllTaskStatuses({ organizationId: ws.organizationId })
-          : [];
-        setAvailableStatuses(statuses);
+       
         isInitializedRef.current = true;
       } catch (error) {
         console.error("Error initializing workspace data:", error);
@@ -90,8 +83,6 @@ function NewTaskPageContent() {
         }
         workspace={workspace}
         projects={projects}
-        availableStatuses={availableStatuses}
-        getProjectMembers={getProjectMembers}
       />
     </>
   );

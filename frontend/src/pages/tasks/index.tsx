@@ -1,37 +1,46 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import TaskProvider, { useTask } from "@/contexts/task-context";
-
+import { useTask } from "@/contexts/task-context";
 import { useProjectContext } from "@/contexts/project-context";
-import { NewTaskModal } from "@/components/tasks/NewTaskModal";
+import { useWorkspaceContext } from "@/contexts/workspace-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/router";
+
+import { NewTaskModal } from "@/components/tasks/NewTaskModal";
 import TaskListView from "@/components/tasks/views/TaskListView";
 import TaskGanttView from "@/components/tasks/views/TaskGanttView";
-import { HiXMark } from "react-icons/hi2";
-import { Input } from "@/components/ui/input";
-import { Task } from "@/contexts/task-context";
-import { ColumnConfig, Project, ViewMode } from "@/types";
-import { TokenManager } from "@/lib/api";
-import ErrorState from "@/components/common/ErrorState";
-import EmptyState from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
-import { HiClipboardList, HiSearch } from "react-icons/hi";
 import ActionButton from "@/components/common/ActionButton";
 import TabView from "@/components/tasks/TabView";
 import Loader from "@/components/common/Loader";
 import Pagination from "@/components/common/Pagination";
+import ErrorState from "@/components/common/ErrorState";
+import EmptyState from "@/components/common/EmptyState";
 import { ColumnManager } from "@/components/tasks/ColumnManager";
 import {
   FilterDropdown,
   useGenericFilters,
 } from "@/components/common/FilterDropdown";
-import { CheckSquare, Flame, Building2, Folder } from "lucide-react";
-import { useWorkspaceContext } from "@/contexts/workspace-context";
 import SortIngManager, {
   SortOrder,
   SortField,
 } from "@/components/tasks/SortIngManager";
+import Tooltip from "@/components/common/ToolTip";
 
+import { HiXMark } from "react-icons/hi2";
+import {
+  CheckSquare,
+  Flame,
+  Building2,
+  Folder,
+  Search,
+  Clipboard,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+
+import { Task, ColumnConfig, Project, ViewMode } from "@/types";
+import { TokenManager } from "@/lib/api";
+
+// Custom hook for debouncing
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState<T>(value);
 
@@ -53,40 +62,49 @@ interface PaginationInfo {
 
 function TasksPageContent() {
   const router = useRouter();
-  const { getAllTasks, getAllTaskStatuses, isLoading: taskLoading } = useTask();
-  const { getWorkspacesByOrganization, isLoading: workspaceLoading } =
-    useWorkspaceContext();
   const {
-    getProjectsByOrganization,
-    isLoading: projectLoading,
-    getTaskStatusByProject,
-  } = useProjectContext();
+    getAllTasks,
+    getCalendarTask,
+    isLoading: taskLoading,
+    taskResponse,
+    tasks,
+  } = useTask();
+  const { getWorkspacesByOrganization } = useWorkspaceContext();
+  const { getProjectsByOrganization, getTaskStatusByProject } =
+    useProjectContext();
   const { getCurrentUser, getUserAccess } = useAuth();
-  const currentOrganizationId = TokenManager.getCurrentOrgId();
+  const { createSection } = useGenericFilters();
 
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const currentOrganizationId = TokenManager.getCurrentOrgId();
+  const currentUser = getCurrentUser();
+
+  // State management
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [availableStatuses, setAvailableStatuses] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
-  const [availableStatuses, setAvailableStatuses] = useState<any[]>([]);
   const [hasAccess, setHasAccess] = useState(false);
   const [statusFilterEnabled, setStatusFilterEnabled] = useState(false);
+  const [isNewTaskModalOpen, setNewTaskModalOpen] = useState(false);
 
-  const [currentView, setCurrentView] = useState<"list" | "kanban" | "gantt">(
-    () => {
-      const type =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search).get("type")
-          : null;
-      return type === "list" || type === "gantt" ? type : "list";
-    }
-  );
+  // View and display state
+  type ViewType = "list" | "kanban" | "gantt";
+
+const [currentView, setCurrentView] = useState<ViewType>(() => {
+  if (typeof window === "undefined") return "list";
+  const type = new URLSearchParams(window.location.search).get("type");
+  return type === "list" || type === "gantt" || type === "kanban"
+    ? type
+    : "list";
+});
+
   const [columns, setColumns] = useState<ColumnConfig[]>([]);
   const [ganttViewMode, setGanttViewMode] = useState<ViewMode>("days");
+
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [isNewTaskModalOpen, setNewTaskModalOpen] = useState(false);
   const [pagination, setPagination] = useState<PaginationInfo>({
     currentPage: 1,
     totalPages: 0,
@@ -94,18 +112,19 @@ function TasksPageContent() {
     hasNextPage: false,
     hasPrevPage: false,
   });
+
+  // Filter state
   const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+
+  // Sorting state
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [sortField, setSortField] = useState<SortField>("createdAt");
-  const { createSection } = useGenericFilters();
 
-  const currentUser = getCurrentUser();
+  // Derived state
   const debouncedSearchQuery = useDebounce(searchInput, 500);
-
-  const isLoading = taskLoading;
   const hasValidUserAndOrg = !!currentUser?.id && !!currentOrganizationId;
 
   const defaultProject = useMemo(() => {
@@ -116,60 +135,45 @@ function TasksPageContent() {
     return projects.length > 0 && projects[0].workspace
       ? projects[0].workspace
       : { slug: "default-workspace" };
-  }, [projects]);
-
+  }, [projects]); 
+  // Check user access
   useEffect(() => {
     if (!currentOrganizationId) return;
+
     getUserAccess({ name: "organization", id: currentOrganizationId })
-      .then((data) => {
-        setHasAccess(data?.canChange);
-      })
-      .catch((error) => {
-        console.error("Error fetching user access:", error);
-      });
+      .then((data) => setHasAccess(data?.canChange))
+      .catch((error) => console.error("Error fetching user access:", error));
   }, [currentOrganizationId]);
 
   // Fetch statuses for selected project
   useEffect(() => {
     const fetchStatusesForProject = async () => {
-      if (selectedProjects.length === 1) {
-        try {
-          const statuses = await getTaskStatusByProject(selectedProjects[0]);
-          setAvailableStatuses(statuses || []);
-          setStatusFilterEnabled(true);
-        } catch (error) {
-          console.error(
-            "Failed to fetch statuses for selected project:",
-            error
-          );
-          setAvailableStatuses([]);
-          setStatusFilterEnabled(false);
-        }
-      } else {
+      if (selectedProjects.length !== 1) {
+        setAvailableStatuses([]);
+        setStatusFilterEnabled(false);
+        return;
+      }
+
+      try {
+        const statuses = await getTaskStatusByProject(selectedProjects[0]);
+        setAvailableStatuses(statuses || []);
+        setStatusFilterEnabled(true);
+      } catch (error) {
+        console.error("Failed to fetch statuses for selected project:", error);
         setAvailableStatuses([]);
         setStatusFilterEnabled(false);
       }
     };
+
     fetchStatusesForProject();
   }, [selectedProjects]);
 
-  const normalizeTaskStatus = useCallback((task: Task) => {
-    const statusId =
-      task.statusId ||
-      (typeof task.status === "object" ? task.status?.id : task.status);
-    return {
-      ...task,
-      statusId: statusId,
-      normalizedStatusId: statusId,
-    };
-  }, []);
-
+  // Load initial data (workspaces and projects)
   const loadInitialData = useCallback(async () => {
     if (!hasValidUserAndOrg || !currentOrganizationId) return;
 
     try {
       setError(null);
-
       const [workspacesData, projectsData] = await Promise.all([
         getWorkspacesByOrganization(currentOrganizationId),
         getProjectsByOrganization(currentOrganizationId),
@@ -182,28 +186,16 @@ function TasksPageContent() {
         error instanceof Error ? error.message : "Failed to load initial data"
       );
     }
-  }, [
-    hasValidUserAndOrg,
-    currentOrganizationId,
-    getWorkspacesByOrganization,
-    getProjectsByOrganization,
-  ]);
+  }, [hasValidUserAndOrg, currentOrganizationId]);
 
+  // Load tasks with filters
   const loadTasks = useCallback(async () => {
     if (!hasValidUserAndOrg || !currentOrganizationId) return;
 
     try {
       setError(null);
 
-      const params: {
-        workspaceId?: string;
-        projectId?: string;
-        priorities?: string;
-        statuses?: string;
-        search?: string;
-        page?: number;
-        limit?: number;
-      } = {
+      const params = {
         page: currentPage,
         limit: pageSize,
         ...(debouncedSearchQuery.trim() && {
@@ -223,23 +215,16 @@ function TasksPageContent() {
         }),
       };
 
-      const allTasks = await getAllTasks(currentOrganizationId, params);
-      const normalizedTasks = allTasks.map(normalizeTaskStatus);
-
-      const totalTasks = normalizedTasks.length;
-      const totalPages = Math.ceil(totalTasks / pageSize);
-      const startIndex = (currentPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedTasks = normalizedTasks.slice(startIndex, endIndex);
-
-      setTasks(paginatedTasks);
-      setPagination({
-        currentPage,
-        totalPages,
-        totalCount: totalTasks,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-      });
+      const res = await getAllTasks(currentOrganizationId, params);
+      if (res) {
+        setPagination({
+          currentPage: res.page,
+          totalPages: res.totalPages,
+          totalCount: res.total,
+          hasNextPage: res.page < res.totalPages,
+          hasPrevPage: res.page > 1,
+        });
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to load tasks");
     }
@@ -253,10 +238,60 @@ function TasksPageContent() {
     currentPage,
     pageSize,
     debouncedSearchQuery,
-    normalizeTaskStatus,
+    taskResponse,
   ]);
 
-  const handleAddColumn = (columnId: string) => {
+  // Load Gantt data
+  const [ganttTasks, setGanttTasks] = useState<Task[]>([]);
+  const [ganttLoading, setGanttLoading] = useState(false);
+  const [ganttError, setGanttError] = useState<string | null>(null);
+
+  const loadGanttData = useCallback(async () => {
+    if (!currentOrganizationId) return;
+    try {
+      setGanttError(null);
+      setGanttLoading(true);
+      const data = await getCalendarTask(currentOrganizationId);
+      setGanttTasks(data || []);
+    } catch (error) {
+      setGanttError(
+        error instanceof Error ? error.message : "Failed to load Gantt data"
+      );
+      setGanttTasks([]);
+    } finally {
+      setGanttLoading(false);
+    }
+  }, [currentOrganizationId, getCalendarTask]);
+
+  // Load data on mount and when organization changes
+  useEffect(() => {
+    if (hasValidUserAndOrg && currentOrganizationId) {
+      loadInitialData();
+    }
+  }, [hasValidUserAndOrg, currentOrganizationId, loadInitialData]);
+
+  // Load tasks when filters change
+  useEffect(() => {
+    loadTasks();
+  }, [
+    selectedWorkspaces,
+    selectedProjects,
+    selectedStatuses,
+    selectedPriorities,
+    currentPage,
+    pageSize,
+    debouncedSearchQuery,
+  ]);
+
+  // Load Gantt data when Gantt tab is active
+  useEffect(() => {
+    if (currentView === "gantt" && currentOrganizationId) {
+      loadGanttData();
+    }
+  }, [currentView, currentOrganizationId, loadGanttData]);
+
+  // Column management
+  const handleAddColumn = useCallback((columnId: string) => {
     const columnConfigs: Record<
       string,
       { label: string; type: ColumnConfig["type"] }
@@ -294,80 +329,18 @@ function TasksPageContent() {
     };
 
     setColumns((prev) => [...prev, newColumn]);
-  };
+  }, []);
 
-  const handleRemoveColumn = (columnId: string) => {
+  const handleRemoveColumn = useCallback((columnId: string) => {
     setColumns((prev) => prev.filter((col) => col.id !== columnId));
-  };
-
-  const handleFilterDropdownOpen = useCallback(() => {
-    if (hasValidUserAndOrg) {
-      // No need to call loadTaskStatuses here
-      (async () => {
-        try {
-          const [workspacesData, projectsData] = await Promise.all([
-            getWorkspacesByOrganization(currentOrganizationId),
-            getProjectsByOrganization(currentOrganizationId),
-          ]);
-          setWorkspaces(workspacesData || []);
-          setProjects(projectsData || []);
-        } catch (error) {
-          setError(
-            error instanceof Error
-              ? error.message
-              : "Failed to load filter data"
-          );
-        }
-      })();
-    }
-  }, [hasValidUserAndOrg, currentOrganizationId]);
-
-  useEffect(() => {
-    loadTasks();
-  }, [
-    selectedWorkspaces,
-    selectedProjects,
-    selectedStatuses,
-    selectedPriorities,
-    currentPage,
-    pageSize,
-    debouncedSearchQuery,
-  ]);
-
-  const handleRetry = useCallback(() => {
-    setError(null);
-    loadInitialData();
-    loadTasks();
   }, []);
 
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
-
-  const handlePageSizeChange = useCallback((size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  }, []);
-
-  const clearSearch = useCallback(() => {
-    setSearchInput("");
-  }, []);
-
-  const handleTaskCreated = useCallback(async () => {
-    try {
-      await loadTasks();
-    } catch (error) {
-      console.error("Error refreshing tasks:", error);
-    }
-  }, [loadTasks]);
-
+  // Filter handlers
   const toggleWorkspace = useCallback((id: string) => {
-    console.log("Toggling workspace:", id);
     setSelectedWorkspaces((prev) => {
       const newSelection = prev.includes(id)
         ? prev.filter((x) => x !== id)
         : [...prev, id];
-      console.log("New workspace selection:", newSelection);
       return newSelection;
     });
     setCurrentPage(1);
@@ -402,6 +375,33 @@ function TasksPageContent() {
     setCurrentPage(1);
   }, []);
 
+  // Event handlers
+  const handleRetry = useCallback(() => {
+    setError(null);
+    loadInitialData();
+    loadTasks();
+  }, [loadInitialData, loadTasks]);
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput("");
+  }, []);
+
+  const handleFilterDropdownOpen = useCallback(() => {
+    if (hasValidUserAndOrg) {
+      loadInitialData();
+    }
+  }, [hasValidUserAndOrg]);
+
+  // Memoized computations
   const totalActiveFilters = useMemo(
     () =>
       selectedWorkspaces.length +
@@ -420,7 +420,7 @@ function TasksPageContent() {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    const filters = workspaces
+    return workspaces
       .filter((workspace) => workspace.id && uuidRegex.test(workspace.id))
       .map((workspace) => ({
         id: workspace.id,
@@ -429,9 +429,6 @@ function TasksPageContent() {
         selected: selectedWorkspaces.includes(workspace.id),
         count: projects.filter((p) => p.workspaceId === workspace.id).length,
       }));
-
-    console.log("Workspace Filters:", filters);
-    return filters;
   }, [workspaces, projects, selectedWorkspaces]);
 
   const projectFilters = useMemo(() => {
@@ -439,7 +436,12 @@ function TasksPageContent() {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     return projects
-      .filter((project) => project.id && uuidRegex.test(project.id))
+      .filter(
+        (project) =>
+          project.id &&
+          uuidRegex.test(project.id) &&
+          selectedWorkspaces.includes(project.workspaceId)
+      )
       .map((project) => ({
         id: project.id,
         name: project.name,
@@ -450,7 +452,7 @@ function TasksPageContent() {
           workspaces.find((w) => w.id === project.workspaceId)?.name || "",
         workspaceId: project.workspaceId,
       }));
-  }, [projects, selectedProjects, tasks, workspaces]);
+  }, [projects, selectedProjects, tasks, workspaces, selectedWorkspaces]);
 
   const statusFilters = useMemo(
     () =>
@@ -470,20 +472,20 @@ function TasksPageContent() {
     [availableStatuses, selectedStatuses, tasks]
   );
 
-  const priorityFilters = useMemo(
-    () =>
-      [
-        { id: "LOW", name: "Low", value: "LOW", color: "#6b7280" },
-        { id: "MEDIUM", name: "Medium", value: "MEDIUM", color: "#f59e0b" },
-        { id: "HIGH", name: "High", value: "HIGH", color: "#ef4444" },
-        { id: "HIGHEST", name: "Highest", value: "HIGHEST", color: "#dc2626" },
-      ].map((priority) => ({
-        ...priority,
-        selected: selectedPriorities.includes(priority.value),
-        count: tasks.filter((task) => task.priority === priority.value).length,
-      })),
-    [selectedPriorities, tasks]
-  );
+  const priorityFilters = useMemo(() => {
+    const priorities = [
+      { id: "LOW", name: "Low", value: "LOW", color: "#6b7280" },
+      { id: "MEDIUM", name: "Medium", value: "MEDIUM", color: "#f59e0b" },
+      { id: "HIGH", name: "High", value: "HIGH", color: "#ef4444" },
+      { id: "HIGHEST", name: "Highest", value: "HIGHEST", color: "#dc2626" },
+    ];
+
+    return priorities.map((priority) => ({
+      ...priority,
+      selected: selectedPriorities.includes(priority.value),
+      count: Array.isArray(tasks) ? tasks.filter((task) => task.priority === priority.value).length : 0,
+    }));
+  }, [selectedPriorities, tasks]);
 
   const filterSections = useMemo(
     () => [
@@ -553,34 +555,16 @@ function TasksPageContent() {
       toggleStatus,
       togglePriority,
       statusFilterEnabled,
+      createSection,
     ]
   );
 
-  // List of sortable fields (add more as needed)
-  const sortableFields = [
-    { value: "createdAt", label: "Created Date" },
-    { value: "updatedAt", label: "Updated Date" },
-    { value: "priority", label: "Priority" },
-    { value: "taskNumber", label: "Task Number" },
-    { value: "storyPoints", label: "Story Points" },
-    { value: "completedAt", label: "Completed Date" },
-    { value: "timeline", label: "Timeline" },
-    { value: "reporter", label: "Reporter" },
-    { value: "updatedBy", label: "Updated By" },
-    { value: "sprint", label: "Sprint" },
-    { value: "parentTask", label: "Parent Task" },
-    { value: "childTasksCount", label: "Child Tasks" },
-    { value: "commentsCount", label: "Comments" },
-    { value: "attachmentsCount", label: "Attachments" },
-    { value: "timeEntries", label: "Time Entries" },
-    // Add more fields as needed
-  ];
-
   // Sorting logic
   const sortedTasks = useMemo(() => {
-    const sorted = [...tasks].sort((a, b) => {
+    return [...tasks]?.sort((a, b) => {
       let aValue = a[sortField];
       let bValue = b[sortField];
+
       // Handle date fields
       if (
         ["createdAt", "updatedAt", "completedAt", "timeline"].includes(
@@ -590,25 +574,46 @@ function TasksPageContent() {
         aValue = aValue ? new Date(aValue).getTime() : 0;
         bValue = bValue ? new Date(bValue).getTime() : 0;
       }
+
       // Handle string comparison
       if (typeof aValue === "string" && typeof bValue === "string") {
         return sortOrder === "asc"
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       }
+
       // Handle number comparison
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
       }
-      // Fallback
+
       return 0;
     });
-    return sorted;
   }, [tasks, sortOrder, sortField]);
 
+  // Render content based on view
   const renderContent = () => {
-    if (isLoading)
+    if (currentView === "gantt") {
+      if (ganttLoading) {
+        return <Loader text="Fetching Gantt tasks..." className="py-20" />;
+      }
+      if (ganttError) {
+        return <ErrorState error={ganttError} onRetry={loadGanttData} />;
+      }
+      return (
+        <TaskGanttView
+          tasks={ganttTasks}
+          workspaceSlug={defaultWorkspace.slug}
+          projectSlug={defaultProject.slug}
+          viewMode={ganttViewMode}
+          onViewModeChange={setGanttViewMode}
+        />
+      );
+    }
+
+    if (taskLoading) {
       return <Loader text="Fetching your tasks..." className="py-20" />;
+    }
 
     if (!tasks.length) {
       return (
@@ -620,16 +625,6 @@ function TasksPageContent() {
     }
 
     switch (currentView) {
-      case "gantt":
-        return (
-          <TaskGanttView
-            tasks={sortedTasks}
-            workspaceSlug={defaultWorkspace.slug}
-            projectSlug={defaultProject.slug}
-            viewMode={ganttViewMode}
-            onViewModeChange={setGanttViewMode}
-          />
-        );
       case "kanban":
         return <div>Kanban Is only available on Project Level.</div>;
       default:
@@ -643,7 +638,6 @@ function TasksPageContent() {
         );
     }
   };
-
   const showPagination =
     currentView === "list" && tasks.length > 0 && pagination.totalPages > 1;
 
@@ -652,14 +646,14 @@ function TasksPageContent() {
       {/* Sticky PageHeader */}
       <div className="sticky top-0 z-50">
         <PageHeader
-          icon={<HiClipboardList className="size-20px" />}
+          icon={<Clipboard className="size-20px" />}
           title="My Tasks"
           description="Manage and track all your assigned tasks in one place."
           actions={
             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2">
               <div className="flex items-center gap-2">
                 <div className="relative w-full sm:max-w-xs">
-                  <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
                   <Input
                     type="text"
                     placeholder="Search tasks..."
@@ -677,16 +671,22 @@ function TasksPageContent() {
                   )}
                 </div>
                 {currentView === "list" && (
-                  <FilterDropdown
-                    sections={filterSections}
-                    title="Advanced Filters"
-                    activeFiltersCount={totalActiveFilters}
-                    onClearAllFilters={clearAllFilters}
-                    placeholder="Filter results..."
-                    dropdownWidth="w-56"
-                    showApplyButton={false}
-                    onOpen={handleFilterDropdownOpen}
-                  />
+                  <Tooltip
+                    content="Advanced Filters"
+                    position="top"
+                    color="primary"
+                  >
+                    <FilterDropdown
+                      sections={filterSections}
+                      title="Advanced Filters"
+                      activeFiltersCount={totalActiveFilters}
+                      onClearAllFilters={clearAllFilters}
+                      placeholder="Filter results..."
+                      dropdownWidth="w-56"
+                      showApplyButton={false}
+                      onOpen={handleFilterDropdownOpen}
+                    />
+                  </Tooltip>
                 )}
               </div>
               {hasAccess && (
@@ -698,11 +698,6 @@ function TasksPageContent() {
                   Create Task
                 </ActionButton>
               )}
-              <NewTaskModal
-                isOpen={isNewTaskModalOpen}
-                onClose={() => setNewTaskModalOpen(false)}
-                onTaskCreated={handleTaskCreated}
-              />
             </div>
           }
         />
@@ -738,18 +733,30 @@ function TasksPageContent() {
               )}
               {currentView === "list" && (
                 <div className="flex items-center gap-2">
-                  <SortIngManager
-                    sortField={sortField}
-                    sortOrder={sortOrder}
-                    onSortFieldChange={setSortField}
-                    onSortOrderChange={setSortOrder}
-                  />
-                  <ColumnManager
-                    currentView={currentView}
-                    availableColumns={columns}
-                    onAddColumn={handleAddColumn}
-                    onRemoveColumn={handleRemoveColumn}
-                  />
+                  <Tooltip
+                    content="Sorting Manager"
+                    position="top"
+                    color="primary"
+                  >
+                    <SortIngManager
+                      sortField={sortField}
+                      sortOrder={sortOrder}
+                      onSortFieldChange={setSortField}
+                      onSortOrderChange={setSortOrder}
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="Manage Columns"
+                    position="top"
+                    color="primary"
+                  >
+                    <ColumnManager
+                      currentView={currentView}
+                      availableColumns={columns}
+                      onAddColumn={handleAddColumn}
+                      onRemoveColumn={handleRemoveColumn}
+                    />
+                  </Tooltip>
                 </div>
               )}
             </>
@@ -778,14 +785,15 @@ function TasksPageContent() {
           />
         </div>
       )}
+
+      <NewTaskModal
+        isOpen={isNewTaskModalOpen}
+        onClose={() => setNewTaskModalOpen(false)}
+      />
     </div>
   );
 }
 
 export default function TasksPage() {
-  return (
-    <TaskProvider>
-      <TasksPageContent />
-    </TaskProvider>
-  );
+  return <TasksPageContent />;
 }

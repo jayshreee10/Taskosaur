@@ -3,7 +3,6 @@ import { useWorkspaceContext } from "@/contexts/workspace-context";
 import { useProjectContext } from "@/contexts/project-context";
 import { useAuth } from "@/contexts/auth-context";
 import ProjectAvatar from "@/components/ui/avatars/ProjectAvatar";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -15,8 +14,7 @@ import {
   HiCalendarDays,
   HiXMark,
 } from "react-icons/hi2";
-import { HiSearch, HiExclamation, HiChevronDown, HiViewBoards } from "react-icons/hi";
-import { useRouter } from "next/router";
+import { HiSearch, HiChevronDown, HiViewBoards } from "react-icons/hi";
 import { DynamicBadge } from "@/components/common/DynamicBadge";
 import { NewProjectModal } from "@/components/projects/NewProjectModal";
 import {
@@ -28,38 +26,24 @@ import {
   useGenericFilters,
 } from "@/components/common/FilterDropdown";
 import { CheckSquare, Flame } from "lucide-react";
-import Loader from "@/components/common/Loader";
 import ErrorState from "@/components/common/ErrorState";
-import { EmptyState, LoadingSkeleton } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 
 import { toast } from "sonner";
+import Tooltip from "../common/ToolTip";
 
 interface ProjectsContentProps {
-  // Context type - determines which API to use
-  contextType: 'workspace' | 'organization';
-  
-  // ID of the parent entity
+  contextType: "workspace" | "organization";
   contextId: string;
-  
-  // Optional workspace slug (for workspace context)
   workspaceSlug?: string;
-  
-  // Page configuration
   title: string;
   description: string;
   emptyStateTitle: string;
   emptyStateDescription: string;
-  
-  // Feature flags - now always true for search and filters
   enablePagination?: boolean;
-  
-  // Custom link generator
   generateProjectLink: (project: any, workspaceSlug?: string) => string;
 }
 
-// Common components
-
-// Utility functions
 const formatDate = (dateString: string) => {
   if (!dateString) return "Unknown";
   try {
@@ -95,11 +79,9 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
   enablePagination = false,
   generateProjectLink,
 }) => {
-  const router = useRouter();
   const { isAuthenticated, getUserAccess } = useAuth();
   const { getWorkspaceBySlug } = useWorkspaceContext();
-  
-  // Use context state and methods
+
   const {
     projects,
     isLoading,
@@ -110,30 +92,22 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
     clearError,
   } = useProjectContext();
 
-  // States
   const [hasAccess, setHasAccess] = useState(false);
   const [workspace, setWorkspace] = useState<any>(null);
   const [searchInput, setSearchInput] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
-
-  // Filter states - always enabled
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
-
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(12);
   const [hasMore, setHasMore] = useState(false);
-
-  // Refs for cleanup and state management
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef<string>("");
   const currentContextRef = useRef<string>("");
   const isInitializedRef = useRef(false);
 
-  // Debounced search - always call API on search
   const debouncedSearchQuery = useDebounce(searchInput, 500);
 
   const { createSection } = useGenericFilters();
@@ -219,9 +193,8 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
         name: priority.name,
         value: priority.value,
         selected: selectedPriorities.includes(priority.value),
-        count: projects.filter(
-          (project) => project.priority === priority.value
-        ).length,
+        count: projects.filter((project) => project.priority === priority.value)
+          .length,
         color: priority.color,
         icon: priority.icon,
       })),
@@ -270,118 +243,123 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
   );
 
   // Data fetching function - always call API for both search and filters
-  const fetchData = useCallback(async (
-    page: number = 1, 
-    resetData: boolean = true
-  ) => {
-    const contextKey = `${contextType}/${contextId}`;
-    const requestId = `${contextKey}-${Date.now()}-${Math.random()}`;
+  const fetchData = useCallback(
+    async (page: number = 1, resetData: boolean = true) => {
+      const contextKey = `${contextType}/${contextId}`;
+      const requestId = `${contextKey}-${Date.now()}-${Math.random()}`;
 
-    if (!contextId || !isAuthenticated()) {
-      return;
-    }
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    abortControllerRef.current = new AbortController();
-    requestIdRef.current = requestId;
-    currentContextRef.current = contextKey;
-
-    try {
-      // Build filters object - always include search and filters
-      const filters = {
-        ...(selectedStatuses.length > 0 && {
-          status: selectedStatuses.join(","),
-        }),
-        ...(selectedPriorities.length > 0 && {
-          priority: selectedPriorities.join(","),
-        }),
-        ...(debouncedSearchQuery.trim() && {
-          search: debouncedSearchQuery.trim(),
-        }),
-        ...(enablePagination && {
-          page,
-          pageSize,
-        }),
-      };
-
-      let projectsData: any[] = [];
-
-      if (contextType === 'workspace') {
-        // For workspace context, get workspace first if needed
-        if (!workspace) {
-          const workspaceData = await getWorkspaceBySlug(contextId);
-          
-          if (requestIdRef.current !== requestId || !isMountedRef.current) {
-            return;
-          }
-
-          if (!workspaceData) {
-            throw new Error("Workspace not found");
-          }
-          
-          setWorkspace(workspaceData);
-          
-          // Call workspace projects API with filters
-          projectsData = await getProjectsByWorkspace(workspaceData.id, filters);
-        } else {
-          // Call workspace projects API with filters
-          projectsData = await getProjectsByWorkspace(workspace.id, filters);
-        }
-      } else if (contextType === 'organization') {
-        // Call organization projects API with filters
-        projectsData = await getProjectsByOrganization(contextId, filters);
-      }
-
-      if (requestIdRef.current !== requestId || !isMountedRef.current) {
+      if (!contextId || !isAuthenticated()) {
         return;
       }
 
-      // Handle pagination
-      if (enablePagination) {
-        setHasMore(projectsData.length === pageSize);
-        setCurrentPage(page);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
 
-      setDataLoaded(true);
-      isInitializedRef.current = true;
+      abortControllerRef.current = new AbortController();
+      requestIdRef.current = requestId;
+      currentContextRef.current = contextKey;
 
-    } catch (error: any) {
-      if (requestIdRef.current === requestId && isMountedRef.current) {
-        if (
-          error.message?.includes("401") ||
-          error.message?.includes("Unauthorized")
-        ) {
-          toast.error("Authentication required. Please log in again.");
-        } else {
-          toast.error(
-            `Failed to load ${contextType === 'workspace' ? 'workspace' : 'organization'} projects`
-          );
+      try {
+        const filters = {
+          ...(selectedStatuses.length > 0 && {
+            status: selectedStatuses.join(","),
+          }),
+          ...(selectedPriorities.length > 0 && {
+            priority: selectedPriorities.join(","),
+          }),
+          ...(debouncedSearchQuery.trim() && {
+            search: debouncedSearchQuery.trim(),
+          }),
+          ...(enablePagination && {
+            page,
+            pageSize,
+          }),
+        };
+
+        let projectsData: any[] = [];
+
+        if (contextType === "workspace") {
+          // For workspace context, get workspace first if needed
+          if (!workspace) {
+            const workspaceData = await getWorkspaceBySlug(contextId);
+
+            if (requestIdRef.current !== requestId || !isMountedRef.current) {
+              return;
+            }
+
+            if (!workspaceData) {
+              throw new Error("Workspace not found");
+            }
+
+            setWorkspace(workspaceData);
+
+            // Call workspace projects API with filters
+            projectsData = await getProjectsByWorkspace(
+              workspaceData.id,
+              filters
+            );
+          } else {
+            // Call workspace projects API with filters
+            projectsData = await getProjectsByWorkspace(workspace.id, filters);
+          }
+        } else if (contextType === "organization") {
+          // Call organization projects API with filters
+          projectsData = await getProjectsByOrganization(contextId, filters);
+        }
+
+        if (requestIdRef.current !== requestId || !isMountedRef.current) {
+          return;
+        }
+
+        // Handle pagination
+        if (enablePagination) {
+          setHasMore(projectsData.length === pageSize);
+          setCurrentPage(page);
+        }
+
+        setDataLoaded(true);
+        isInitializedRef.current = true;
+      } catch (error: any) {
+        if (requestIdRef.current === requestId && isMountedRef.current) {
+          if (
+            error.message?.includes("401") ||
+            error.message?.includes("Unauthorized")
+          ) {
+            toast.error("Authentication required. Please log in again.");
+          } else {
+            toast.error(
+              `Failed to load ${
+                contextType === "workspace" ? "workspace" : "organization"
+              } projects`
+            );
+          }
         }
       }
-    }
-  }, [
-    contextType,
-    contextId,
-    isAuthenticated,
-    selectedStatuses,
-    selectedPriorities,
-    debouncedSearchQuery,
-    enablePagination,
-    pageSize,
-    workspace,
-  ]);
+    },
+    [
+      contextType,
+      contextId,
+      isAuthenticated,
+      selectedStatuses,
+      selectedPriorities,
+      debouncedSearchQuery,
+      enablePagination,
+      pageSize,
+      workspace,
+    ]
+  );
 
   // Check user access
   useEffect(() => {
     if (contextId) {
-      const accessType = contextType === 'workspace' ? 'workspace' : 'organization';
-      const accessId = contextType === 'workspace' && workspace ? workspace.id : contextId;
-      
-      if (contextType === 'workspace' && !workspace) return;
-      
+      const accessType =
+        contextType === "workspace" ? "workspace" : "organization";
+      const accessId =
+        contextType === "workspace" && workspace ? workspace.id : contextId;
+
+      if (contextType === "workspace" && !workspace) return;
+
       getUserAccess({ name: accessType, id: accessId })
         .then((data) => {
           setHasAccess(data?.canChange);
@@ -494,27 +472,21 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
 
   const loadMore = () => {
     if (hasMore && !isLoading && enablePagination) {
-      setCurrentPage(prev => prev + 1);
+      setCurrentPage((prev) => prev + 1);
     }
   };
 
-  // Calculate active filters
-  const totalActiveFilters = selectedStatuses.length + selectedPriorities.length;
+  const totalActiveFilters =
+    selectedStatuses.length + selectedPriorities.length;
 
-  // Loading state
-  if (isLoading && projects.length === 0) {
-    return <Loader />;
-  }
-
-  // Error state
   if (error) {
     return <ErrorState error={error} onRetry={retryFetch} />;
   }
 
-  // Updated title to include workspace name when available
-  const displayTitle = contextType === 'workspace' && workspace 
-    ? `${workspace.name} Projects` 
-    : title;
+  const displayTitle =
+    contextType === "workspace" && workspace
+      ? `${workspace.name} Projects`
+      : title;
 
   return (
     <div className="dashboard-container">
@@ -551,15 +523,21 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
               </div>
 
               {/* Filter Controls - Always shown */}
-              <FilterDropdown
-                sections={filterSections}
-                title="Advanced Filters"
-                activeFiltersCount={totalActiveFilters}
-                onClearAllFilters={clearAllFilters}
-                placeholder="Filter projects..."
-                dropdownWidth="w-56"
-                showApplyButton={false}
-              />
+              <Tooltip
+                content="Advanced Filters"
+                position="top"
+                color="primary"
+              >
+                <FilterDropdown
+                  sections={filterSections}
+                  title="Advanced Filters"
+                  activeFiltersCount={totalActiveFilters}
+                  onClearAllFilters={clearAllFilters}
+                  placeholder="Filter projects..."
+                  dropdownWidth="w-56"
+                  showApplyButton={false}
+                />
+              </Tooltip>
 
               {/* Primary Action */}
               {hasAccess && (
@@ -578,10 +556,12 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
         <NewProjectModal
           isOpen={isNewProjectModalOpen}
           onClose={() => setIsNewProjectModalOpen(false)}
-          workspaceSlug={contextType === 'workspace' ? workspaceSlug : undefined}
+          workspaceSlug={
+            contextType === "workspace" ? workspaceSlug : undefined
+          }
           onProjectCreated={handleProjectCreated}
           initialData={
-            contextType === 'organization'
+            contextType === "organization"
               ? { organizationId: contextId }
               : undefined
           }
@@ -600,7 +580,9 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
             <EmptyState
               icon={<HiSearch size={24} />}
               title="No projects found"
-              description={`No projects match your current search${totalActiveFilters > 0 ? ' and filters' : ''}. Try adjusting your criteria.`}
+              description={`No projects match your current search${
+                totalActiveFilters > 0 ? " and filters" : ""
+              }. Try adjusting your criteria.`}
               action={
                 <ActionButton onClick={clearAllFilters}>Clear All</ActionButton>
               }
@@ -691,9 +673,13 @@ const ProjectsContent: React.FC<ProjectsContentProps> = ({
             {projects.length > 0 && (
               <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full min-h-[48px] flex items-center justify-center pb-4 pointer-events-none">
                 <p className="text-sm text-[var(--muted-foreground)] pointer-events-auto">
-                  Showing {projects.length} project{projects.length !== 1 ? "s" : ""}
+                  Showing {projects.length} project
+                  {projects.length !== 1 ? "s" : ""}
                   {searchInput && ` matching "${searchInput}"`}
-                  {totalActiveFilters > 0 && ` with ${totalActiveFilters} filter${totalActiveFilters !== 1 ? 's' : ''} applied`}
+                  {totalActiveFilters > 0 &&
+                    ` with ${totalActiveFilters} filter${
+                      totalActiveFilters !== 1 ? "s" : ""
+                    } applied`}
                   {(searchInput || totalActiveFilters > 0) && (
                     <button
                       onClick={clearAllFilters}

@@ -1,5 +1,3 @@
-;
-
 import { useState } from 'react';
 import { Task, TaskDependency, DependencyType } from '@/types/tasks';
 import UserAvatar from '@/components/ui/avatars/UserAvatar';
@@ -19,7 +17,6 @@ export default function TaskDependencies({
   allTasks, 
   onAddDependency, 
   onRemoveDependency,
-  onUpdateDependency 
 }: TaskDependenciesProps) {
   const [showAddDependency, setShowAddDependency] = useState(false);
   const [newDependency, setNewDependency] = useState({
@@ -28,7 +25,6 @@ export default function TaskDependencies({
   });
   const [dependencyToRemove, setDependencyToRemove] = useState<TaskDependency | null>(null);
 
-  // Get tasks that can be dependencies (exclude current task and its children)
   const availableTasks = allTasks.filter(t => 
     t.id !== task.id && 
     t.parentTaskId !== task.id &&

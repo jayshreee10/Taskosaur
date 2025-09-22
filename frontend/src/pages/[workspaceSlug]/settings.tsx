@@ -374,7 +374,7 @@ function WorkspaceSettingsContent() {
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       <HiExclamationTriangle className="w-4 h-4 mr-2" />
-                      Danger Zone
+                      Delete Workspace
                     </Button>
                   </DangerZoneModal>
                 </div>

@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HiSparkles, HiKey, HiCog6Tooth } from "react-icons/hi2";
+import { HiSparkles, HiKey, HiCog6Tooth, HiLink, HiXMark } from "react-icons/hi2";
 import { settingsApi, Setting } from "@/utils/api/settingsApi";
 import api from "@/lib/api";
 import { Button, Input, Label } from "../ui";
 
-export default function AISettings() {
+interface AISettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
   const [isEnabled, setIsEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
@@ -18,10 +23,31 @@ export default function AISettings() {
     text: string;
   } | null>(null);
 
-  // Load settings on mount
+  // Load settings when modal opens
   useEffect(() => {
-    loadSettings();
-  }, []);
+    if (isOpen) {
+      loadSettings();
+    }
+  }, [isOpen]);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden'; // Prevent background scroll
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -81,13 +107,6 @@ export default function AISettings() {
     setMessage(null);
 
     try {
-      console.log("Saving AI settings:", {
-        ai_enabled: isEnabled.toString(),
-        ai_api_key: apiKey ? "set" : "empty",
-        ai_model: model,
-        ai_api_url: apiUrl,
-      });
-
       await Promise.all([
         saveSetting(
           "ai_enabled",
@@ -156,187 +175,205 @@ export default function AISettings() {
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className=" p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <HiSparkles className="w-6 h-6 text-blue-500" />
-        <h2 className="text-xl font-semibold ">AI Assistant Settings</h2>
-      </div>
-
-      {message && (
-        <div
-          className={`mb-4 p-3 rounded-lg ${
-            message.type === "success"
-              ? "bg-[var(--status-active-bg) text-[var(--status-active-text)] border border-[var(--status-active-border)]"
-              : "bg-[var(--status-suspended-bg)] text-[var(--status-suspended-text)] border border-[var(--status-suspended-border)]"
-          }`}
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div 
+          className="bg-[var(--card)] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-[var(--border)]"
+          onClick={(e) => e.stopPropagation()}
         >
-          {message.text}
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {/* Instructions */}
-        {!isEnabled && (
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-600 dark:text-blue-400">
-              <strong>To use AI Chat:</strong> Toggle the switch below to enable
-              AI, then add your API credentials.
-            </p>
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+            <div className="flex items-center gap-2">
+              <HiSparkles className="w-6 h-6 text-blue-500" />
+              <h2 className="text-xl font-semibold">AI Assistant Settings</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-[var(--muted)] rounded-lg transition-colors"
+            >
+              <HiXMark className="w-5 h-5" />
+            </button>
           </div>
-        )}
 
-        {/* Enable/Disable Switch */}
-        <div className="flex items-center justify-between p-4 rounded-lg">
-          <div>
-            <h3 className="text-sm font-medium ">Enable AI Chat</h3>
-            <p className="text-sm text-muted">
-              Turn AI chat functionality on or off
-            </p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isEnabled}
-              onChange={async (e) => {
-                const newValue = e.target.checked;
-                setIsEnabled(newValue);
-                // Cache the value for immediate loading on page refresh
-                localStorage.setItem("aiEnabled", newValue.toString());
-                // Immediately notify other components for real-time updates
-                window.dispatchEvent(
-                  new CustomEvent("aiSettingsChanged", {
-                    detail: { aiEnabled: newValue },
-                  })
-                );
+          {/* Content */}
+          <div className="p-6">
+            {message && (
+              <div
+                className={`mb-4 p-3 rounded-lg ${
+                  message.type === "success"
+                    ? "bg-[var(--status-active-bg)] text-[var(--status-active-text)] border border-[var(--status-active-border)]"
+                    : "bg-[var(--status-suspended-bg)] text-[var(--status-suspended-text)] border border-[var(--status-suspended-border)]"
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
 
-                // Auto-save the enabled/disabled state to database
-                try {
-                  await saveSetting(
-                    "ai_enabled",
-                    newValue.toString(),
-                    "Enable/disable AI chat functionality"
-                  );
-                  console.log("AI enabled state saved to database:", newValue);
-                  setMessage({
-                    type: "success",
-                    text: `AI chat ${newValue ? "enabled" : "disabled"}`,
-                  });
-                } catch (error) {
-                  console.error("Failed to save AI enabled state:", error);
-                  setMessage({
-                    type: "error",
-                    text: "Failed to save AI enabled state",
-                  });
-                }
-              }}
-              disabled={isLoading || isSaving}
-              className="sr-only peer"
-            />
-            <div className="w-9 h-5 bg-[var(--muted-foreground)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
-          </label>
-        </div>
+            <div className="space-y-4">
+              {/* Instructions */}
+              {!isEnabled && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    <strong>To use AI Chat:</strong> Toggle the switch below to enable
+                    AI, then add your API credentials.
+                  </p>
+                </div>
+              )}
 
-        {/* Configuration Fields - Only shown when enabled */}
-        {isEnabled && (
-          <>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                <HiKey className="w-4 h-4 inline mr-1" />
-                API Key
-              </label>
-              <Input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your API key"
-                disabled={isLoading || isSaving}
-                className="login-input"
-              />
+              {/* Enable/Disable Switch */}
+              <div className="flex items-center justify-between rounded-lg">
+                <div>
+                  <h3 className="text-sm font-medium">Enable AI Chat</h3>
+                  <p className="text-sm text-muted">
+                    Turn AI chat functionality on or off
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={async (e) => {
+                      const newValue = e.target.checked;
+                      setIsEnabled(newValue);
+                      // Cache the value for immediate loading on page refresh
+                      localStorage.setItem("aiEnabled", newValue.toString());
+                      // Immediately notify other components for real-time updates
+                      window.dispatchEvent(
+                        new CustomEvent("aiSettingsChanged", {
+                          detail: { aiEnabled: newValue },
+                        })
+                      );
+
+                      // Auto-save the enabled/disabled state to database
+                      try {
+                        await saveSetting('ai_enabled', newValue.toString(), 'Enable/disable AI chat functionality');
+                        setMessage({ type: 'success', text: `AI chat ${newValue ? 'enabled' : 'disabled'}` });
+                      } catch (error) {
+                        setMessage({ type: 'error', text: 'Failed to save AI enabled state' });
+                      }
+                    }}
+                    disabled={isLoading || isSaving}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-[var(--muted-foreground)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+
+              {/* Configuration Fields - Only shown when enabled */}
+              {isEnabled && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      <HiKey className="w-4 h-4 inline mr-1" />
+                      API Key <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Enter your API key"
+                      disabled={isLoading || isSaving}
+                      className="h-11 sm:h-12 px-4 bg-[var(--card)] border-[var(--border)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent transition-all duration-200 rounded-xl shadow-sm hover:shadow-md"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="block text-sm font-medium mb-2">
+                      <HiCog6Tooth className="w-4 h-4 inline mr-1" />
+                      Model <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      type="text"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      placeholder="e.g., deepseek/deepseek-chat-v3-0324:free"
+                      disabled={isLoading || isSaving}
+                      className="h-11 sm:h-12 px-4 bg-[var(--card)] border-[var(--border)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent transition-all duration-200 rounded-xl shadow-sm hover:shadow-md"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Enter the model name for your AI provider
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="block text-sm font-medium mb-2">
+                      <HiLink className="w-4 h-4 inline mr-1" />
+                      API URL<span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      type="url"
+                      value={apiUrl}
+                      onChange={(e) => setApiUrl(e.target.value)}
+                      placeholder="https://api.provider.com/v1"
+                      disabled={isLoading || isSaving}
+                      className="h-11 sm:h-12 px-4 bg-[var(--card)] border-[var(--border)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent transition-all duration-200 rounded-xl shadow-sm hover:shadow-md"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      The base URL determines which AI provider is used
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
-            <div>
-              <Label className="block text-sm font-medium mb-2">
-                <HiCog6Tooth className="w-4 h-4 inline mr-1" />
-                Model
-              </Label>
-              <Input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g., deepseek/deepseek-chat-v3-0324:free"
-                disabled={isLoading || isSaving}
-                className="login-input"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Enter the model name for your AI provider
+            <div className="flex items-center gap-3 mt-6 pt-4 border-t border-[var(--border)]">
+              <Button
+                onClick={handleSave}
+                disabled={isLoading || isSaving || (isEnabled && !apiKey)}
+                className="h-8 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium flex items-center gap-2"
+              >
+                {isSaving ? "Saving..." : "Save Settings"}
+              </Button>
+
+              {isEnabled && (
+                <Button
+                  variant="destructive"
+                  onClick={testConnection}
+                  disabled={isLoading || isSaving || !apiKey}
+                  className="h-8 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 hover:shadow-md transition-all duration-200 font-medium flex items-center gap-2"
+                >
+                  {isLoading ? "Testing..." : "Test Connection"}
+                </Button>
+              )}
+            </div>
+
+            <div className="mt-4 p-3 bg-[var(--border)] rounded-lg">
+              <h3 className="text-sm font-medium mb-2">Popular AI Providers:</h3>
+              <ul className="text-xs space-y-1 text-[var(--accent-foreground)]">
+                <li>
+                  • <strong>OpenRouter:</strong> https://openrouter.ai/api/v1 (100+
+                  models, free options available)
+                </li>
+                <li>
+                  • <strong>OpenAI:</strong> https://api.openai.com/v1 (GPT models)
+                </li>
+                <li>
+                  • <strong>Anthropic:</strong> https://api.anthropic.com/v1 (Claude
+                  models)
+                </li>
+                <li>
+                  • <strong>Google:</strong>{" "}
+                  https://generativelanguage.googleapis.com/v1beta (Gemini models)
+                </li>
+              </ul>
+              <p className="text-xs mt-3">
+                • API keys are encrypted and stored securely • Test connection after
+                changes • The URL determines which provider is used
               </p>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">API URL</label>
-              <Input
-                type="url"
-                value={apiUrl}
-                onChange={(e) => setApiUrl(e.target.value)}
-                placeholder="https://api.provider.com/v1"
-                disabled={isLoading || isSaving}
-                className="login-input"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                The base URL determines which AI provider is used
-              </p>
-            </div>
-          </>
-        )}
+          </div>
+        </div>
       </div>
-
-      <div className="flex items-center gap-3 mt-6 pt-4 border-t border-[var(--border)]">
-        <Button
-          variant="default"
-          onClick={handleSave}
-          disabled={isLoading || isSaving || (isEnabled && !apiKey)}
-          className="px-4 py-2 bg-[var(--primary)]/80 hover:bg-[var(--primary)] disabled:bg-gray-300 disabled:cursor-not-allowed text-[var(--primary-foreground)] rounded-lg transition-colors"
-        >
-          {isSaving ? "Saving..." : "Save Settings"}
-        </Button>
-
-        {isEnabled && (
-          <Button
-            variant="destructive"
-            onClick={testConnection}
-            disabled={isLoading || isSaving || !apiKey}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-          >
-            {isLoading ? "Testing..." : "Test Connection"}
-          </Button>
-        )}
-      </div>
-
-      <div className="mt-4 p-3 bg-[var(--border)] rounded-lg">
-        <h3 className="text-sm font-medium mb-2">Popular AI Providers:</h3>
-        <ul className="text-xs space-y-1 text-[var(--accent-foreground)]">
-          <li>
-            • <strong>OpenRouter:</strong> https://openrouter.ai/api/v1 (100+
-            models, free options available)
-          </li>
-          <li>
-            • <strong>OpenAI:</strong> https://api.openai.com/v1 (GPT models)
-          </li>
-          <li>
-            • <strong>Anthropic:</strong> https://api.anthropic.com/v1 (Claude
-            models)
-          </li>
-          <li>
-            • <strong>Google:</strong>{" "}
-            https://generativelanguage.googleapis.com/v1beta (Gemini models)
-          </li>
-        </ul>
-        <p className="text-xs mt-3">
-          • API keys are encrypted and stored securely • Test connection after
-          changes • The URL determines which provider is used
-        </p>
-      </div>
-    </div>
+    </>
   );
 }

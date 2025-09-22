@@ -38,8 +38,8 @@ export class ProjectMembersController {
   }
 
   @Get()
-  findAll(@Query('projectId') projectId?: string) {
-    return this.projectMembersService.findAll(projectId);
+  findAll(@Query('projectId') projectId?: string, @Query('search') search?: string) {
+    return this.projectMembersService.findAll(projectId, search);
   }
 
   @Get('workspace/:workspaceId')

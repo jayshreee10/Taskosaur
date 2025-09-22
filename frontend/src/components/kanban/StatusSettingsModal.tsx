@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { HiPlus, HiEllipsisVertical, HiCheck, HiPencil, HiTrash } from "react-icons/hi2";
+import {
+  HiPlus,
+  HiEllipsisVertical,
+  HiCheck,
+  HiPencil,
+  HiTrash,
+} from "react-icons/hi2";
 import { GripVertical, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectContext } from "@/contexts/project-context";
@@ -21,7 +27,8 @@ import {
 } from "../ui/DropdownMenu";
 import { toast } from "sonner";
 import { TaskStatus } from "@/types";
-
+import ActionButton from "../common/ActionButton";
+import ConfirmationModal from "../modals/ConfirmationModal";
 
 interface StatusSettingsModalProps {
   isOpen: boolean;
@@ -58,6 +65,8 @@ const StatusSettingsModal: React.FC<StatusSettingsModalProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("#94A3B8");
+
+  const [workFlowStatusToDelete, setWorkFlowStatusToDelete] = useState("");
 
   useEffect(() => {
     if (isOpen && projectId) fetchStatuses();
@@ -109,13 +118,15 @@ const StatusSettingsModal: React.FC<StatusSettingsModalProps> = ({
         name: editName.trim(),
         color: editColor,
       });
-      setStatusList((prev) => prev.map((s) => (s.id === editingId ? updated : s)));
+      setStatusList((prev) =>
+        prev.map((s) => (s.id === editingId ? updated : s))
+      );
       onStatusUpdated();
       toast.success("Status updated");
       cancelEdit();
     } catch {
       toast.error("Failed to update status");
-    } 
+    }
   };
 
   const cancelEdit = () => {
@@ -125,14 +136,15 @@ const StatusSettingsModal: React.FC<StatusSettingsModalProps> = ({
   };
 
   const removeStatus = async (id: string) => {
-    if (!window.confirm("Delete this status?")) return;
     try {
       await deleteTaskStatus(id);
       setStatusList((prev) => prev.filter((s) => s.id !== id));
       onStatusUpdated();
-      toast.success("Status deleted");
-    } catch {
-      toast.error("Failed to delete status");
+      setWorkFlowStatusToDelete(null)
+      toast.success("Status deleted successfully!");
+    } catch (error) {
+      setWorkFlowStatusToDelete(null)
+      toast.error(error.message || "Failed to delete status");
     }
   };
 
@@ -227,9 +239,7 @@ const StatusSettingsModal: React.FC<StatusSettingsModalProps> = ({
           className="kanban-status-row-color"
           style={{ backgroundColor: s.color || "#94A3B8" }}
         />
-        <span className="kanban-status-row-name">
-          {s.name}
-        </span>
+        <span className="kanban-status-row-name">{s.name}</span>
 
         {/* kebab menu */}
         <DropdownMenu>
@@ -247,11 +257,14 @@ const StatusSettingsModal: React.FC<StatusSettingsModalProps> = ({
             align="end"
             className="kanban-status-row-menu-content"
           >
-            <DropdownMenuItem onClick={() => startEdit(s)}>
+            <DropdownMenuItem
+              onClick={() => startEdit(s)}
+              className="cursor-pointer hover:bg-[var(--muted)]"
+            >
               <HiPencil size={14} /> Edit
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => removeStatus(s.id)}
+              onClick={() => setWorkFlowStatusToDelete(s.id)}
               className="kanban-status-row-menu-delete"
             >
               <HiTrash size={14} /> Delete
@@ -262,74 +275,98 @@ const StatusSettingsModal: React.FC<StatusSettingsModalProps> = ({
     );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="kanban-status-modal-content">
-        <DialogHeader>
-          <DialogTitle className="kanban-status-modal-title">Workflow Settings</DialogTitle>
-          <DialogDescription className="kanban-status-modal-description">
-            Drag rows to reorder. Use the menu to edit or delete.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="kanban-status-modal-content">
+          <DialogHeader>
+            <DialogTitle className="kanban-status-modal-title">
+              Workflow Settings
+            </DialogTitle>
+            <DialogDescription className="kanban-status-modal-description">
+              Drag rows to reorder. Use the menu to edit or delete.
+            </DialogDescription>
+          </DialogHeader>
 
-        {/* -------- status list -------- */}
-        <div className="kanban-status-modal-list">
-          {loading ? (
-            <div className="kanban-status-modal-loading">
-              Loading…
-            </div>
-          ) : (
-            <>
-              {statusList.map(StatusRow)}
+          {/* -------- status list -------- */}
+          <div className="kanban-status-modal-list">
+            {loading ? (
+              <div className="kanban-status-modal-loading">Loading…</div>
+            ) : (
+              <>
+                {statusList.map(StatusRow)}
 
-              {/* -------- new status row -------- */}
-              {isAdding ? (
-                <div className="kanban-add-status-row">
-                  <GripVertical size={14} className="kanban-add-status-grip" />
-                  <div className="kanban-add-status-color" />
-                  <input
-                    className="kanban-add-status-input"
-                    placeholder="New status…"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") addStatus();
-                      if (e.key === "Escape") {
-                        setIsAdding(false);
-                        setNewName("");
-                      }
-                    }}
-                    autoFocus
-                  />
-                  <Button size="sm" disabled={!newName.trim()} onClick={addStatus}>
-                    {creating ? "…" : "Add"}
+                {/* -------- new status row -------- */}
+                {isAdding ? (
+                  <div className="kanban-add-status-row">
+                    <GripVertical
+                      size={14}
+                      className="kanban-add-status-grip"
+                    />
+                    <div className="kanban-add-status-color" />
+                    <input
+                      className="kanban-add-status-input"
+                      placeholder="New status…"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") addStatus();
+                        if (e.key === "Escape") {
+                          setIsAdding(false);
+                          setNewName("");
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <ActionButton
+                      type="submit"
+                      primary
+                      disabled={!newName.trim()}
+                      onClick={addStatus}
+                    >
+                      {creating ? "…" : "Add"}
+                    </ActionButton>
+                    <ActionButton
+                      type="button"
+                      secondary
+                      onClick={() => setIsAdding(false)}
+                    >
+                      Cancel
+                    </ActionButton>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    className="kanban-add-status-button"
+                    onClick={() => setIsAdding(true)}
+                  >
+                    <HiPlus size={15} />
+                    Add status
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  className="kanban-add-status-button"
-                  onClick={() => setIsAdding(true)}
-                >
-                  <HiPlus size={15} />
-                  Add status
-                </Button>
-              )}
-            </>
-          )}
-        </div>
+                )}
+              </>
+            )}
+          </div>
 
-        {/* -------- footer -------- */}
-        <div className="kanban-status-modal-footer">
-          {statusList.length} status{statusList.length !== 1 && "es"} configured
-          <Button variant="outline" onClick={onClose}>
-            Done
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* -------- footer -------- */}
+          <div className="kanban-status-modal-footer">
+            {statusList.length} status{statusList.length !== 1 && "es"}{" "}
+            configured
+            <ActionButton type="submit" primary onClick={onClose}>
+              Done
+            </ActionButton>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmationModal
+        isOpen={!!workFlowStatusToDelete}
+        onClose={() => setWorkFlowStatusToDelete(null)}
+        onConfirm={() => removeStatus(workFlowStatusToDelete!)}
+        title="Delete Status"
+        message="Delete the status? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+    </>
   );
 };
 

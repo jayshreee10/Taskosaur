@@ -25,6 +25,7 @@ export function MonthlyTaskCompletionChart({ data }: MonthlyTaskCompletionChartP
       title="Monthly Task Completion Trend"
       description="Tasks completed per month across workspace"
       config={chartConfig}
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={350}>
         <LineChart 

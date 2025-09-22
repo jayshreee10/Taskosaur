@@ -49,7 +49,16 @@ class AutomationExecutor {
     getTaskDetails: automation.getTaskDetails,
     deleteTask: automation.deleteTask,
     navigateToTasksView: automation.navigateToTasksView,
-    
+
+    // Member Management;
+    inviteMember: automation.inviteMember,
+
+    // Secondary Navigation Management
+    navigateToDashboard: automation.navigateToDashboard,
+
+    // Sprint Management
+    createSprint: automation.createSprint,
+
     // Navigation
     navigateTo: async (url: string): Promise<AutomationResult> => {
       await automation.utils.navigateTo(url);
@@ -138,9 +147,9 @@ class AutomationExecutor {
         pattern: /rename workspace (\w+) to (.+)$/i,
         action: 'editWorkspace',
         extractor: (match) => {
-          console.log('Frontend regex match:', match);
+          // console.log('Frontend regex match:', match);
           const extractedName = match[2] ? match[2].trim() : '';
-          console.log('Extracted name:', extractedName);
+          // console.log('Extracted name:', extractedName);
           return {
             workspaceSlug: match[1].trim(),
             name: extractedName
@@ -284,6 +293,7 @@ class AutomationExecutor {
   ): Promise<AutomationResult> {
     // Check if action is supported
     if (!capabilitiesManager.isActionSupported(action)) {
+      
       return {
         success: false,
         message: `Action "${action}" is not supported`,
@@ -329,7 +339,6 @@ class AutomationExecutor {
       const args = this.prepareArguments(action, parameters);
       
       // Execute the automation function
-      console.log(`Executing automation: ${action}`, args);
       const result = await fn(...args);
       
       return result;
@@ -375,11 +384,6 @@ class AutomationExecutor {
         // Handle both formats: direct name or updates object
         const cleanName = parameters.updates?.name || parameters.name || '';
         const cleanDescription = parameters.updates?.description || parameters.description || '';
-        console.log('editWorkspace parameters:', { 
-          workspaceSlug: parameters.workspaceSlug, 
-          name: cleanName,
-          rawParameters: parameters 
-        });
         return [
           parameters.workspaceSlug,
           {

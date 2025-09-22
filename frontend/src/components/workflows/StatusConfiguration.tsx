@@ -36,7 +36,6 @@ interface StatusConfigurationProps {
 }
 export default function StatusConfiguration({
   workflow,
-  onUpdateStatus,
   onCreateStatus,
   onDeleteStatus,
 }: StatusConfigurationProps) {
@@ -288,7 +287,7 @@ export default function StatusConfiguration({
               {/* Name */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-[var(--foreground)]">
-                  Name *
+                  Name <span className="text-red-500">*</span>
                 </label>
                 <Input
                   type="text"
@@ -325,7 +324,8 @@ export default function StatusConfiguration({
               {/* Category */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-[var(--foreground)]">
-                  Category *
+                  Category{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <Select
                   value={formData.category}
@@ -352,7 +352,7 @@ export default function StatusConfiguration({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                  Color *
+                  Color <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center space-x-3">
                   <input

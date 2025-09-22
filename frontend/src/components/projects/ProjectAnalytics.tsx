@@ -18,6 +18,7 @@ import {
 import { PageHeaderSkeleton } from "../common/PageHeaderSkeleton";
 import { useProject } from "@/contexts/project-context";
 import ErrorState from "../common/ErrorState";
+import Tooltip from "../common/ToolTip";
 
 interface ProjectAnalyticsProps {
   projectSlug: string;
@@ -206,17 +207,23 @@ export function ProjectAnalytics({ projectSlug }: ProjectAnalyticsProps) {
     }),
   ];
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="project-content">
       {/* Header */}
       <PageHeader
         title="Project Analytics"
         description="Insights into your project performance and team productivity"
         actions={
           <div className="flex items-center gap-2">
-            <DashboardSettingsDropdown
-              sections={settingSections}
-              description="Customize your dashboard widgets"
-            />
+            <Tooltip
+              content="Dashboard Settings"
+              position="top"
+              color="primary"
+            >
+              <DashboardSettingsDropdown
+                sections={settingSections}
+                description="Customize your dashboard widgets"
+              />
+            </Tooltip>
           </div>
         }
       />

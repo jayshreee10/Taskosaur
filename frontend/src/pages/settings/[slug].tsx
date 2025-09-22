@@ -72,8 +72,6 @@ function OrganizationManagePageContent() {
     getOrganizationMembers,
     getOrganizationWorkFlows,
     isLoading: orgLoading,
-    createWorkflow,
-    updateWorkflow,
   } = useOrganization();
   const { getCurrentUser } = useAuth();
 
@@ -257,7 +255,7 @@ function OrganizationManagePageContent() {
   const canManage =
     getCurrentUserRole() === OrganizationRole.SUPER_ADMIN ||
     organization.ownerId === currentUser?.id;
-  console.log("Can Manage Organization:", getCurrentUserRole());
+
   if (!canManage) {
     return <AccessDenied onBack={handleBackToOrganizations} />;
   }
@@ -366,13 +364,6 @@ function OrganizationManagePageContent() {
                   {members.length}
                 </Badge>
               </TabsTrigger>
-              <TabsTrigger
-                value="ai-chat"
-                className="flex items-center gap-2 px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:text-[var(--primary)] hover:text-[var(--foreground)] transition-colors bg-transparent rounded-none shadow-none cursor-pointer"
-              >
-                <HiSparkles className="w-4 h-4" />
-                <span className="hidden sm:inline">AI Chat</span>
-              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -450,12 +441,6 @@ function OrganizationManagePageContent() {
                 currentUserRole={getCurrentUserRole()}
                 onMembersChange={loadData}
               />
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="ai-chat" className="space-y-4 mt-4">
-            <Card className="bg-[var(--card)] rounded-[var(--card-radius)] border-none shadow-sm p-0">
-              <AISettings />
             </Card>
           </TabsContent>
         </Tabs>

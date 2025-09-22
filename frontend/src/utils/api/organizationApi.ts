@@ -55,17 +55,6 @@ export const organizationApi = {
         throw new Error("User not authenticated or user ID not found");
       }
 
-      // Generate slug from name if not provided
-      const slug =
-        organizationData.slug ||
-        organizationData.name
-          .toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
-          .replace(/\s+/g, "-") // Replace spaces with hyphens
-          .replace(/-+/g, "-") // Replace multiple hyphens with single
-          .trim();
-
-      // Default settings if not provided
       const defaultSettings: OrganizationSettings = {
         allowInvites: true,
         requireEmailVerification: false,
@@ -83,7 +72,9 @@ export const organizationApi = {
         description: organizationData.description?.trim() || "",
         ownerId: currentUser.id,
         settings: organizationData.settings || defaultSettings,
-        ...(organizationData.website?.trim() && { website: organizationData.website.trim() })
+        ...(organizationData.website?.trim() && {
+          website: organizationData.website.trim(),
+        }),
       };
 
       const response = await api.post<Organization>(
@@ -282,6 +273,31 @@ export const organizationApi = {
       return response.data;
     } catch (error) {
       console.error("Failed to fetch organization activity:", error);
+      throw error;
+    }
+  },
+
+  universalSearch: async (
+    query: string,
+    organizationId: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<any> => {
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        organizationId,
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      const response = await api.get(
+        `/organizations/universal-search?${params.toString()}`
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Universal search API error:", error);
       throw error;
     }
   },

@@ -114,8 +114,6 @@ export async function createWorkspace(
     nameInput.dispatchEvent(new Event('change', { bubbles: true }));
     await waitFor(300);
     
-    console.log('Name input value after typing:', nameInput.value);
-    
     descriptionInput.focus();
     descriptionInput.click();
     await waitFor(100);
@@ -196,11 +194,10 @@ export async function createWorkspace(
     // Check if button is disabled but try anyway
     const isDisabled = (createButton as HTMLButtonElement).disabled;
     if (isDisabled) {
-      console.warn('Create button appears disabled. Form values:', {
+      console.log('Create button appears disabled. Form values:', {
         name: nameInput.value,
         description: descriptionInput.value
       });
-      console.warn('Attempting to click anyway...');
     }
 
     await simulateClick(createButton);
@@ -233,7 +230,6 @@ export async function createWorkspace(
       const element = document.querySelector(selector);
       if (element) {
         successFound = true;
-        console.log('Success indicator found:', selector, element.textContent);
         break;
       }
     }
@@ -332,9 +328,20 @@ export async function listWorkspaces(options: { timeout?: number } = {}): Promis
       // Wait for workspaces to load
       await waitForElement('.dashboard-container, .space-y-6, [data-testid="workspaces-page"]', timeout);
     }
+    const workspaceSearchHistory = document.querySelector('[data-slot="input"]') as HTMLInputElement | null;
 
-    // Based on the HTML structure, workspace cards are <a> tags with hrefs
+    if (workspaceSearchHistory) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      ).set;
+
+      nativeInputValueSetter.call(workspaceSearchHistory, '');
+      workspaceSearchHistory.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
     // They contain a card structure with workspace information
+    await waitFor(1000); // Wait for any dynamic loading
     const workspaceLinks = document.querySelectorAll('a[href^="/"][style*="text-decoration"]');
     
     // If no links found with style, try broader selector

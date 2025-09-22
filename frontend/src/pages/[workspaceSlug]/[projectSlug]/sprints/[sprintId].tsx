@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useTask } from "@/contexts/task-context";
-import { HiClipboardDocumentList, HiXMark } from "react-icons/hi2";
+import { HiXMark } from "react-icons/hi2";
 import { HiSearch } from "react-icons/hi";
-import type { ColumnConfig, Task } from "@/types/tasks";
+import type { ColumnConfig } from "@/types/tasks";
 import { useRouter } from "next/router";
 import TabView from "@/components/tasks/TabView";
 import TaskListView from "@/components/tasks/views/TaskListView";
@@ -18,16 +18,17 @@ import {
   FilterDropdown,
   useGenericFilters,
 } from "@/components/common/FilterDropdown";
-import { CheckSquare, Flame, Folder } from "lucide-react";
+import { CheckSquare, Flame } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import SortingManager, {
   SortOrder,
   SortField,
 } from "@/components/tasks/SortIngManager";
-import { useWorkspaceContext } from "@/contexts/workspace-context";
 import { useProjectContext } from "@/contexts/project-context";
+import Tooltip from "@/components/common/ToolTip";
+import Pagination from "@/components/common/Pagination";
 
-// Debounce hook
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState<T>(value);
 
@@ -42,13 +43,21 @@ function useDebounce<T>(value: T, delay: number): T {
 const SprintTasksTable = () => {
   const router = useRouter();
   const { sprintId, projectSlug, workspaceSlug } = router.query;
-  const { getTasksBySprint, getTaskKanbanStatus } = useTask();
-  const workspaceApi = useWorkspaceContext();
+
+  
+  const {
+    getAllTasks,
+    getCalendarTask,
+    getTaskKanbanStatus,
+    tasks, 
+    isLoading,
+    error: contextError, 
+    taskResponse, 
+  } = useTask();
+
   const projectApi = useProjectContext();
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [kanban, setKanban] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<"list" | "kanban" | "gantt">(
     "list"
   );
@@ -56,8 +65,8 @@ const SprintTasksTable = () => {
   const [columns, setColumns] = useState<ColumnConfig[]>([]);
   const [kabBanSettingModal, setKabBanSettingModal] = useState(false);
   const [ganttViewMode, setGanttViewMode] = useState<ViewMode>("days");
-
-  // New filter states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
@@ -71,6 +80,27 @@ const SprintTasksTable = () => {
 
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [sortField, setSortField] = useState<SortField>("createdAt");
+  const error = contextError || localError;
+
+  const pagination = useMemo(() => {
+    if (!taskResponse) {
+      return {
+        currentPage: 1,
+        totalPages: 0,
+        totalCount: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      };
+    }
+
+    return {
+      currentPage: taskResponse.page,
+      totalPages: taskResponse.totalPages,
+      totalCount: taskResponse.total,
+      hasNextPage: taskResponse.page < taskResponse.totalPages,
+      hasPrevPage: taskResponse.page > 1,
+    };
+  }, [taskResponse]);
 
   const debouncedSearchQuery = useDebounce(searchInput, 500);
   const currentOrganizationId = TokenManager.getCurrentOrgId();
@@ -79,10 +109,8 @@ const SprintTasksTable = () => {
   const [membersLoaded, setMembersLoaded] = useState(false);
   const [availableTaskStatuses, setAvailableTaskStatuses] = useState<any[]>([]);
   const [statusesLoaded, setStatusesLoaded] = useState(false);
-
   const [project, setProject] = useState<any>(null);
 
-  // Load workspace and project by slug
   useEffect(() => {
     if (!workspaceSlug || !projectSlug || project) return;
     const fetchProject = async () => {
@@ -96,56 +124,55 @@ const SprintTasksTable = () => {
     fetchProject();
   }, [workspaceSlug, projectSlug, projectApi, project]);
 
-  const loadListData = useCallback(async () => {
-    if (!sprintId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getTasksBySprint(
-        currentOrganizationId,
-        sprintId as string
-      );
-      const mapped = (result || []).map((task: any) => ({
-        ...task,
-        key: task.key || task.id,
-        slug: task.slug || "",
-        createdBy: task.createdBy || "",
-        updatedBy: task.updatedBy || "",
-        project: task.project || { id: task.projectId, name: "", slug: "" },
-        assignee: task.assignee || null,
-        reporter: task.reporter || {
-          id: "",
-          firstName: "",
-          lastName: "",
-          avatar: "",
-        },
-        status: task.status || {
-          id: "",
-          name: "",
-          color: "",
-          category: "TODO",
-        },
-      }));
-      setTasks(mapped);
+  const loadTasks = useCallback(async () => {
+    if (!sprintId || !currentOrganizationId) return;
 
-      // Extract unique statuses from tasks
+    setLocalError(null);
+
+    try {
+      const params = {
+        ...(project?.id && { projectId: project.id }),
+        ...(project?.workspaceId && { workspaceId: project.workspaceId }),
+        sprintId: sprintId as string,
+        ...(selectedStatuses.length > 0 && {
+          statuses: selectedStatuses.join(","),
+        }),
+        ...(selectedPriorities.length > 0 && {
+          priorities: selectedPriorities.join(","),
+        }),
+        ...(debouncedSearchQuery.trim() && {
+          search: debouncedSearchQuery.trim(),
+        }),
+        page: currentPage,
+        limit: pageSize,
+      };
+
+      await getAllTasks(currentOrganizationId, params);
       const uniqueStatuses = Array.from(
         new Map(
-          mapped
-            .map((task) => {
-              return task.status;
-            })
+          tasks
+            .map((task) => task.status)
             .filter((status) => status && status.id)
             .map((status) => [status.id, status])
         ).values()
       );
       setAvailableStatuses(uniqueStatuses);
     } catch (err: any) {
-      setError(err?.message || "Failed to fetch tasks");
-    } finally {
-      setLoading(false);
+      setLocalError(err?.message || "Failed to fetch tasks");
     }
-  }, [sprintId]);
+  }, [
+    sprintId,
+    currentOrganizationId,
+    project?.id,
+    project?.workspaceId,
+    currentPage,
+    pageSize,
+    debouncedSearchQuery,
+    selectedStatuses,
+    selectedPriorities,
+    getAllTasks,
+    tasks,
+  ]);
 
   const loadKanbanData = useCallback(async () => {
     if (!projectSlug) return;
@@ -159,9 +186,43 @@ const SprintTasksTable = () => {
     } catch (err) {
       console.error("Failed to load kanban data", err);
     }
-  }, [projectSlug]);
+  }, [projectSlug, getTaskKanbanStatus]);
 
-  // Fetch project members
+  const loadGanttData = useCallback(async () => {
+    if (!sprintId || !currentOrganizationId) return;
+    try {
+      const params = {
+        ...(project?.id && { projectId: project.id }),
+        ...(project?.workspaceId && { workspaceId: project.workspaceId }),
+        sprintId: sprintId as string,
+        ...(selectedStatuses.length > 0 && {
+          statuses: selectedStatuses.join(","),
+        }),
+        ...(selectedPriorities.length > 0 && {
+          priorities: selectedPriorities.join(","),
+        }),
+        ...(debouncedSearchQuery.trim() && {
+          search: debouncedSearchQuery.trim(),
+        }),
+        page: currentPage,
+        limit: pageSize,
+      };
+      await getCalendarTask(currentOrganizationId, params);
+    } catch (err) {
+      console.error("Failed to load Gantt data", err);
+    }
+  }, [
+    sprintId,
+    currentOrganizationId,
+    project?.id,
+    project?.workspaceId,
+    currentPage,
+    pageSize,
+    debouncedSearchQuery,
+    selectedStatuses,
+    selectedPriorities,
+  ]);
+
   useEffect(() => {
     if (!project?.id || membersLoaded) return;
     const fetchMembers = async () => {
@@ -176,7 +237,6 @@ const SprintTasksTable = () => {
     fetchMembers();
   }, [project?.id, membersLoaded, projectApi]);
 
-  // Fetch project statuses
   useEffect(() => {
     if (!project?.id || statusesLoaded) return;
     const fetchStatuses = async () => {
@@ -190,65 +250,50 @@ const SprintTasksTable = () => {
     };
     fetchStatuses();
   }, [project?.id, statusesLoaded, projectApi]);
+
   useEffect(() => {
-    loadListData();
-  }, [loadListData]);
+    loadTasks();
+  }, []);
 
   useEffect(() => {
     if (currentView === "kanban") {
       loadKanbanData();
     }
-  }, [currentView, loadKanbanData]);
-
-  // Fetch tasks on tab (view) change
-  useEffect(() => {
-    if ((currentView === "list" || currentView === "gantt")) {
-      loadListData();
+    if (currentView === "gantt") {
+      loadGanttData();
     }
-  }, [currentView, loadListData]);
+    if (currentView === "list") {
+      loadTasks();
+    }
+  }, [currentView]);
 
-  // Filter functions
   const toggleProject = useCallback((id: string) => {
     setSelectedProjects((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+    setCurrentPage(1);
   }, []);
 
   const toggleStatus = useCallback((id: string) => {
     setSelectedStatuses((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+    setCurrentPage(1);
   }, []);
 
   const togglePriority = useCallback((id: string) => {
     setSelectedPriorities((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+    setCurrentPage(1);
   }, []);
 
   const clearAllFilters = useCallback(() => {
     setSelectedProjects([]);
     setSelectedStatuses([]);
     setSelectedPriorities([]);
+    setCurrentPage(1);
   }, []);
-
-  // Prepare filter data
-  const projectFilters = useMemo(() => {
-    const projectsMap = new Map();
-    tasks.forEach((task) => {
-      if (task.project?.id) {
-        projectsMap.set(task.project.id, task.project);
-      }
-    });
-
-    return Array.from(projectsMap.values()).map((project) => ({
-      id: project.id,
-      name: project.name,
-      value: project.id,
-      selected: selectedProjects.includes(project.id),
-      count: tasks.filter((task) => task.projectId === project.id).length,
-    }));
-  }, [tasks, selectedProjects]);
 
   const statusFilters = useMemo(
     () =>
@@ -313,13 +358,10 @@ const SprintTasksTable = () => {
       }),
     ],
     [
-      projectFilters,
       statusFilters,
       priorityFilters,
-      selectedProjects,
       selectedStatuses,
       selectedPriorities,
-      toggleProject,
       toggleStatus,
       togglePriority,
     ]
@@ -327,8 +369,8 @@ const SprintTasksTable = () => {
 
   // Callback to refetch tasks after creation
   const handleTaskRefetch = useCallback(async () => {
-    await loadListData();
-  }, [loadListData]);
+    await loadTasks();
+  }, [loadTasks]);
 
   const handleAddColumn = (columnId: string) => {
     const columnConfigs: Record<
@@ -374,48 +416,20 @@ const SprintTasksTable = () => {
     setColumns((prev) => prev.filter((col) => col.id !== columnId));
   };
 
-  // Prepare filteredTasks before sortedTasks
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((task) => {
-      const matchesSearch =
-        !debouncedSearchQuery.trim() ||
-        task.title
-          ?.toLowerCase()
-          .includes(debouncedSearchQuery.toLowerCase()) ||
-        task.description
-          ?.toLowerCase()
-          .includes(debouncedSearchQuery.toLowerCase());
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
-      const matchesStatus =
-        selectedStatuses.length === 0 ||
-        (task.status?.id && selectedStatuses.includes(task.status.id));
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  }, []);
 
-      const matchesPriority =
-        selectedPriorities.length === 0 ||
-        (task.priority && selectedPriorities.includes(task.priority));
-
-      const matchesProject =
-        selectedProjects.length === 0 ||
-        (task.projectId && selectedProjects.includes(task.projectId));
-
-      return (
-        matchesSearch && matchesStatus && matchesPriority && matchesProject
-      );
-    });
-  }, [
-    tasks,
-    debouncedSearchQuery,
-    selectedStatuses,
-    selectedPriorities,
-    selectedProjects,
-  ]);
-
-  // Sorting logic for filtered tasks
+  // Sorting logic for tasks (client-side sorting of server results)
   const sortedTasks = useMemo(() => {
-    const sorted = [...filteredTasks].sort((a, b) => {
+    const sorted = [...tasks].sort((a, b) => {
       let aValue = a[sortField];
       let bValue = b[sortField];
-      // Handle date fields
       if (
         ["createdAt", "updatedAt", "completedAt", "timeline"].includes(
           sortField
@@ -424,7 +438,6 @@ const SprintTasksTable = () => {
         aValue = aValue ? new Date(aValue).getTime() : 0;
         bValue = bValue ? new Date(bValue).getTime() : 0;
       }
-      // Handle string comparison
       if (typeof aValue === "string" && typeof bValue === "string") {
         return sortOrder === "asc"
           ? aValue.localeCompare(bValue)
@@ -438,14 +451,14 @@ const SprintTasksTable = () => {
       return 0;
     });
     return sorted;
-  }, [filteredTasks, sortOrder, sortField]);
+  }, [tasks, sortOrder, sortField]);
 
   const clearSearch = useCallback(() => {
     setSearchInput("");
   }, []);
 
   const renderContent = () => {
-    if (loading) {
+    if (isLoading) {
       return <Loader text="Fetching sprint tasks..." className="py-20" />;
     }
 
@@ -453,7 +466,7 @@ const SprintTasksTable = () => {
       return <div className="text-red-500 py-8">{error}</div>;
     }
 
-    if (filteredTasks?.length === 0) {
+    if (tasks?.length === 0) {
       return (
         <EmptyState
           searchQuery={debouncedSearchQuery}
@@ -472,6 +485,8 @@ const SprintTasksTable = () => {
               onRefresh={loadKanbanData}
               kabBanSettingModal={kabBanSettingModal}
               setKabBanSettingModal={setKabBanSettingModal}
+              workspaceSlug={workspaceSlug as string}
+              projectSlug={projectSlug as string}
             />
           </div>
         ) : (
@@ -485,7 +500,7 @@ const SprintTasksTable = () => {
       case "gantt":
         return (
           <TaskGanttView
-            tasks={filteredTasks}
+            tasks={tasks}
             workspaceSlug={tasks[0]?.project?.workspace?.slug || ""}
             projectSlug={tasks[0]?.project?.slug || ""}
             viewMode={ganttViewMode}
@@ -506,13 +521,16 @@ const SprintTasksTable = () => {
     }
   };
 
+  const showPagination =
+    currentView === "list" && tasks.length > 0 && pagination.totalPages > 1;
+
   return (
     <div className="dashboard-container h-[86vh] flex flex-col space-y-3">
       {/* Sticky PageHeader */}
       <div className="sticky top-0 z-50">
         <PageHeader
           title="Sprint Tasks"
-          description={`Manage and track all tasks in this sprint. ${filteredTasks.length} of ${tasks.length} tasks`}
+          description={`Manage and track all tasks in this sprint. ${pagination.totalCount} total tasks`}
           actions={
             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 gap-2">
               <div className="flex items-center gap-2">
@@ -577,32 +595,50 @@ const SprintTasksTable = () => {
                   ))}
                 </div>
               )}
-               {currentView === "list" && (
+              {currentView === "list" && (
                 <div className="flex items-center gap-2">
-                  <SortingManager
-                    sortField={sortField}
-                    sortOrder={sortOrder}
-                    onSortFieldChange={setSortField}
-                    onSortOrderChange={setSortOrder}
-                  />
-                  <ColumnManager
-                    currentView={currentView}
-                    availableColumns={columns}
-                    onAddColumn={handleAddColumn}
-                    onRemoveColumn={handleRemoveColumn}
-                    setKabBanSettingModal={setKabBanSettingModal}
-                  />
+                  <Tooltip
+                    content="Sorting Manager"
+                    position="top"
+                    color="primary"
+                  >
+                    <SortingManager
+                      sortField={sortField}
+                      sortOrder={sortOrder}
+                      onSortFieldChange={setSortField}
+                      onSortOrderChange={setSortOrder}
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="Manage Columns"
+                    position="top"
+                    color="primary"
+                  >
+                    <ColumnManager
+                      currentView={currentView}
+                      availableColumns={columns}
+                      onAddColumn={handleAddColumn}
+                      onRemoveColumn={handleRemoveColumn}
+                      setKabBanSettingModal={setKabBanSettingModal}
+                    />
+                  </Tooltip>
                 </div>
               )}
               {currentView === "kanban" && (
                 <div className="flex items-center gap-2">
-                  <ColumnManager
-                    currentView={currentView}
-                    availableColumns={columns}
-                    onAddColumn={handleAddColumn}
-                    onRemoveColumn={handleRemoveColumn}
-                    setKabBanSettingModal={setKabBanSettingModal}
-                  />
+                  <Tooltip
+                    content="Manage Columns"
+                    position="top"
+                    color="primary"
+                  >
+                    <ColumnManager
+                      currentView={currentView}
+                      availableColumns={columns}
+                      onAddColumn={handleAddColumn}
+                      onRemoveColumn={handleRemoveColumn}
+                      setKabBanSettingModal={setKabBanSettingModal}
+                    />
+                  </Tooltip>
                 </div>
               )}
             </>
@@ -612,6 +648,19 @@ const SprintTasksTable = () => {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto rounded-md">{renderContent()}</div>
+
+      {/* Sticky Pagination */}
+      {showPagination && (
+        <div className="sticky bottom-0 z-30 pt-2">
+          <Pagination
+            pagination={pagination}
+            pageSize={pageSize}
+            onPageSizeChange={handlePageSizeChange}
+            onPageChange={handlePageChange}
+            itemType="tasks"
+          />
+        </div>
+      )}
     </div>
   );
 };

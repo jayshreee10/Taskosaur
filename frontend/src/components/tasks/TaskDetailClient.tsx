@@ -26,6 +26,7 @@ import { Badge } from "../ui";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import TaskActivities from "./TaskActivities";
 import { TaskPriorities } from "@/utils/data/taskData";
+import { formatDateForApi } from "@/utils/handleDateChange";
 interface TaskDetailClientProps {
   task: any;
   taskId: string;
@@ -193,26 +194,22 @@ export default function TaskDetailClient({
   }, [task.projectId, task.project?.id]);
 
   const handleDueDateChange = async (newDueDate: string) => {
-    try {
-      const updateData: UpdateTaskRequest = {
-        dueDate: newDueDate
-          ? new Date(newDueDate + "T23:59:59.999Z").toISOString()
-          : undefined,
-      };
+  try {
+    const updateData: UpdateTaskRequest = {
+      dueDate: formatDateForApi(newDueDate) || undefined,
+    };
 
-      await updateTask(taskId, updateData);
-      handleTaskFieldChange("dueDate", newDueDate);
+    await updateTask(taskId, updateData);
+    handleTaskFieldChange("dueDate", newDueDate);
 
-      // Update the task object's dueDate
-      task.dueDate = newDueDate
-        ? new Date(newDueDate + "T23:59:59.999Z").toISOString()
-        : null;
+    
+    task.dueDate = formatDateForApi(newDueDate);
 
-      toast.success("Task due date updated successfully.");
-    } catch (error) {
-      toast.error("Failed to update task due date.");
-    }
-  };
+    toast.success("Task due date updated successfully.");
+  } catch (error) {
+    toast.error("Failed to update task due date.");
+  }
+};
 
   const findProjectBySlug = (projects: any[], slug: string) => {
     return projects.find((project) => project.slug === slug);
@@ -318,10 +315,7 @@ export default function TaskDetailClient({
           name: folderName,
           id: folderId,
         });
-        console.log(
-          "hasAccess",
-          accessData?.canChange || isAssigneeOrReporter || false
-        );
+        
         // Main logic: access from API, but override for assignee/reporter
         setHasAccess(accessData?.canChange || isAssigneeOrReporter || false);
         setHasAccessLoaded(true);
@@ -623,7 +617,7 @@ export default function TaskDetailClient({
         priority: editTaskData.priority || "MEDIUM",
         startDate: task.startDate || new Date().toISOString(),
         dueDate: editTaskData.dueDate
-          ? new Date(editTaskData.dueDate + "T23:59:59.999Z").toISOString()
+          ? new Date(editTaskData.dueDate + "T00:00:00.000Z").toISOString()
           : undefined,
         remainingEstimate: task.remainingEstimate || 0,
         assigneeId: assignment.assignee?.id || task.assigneeId,
@@ -826,7 +820,7 @@ export default function TaskDetailClient({
           </div>
           {task.createdBy === currentUser?.id && (
             <div className=" flex gap-2">
-              <Tooltip content="Edit task" position="left">
+              <Tooltip content="Edit task" position="left" color="primary">
                 <ActionButton
                   onClick={handleEditTask}
                   variant="outline"
@@ -836,7 +830,7 @@ export default function TaskDetailClient({
                   <HiPencil className="w-4 h-4" />
                 </ActionButton>
               </Tooltip>
-              <Tooltip content="Delete task" position="left">
+              <Tooltip content="Delete task" position="left" color="primary">
                 <ActionButton
                   onClick={handleDeleteTask}
                   variant="outline"

@@ -147,8 +147,25 @@ export class WorkspaceMembersService {
     });
   }
 
-  async findAll(workspaceId?: string): Promise<WorkspaceMember[]> {
-    const whereClause = workspaceId ? { workspaceId } : {};
+  async findAll(
+    workspaceId?: string,
+    search?: string,
+  ): Promise<WorkspaceMember[]> {
+    const whereClause: any = {};
+
+    if (workspaceId) {
+      whereClause.workspaceId = workspaceId;
+    }
+
+    if (search && search.trim()) {
+      whereClause.user = {
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      };
+    }
 
     return this.prisma.workspaceMember.findMany({
       where: whereClause,

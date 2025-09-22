@@ -9,8 +9,7 @@ import TaskListView from "@/components/tasks/views/TaskListView";
 import TaskGanttView from "@/components/tasks/views/TaskGanttView";
 import { HiXMark } from "react-icons/hi2";
 import { Input } from "@/components/ui/input";
-import { Task } from "@/contexts/task-context";
-import { ColumnConfig, ViewMode } from "@/types";
+import { ColumnConfig, Project, ViewMode, Workspace } from "@/types";
 import { TaskPriorities } from "@/utils/data/taskData";
 import ErrorState from "@/components/common/ErrorState";
 import EmptyState from "@/components/common/EmptyState";
@@ -31,6 +30,7 @@ import SortingManager, {
   SortOrder,
   SortField,
 } from "@/components/tasks/SortIngManager";
+import Tooltip from "@/components/common/ToolTip";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState<T>(value);
@@ -43,55 +43,30 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-const generateSlug = (name: string) =>
-  name
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-const findBySlug = (items: any[], slug: string) =>
-  items.find((it) => it.slug === slug);
-
-interface PaginationInfo {
-  currentPage: number;
-  totalPages: number;
-  totalCount: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-}
-
-interface Workspace {
-  id: string;
-  name: string;
-  organizationId: string;
-  [key: string]: any;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  workspaceId: string;
-  [key: string]: any;
-}
-
 function ProjectTasksContent() {
   const router = useRouter();
   const { workspaceSlug, projectSlug } = router.query;
   const auth = useAuth();
   const workspaceApi = useWorkspaceContext();
   const projectApi = useProjectContext();
-  const taskApi = useTask();
+
+  const {
+    getAllTasks,
+    getTaskKanbanStatus,
+    getCalendarTask,
+    tasks,
+    isLoading,
+    error: contextError,
+    taskResponse,
+  } = useTask();
+
   const { getUserAccess } = useAuth();
 
   const [hasAccess, setHasAccess] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [project, setProject] = useState<Project>(null);
   const [kanban, setKanban] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [currentView, setCurrentView] = useState<"list" | "kanban" | "gantt">(
     () => {
@@ -109,31 +84,39 @@ function ProjectTasksContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isNewTaskModalOpen, setNewTaskModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    currentPage: 1,
-    totalPages: 0,
-    totalCount: 0,
-    hasNextPage: false,
-    hasPrevPage: false,
-  });
   const [columns, setColumns] = useState<ColumnConfig[]>([]);
-
-  // Filter states
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
   const [availableStatuses, setAvailableStatuses] = useState<any[]>([]);
   const [statusesLoaded, setStatusesLoaded] = useState(false);
   const [availablePriorities] = useState(TaskPriorities);
-
-  // New states for TaskTable props
   const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [membersLoaded, setMembersLoaded] = useState(false);
   const [addTaskPriorities, setAddTaskPriorities] = useState<any[]>([]);
-
-  // Sorting states
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [sortField, setSortField] = useState<SortField>("createdAt");
+  const error = contextError || localError;
+
+  // Create pagination info from context
+  const pagination = useMemo(() => {
+    if (!taskResponse) {
+      return {
+        currentPage: 1,
+        totalPages: 0,
+        totalCount: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      };
+    }
+
+    return {
+      currentPage: taskResponse.page,
+      totalPages: taskResponse.totalPages,
+      totalCount: taskResponse.total,
+      hasNextPage: taskResponse.page < taskResponse.totalPages,
+      hasPrevPage: taskResponse.page > 1,
+    };
+  }, [taskResponse]);
 
   const routeRef = useRef<string>("");
   const firstRenderRef = useRef(true);
@@ -143,20 +126,9 @@ function ProjectTasksContent() {
 
   const { createSection } = useGenericFilters();
 
-  const normalizeTaskStatus = useCallback((task: Task) => {
-    const statusId =
-      task.statusId ||
-      (typeof task.status === "object" ? task.status?.id : task.status);
-    return {
-      ...task,
-      statusId: statusId,
-      normalizedStatusId: statusId,
-    };
-  }, []);
-
   // Load user access
   useEffect(() => {
-    if (workspace) {
+    if (project) {
       getUserAccess({ name: "project", id: project.id })
         .then((data) => {
           setHasAccess(data?.canChange);
@@ -206,7 +178,7 @@ function ProjectTasksContent() {
 
     if (issues.length > 0) {
       console.error("Validation failed:", issues);
-      setError(`Missing required data: ${issues.join(", ")}`);
+      setLocalError(`Missing required data: ${issues.join(", ")}`);
       return false;
     }
 
@@ -217,8 +189,7 @@ function ProjectTasksContent() {
     if (!hasValidAuth) return;
 
     try {
-      setError(null);
-      setIsLoading(true);
+      setLocalError(null);
 
       if (!auth.isAuthenticated()) {
         router.push("/auth/login");
@@ -232,8 +203,7 @@ function ProjectTasksContent() {
 
       setWorkspace(ws);
 
-      const projs = await projectApi.getProjectsByWorkspace(ws.id);
-      const proj = findBySlug(projs || [], projectSlug as string);
+      const proj = await projectApi.getProjectBySlug(projectSlug as string);
       if (!proj) {
         throw new Error(
           `Project "${projectSlug}" not found in workspace "${workspaceSlug}"`
@@ -245,11 +215,9 @@ function ProjectTasksContent() {
       return { ws, proj };
     } catch (error) {
       console.error("LoadInitialData error:", error);
-      setError(
+      setLocalError(
         error instanceof Error ? error.message : "Failed to load initial data"
       );
-    } finally {
-      setIsLoading(false);
     }
   }, [
     auth.isAuthenticated,
@@ -286,30 +254,9 @@ function ProjectTasksContent() {
     }
   }, [project?.id, membersLoaded, projectApi]);
 
-  const getFilterParams = useCallback(
-    () => ({
-      organizationId: workspace?.organizationId,
-      projectId: project?.id,
-      workspaceId: workspace?.id,
-      statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
-      priorities:
-        selectedPriorities.length > 0
-          ? (selectedPriorities as ("LOW" | "MEDIUM" | "HIGH" | "HIGHEST")[])
-          : undefined,
-      search: debouncedSearchQuery.trim() || undefined,
-    }),
-    [
-      workspace?.organizationId,
-      workspace?.id,
-      project?.id,
-      selectedStatuses,
-      selectedPriorities,
-      debouncedSearchQuery,
-    ]
-  );
-
+  // Updated loadTasks using getAllTasks with proper parameters
   const loadTasks = useCallback(async () => {
-    if (!workspace?.id || !project?.id || !workspace?.organizationId) {
+    if (!workspace?.organizationId || !project?.id) {
       return;
     }
 
@@ -318,72 +265,100 @@ function ProjectTasksContent() {
     }
 
     try {
-      setError(null);
-      setIsLoading(true);
+      setLocalError(null);
 
-      const filterParams = getFilterParams();
+      // Build parameters for getAllTasks
+      const params = {
+        projectId: project.id,
+        workspaceId: workspace.id,
+        ...(selectedStatuses.length > 0 && {
+          statuses: selectedStatuses.join(","),
+        }),
+        ...(selectedPriorities.length > 0 && {
+          priorities: selectedPriorities.join(","),
+        }),
+        ...(debouncedSearchQuery.trim() && {
+          search: debouncedSearchQuery.trim(),
+        }),
+        page: currentPage,
+        limit: pageSize,
+      };
 
-      const allTasks = await taskApi.getFilteredTasks(filterParams);
-      const normalizedTasks = allTasks.map(normalizeTaskStatus);
-
-      const totalTasks = normalizedTasks.length;
-      const totalPages = Math.ceil(totalTasks / pageSize);
-      const startIndex = (currentPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedTasks = normalizedTasks.slice(startIndex, endIndex);
-
-      setTasks(paginatedTasks);
-      setPagination({
-        currentPage,
-        totalPages,
-        totalCount: totalTasks,
-        hasNextPage: currentPage < totalPages,
-        hasPrevPage: currentPage > 1,
-      });
+      // Call getAllTasks - this will update tasks and taskResponse in context
+      await getAllTasks(workspace.organizationId, params);
     } catch (error) {
       console.error("Failed to load tasks:", error);
-      setError(error instanceof Error ? error.message : "Failed to load tasks");
-    } finally {
-      setIsLoading(false);
+      setLocalError(
+        error instanceof Error ? error.message : "Failed to load tasks"
+      );
     }
   }, [
-    workspace?.id,
     workspace?.organizationId,
+    workspace?.id,
     project?.id,
     currentPage,
     pageSize,
     debouncedSearchQuery,
     selectedStatuses,
     selectedPriorities,
-    taskApi,
+    validateRequiredData,
   ]);
 
-  // Fetch tasks on tab (view) change
+  
   useEffect(() => {
+    if (currentView === "gantt") {
+      
+      if (project && projectSlug) {
+        loadGanttData();
+      }
+      return;
+    }
     if (
-      (currentView === "list" || currentView === "gantt") &&
-      workspace?.id &&
-      workspace.organizationId &&
+      currentView === "list" &&
+      workspace?.organizationId &&
       project?.id
     ) {
       loadTasks();
     }
-  }, [currentView, workspace?.id, workspace?.organizationId, project?.id]);
-
-  const loadKanbanData = useCallback(async (projSlug: string) => {
-    try {
-      const data = await taskApi.getTaskKanbanStatus({
-        type: "project",
-        slug: projSlug,
-        includeSubtasks: true,
-      });
-      setKanban(data.data || []);
-    } catch (error) {
-      console.error("Failed to load kanban data:", error);
+    if (
+      currentView === "kanban" &&
+      project &&
+      projectSlug
+    ) {
+      loadKanbanData(projectSlug as string);
     }
-  }, []);
+  }, [currentView, workspace?.organizationId, project?.id, projectSlug]);
 
-  // Effects
+  const loadKanbanData = useCallback(
+    async (projSlug: string) => {
+      try {
+        const data = await getTaskKanbanStatus({
+          type: "project",
+          slug: projSlug,
+          includeSubtasks: true,
+        });
+        setKanban(data.data || []);
+      } catch (error) {
+        console.error("Failed to load kanban data:", error);
+      }
+    },
+    [getTaskKanbanStatus]
+  );
+
+ 
+  const loadGanttData = useCallback(async () => {
+  if (!workspace?.organizationId || !project?.id) return;
+  try {
+    await getCalendarTask(workspace.organizationId, {
+      projectId: project.id,
+      workspaceId: workspace.id,
+     
+    });
+  } catch (error) {
+    console.error("Failed to load Gantt data:", error);
+  }
+}, [ workspace?.organizationId, workspace?.id, project?.id]);
+
   useEffect(() => {
     if (!router.isReady) return;
 
@@ -394,12 +369,12 @@ function ProjectTasksContent() {
     }
   }, [router.isReady, workspaceSlug, projectSlug]);
 
-  // Load initial tasks when workspace and project are ready
+  
   useEffect(() => {
-    if (workspace?.id && workspace.organizationId && project?.id) {
+    if (workspace?.organizationId && project?.id) {
       loadTasks();
     }
-  }, [workspace?.id, workspace?.organizationId, project?.id]);
+  }, [workspace?.organizationId, project?.id]);
 
   // Load supplementary data when project is available
   useEffect(() => {
@@ -407,7 +382,7 @@ function ProjectTasksContent() {
       loadStatusData();
       loadProjectMembers();
     }
-  }, [project?.id, loadStatusData, loadProjectMembers]);
+  }, [project?.id]);
 
   // Handle filter changes
   const previousFiltersRef = useRef({
@@ -450,15 +425,11 @@ function ProjectTasksContent() {
     debouncedSearchQuery,
     selectedStatuses,
     selectedPriorities,
-    validateRequiredData,
-    loadTasks,
+    validateRequiredData
   ]);
 
-  // Load kanban data when needed
-  useEffect(() => {
-    if (!project || !projectSlug || currentView !== "kanban") return;
-    loadKanbanData(projectSlug as string);
-  }, [currentView, project?.id, projectSlug]);
+
+
 
   // Sorting logic for tasks
   const sortedTasks = useMemo(() => {
@@ -516,7 +487,7 @@ function ProjectTasksContent() {
       })),
     [availablePriorities, selectedPriorities, tasks]
   );
-
+// Sorting logic for tasks
   const safeToggleStatus = useCallback((id: string) => {
     try {
       setSelectedStatuses((prev) => {
@@ -666,7 +637,7 @@ function ProjectTasksContent() {
       await loadTasks();
 
       if (currentView === "kanban") {
-        const data = await taskApi.getTaskKanbanStatus({
+        const data = await getTaskKanbanStatus({
           type: "project",
           slug: projectSlug as string,
           includeSubtasks: true,
@@ -677,14 +648,14 @@ function ProjectTasksContent() {
       console.error("Error refreshing tasks:", error);
       throw error;
     }
-  }, [loadTasks, currentView, projectSlug, taskApi]);
+  }, [loadTasks, currentView, projectSlug, getTaskKanbanStatus]);
 
   const handleTaskRefetch = useCallback(async () => {
     await loadTasks();
   }, [loadTasks]);
 
   const handleRetry = useCallback(() => {
-    setError(null);
+    setLocalError(null);
     loadInitialData();
     if (workspace?.organizationId && project?.id) {
       loadTasks();
@@ -728,6 +699,8 @@ function ProjectTasksContent() {
             onRefresh={() => loadKanbanData(projectSlug as string)}
             kabBanSettingModal={kabBanSettingModal}
             setKabBanSettingModal={setKabBanSettingModal}
+            workspaceSlug={workspaceSlug as string}
+            projectSlug={projectSlug as string}
           />
         ) : (
           <div className="text-center py-12">
@@ -827,7 +800,7 @@ function ProjectTasksContent() {
                 isOpen={isNewTaskModalOpen}
                 onClose={() => {
                   setNewTaskModalOpen(false);
-                  setError(null);
+                  setLocalError(null);
                 }}
                 onTaskCreated={async () => {
                   try {
@@ -884,30 +857,48 @@ function ProjectTasksContent() {
               )}
               {currentView === "list" && (
                 <div className="flex items-center gap-2">
-                  <SortingManager
-                    sortField={sortField}
-                    sortOrder={sortOrder}
-                    onSortFieldChange={setSortField}
-                    onSortOrderChange={setSortOrder}
-                  />
-                  <ColumnManager
-                    currentView={currentView}
-                    availableColumns={columns}
-                    onAddColumn={handleAddColumn}
-                    onRemoveColumn={handleRemoveColumn}
-                    setKabBanSettingModal={setKabBanSettingModal}
-                  />
+                  <Tooltip
+                    content="Sorting Manager"
+                    position="top"
+                    color="primary"
+                  >
+                    <SortingManager
+                      sortField={sortField}
+                      sortOrder={sortOrder}
+                      onSortFieldChange={setSortField}
+                      onSortOrderChange={setSortOrder}
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="Manage Columns"
+                    position="top"
+                    color="primary"
+                  >
+                    <ColumnManager
+                      currentView={currentView}
+                      availableColumns={columns}
+                      onAddColumn={handleAddColumn}
+                      onRemoveColumn={handleRemoveColumn}
+                      setKabBanSettingModal={setKabBanSettingModal}
+                    />
+                  </Tooltip>
                 </div>
               )}
               {currentView === "kanban" && (
                 <div className="flex items-center gap-2">
-                  <ColumnManager
-                    currentView={currentView}
-                    availableColumns={columns}
-                    onAddColumn={handleAddColumn}
-                    onRemoveColumn={handleRemoveColumn}
-                    setKabBanSettingModal={setKabBanSettingModal}
-                  />
+                  <Tooltip
+                    content="Manage Columns"
+                    position="top"
+                    color="primary"
+                  >
+                    <ColumnManager
+                      currentView={currentView}
+                      availableColumns={columns}
+                      onAddColumn={handleAddColumn}
+                      onRemoveColumn={handleRemoveColumn}
+                      setKabBanSettingModal={setKabBanSettingModal}
+                    />
+                  </Tooltip>
                 </div>
               )}
             </>

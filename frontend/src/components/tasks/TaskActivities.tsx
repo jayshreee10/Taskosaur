@@ -3,7 +3,6 @@ import UserAvatar from "@/components/ui/avatars/UserAvatar";
 import { HiOutlineBolt } from "react-icons/hi2";
 import { useTask } from "@/contexts/task-context";
 import { TaskActivityType } from "@/types/tasks";
-import Tooltip from "../common/ToolTip";
 
 interface TaskActivitiesProps {
   taskId: string;

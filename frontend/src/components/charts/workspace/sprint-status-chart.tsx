@@ -32,7 +32,7 @@ export function SprintStatusChart({ data }: SprintStatusChartProps) {
       title="Sprint Status Overview"
       description="Current sprint status across projects"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={350}>
         <BarChart 

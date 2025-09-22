@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import ActionButton from "@/components/common/ActionButton";
 import { Input } from "@/components/ui/input";
@@ -12,12 +12,12 @@ import ErrorState from "@/components/common/ErrorState";
 import NewWorkspaceDialog from "@/components/workspace/NewWorkspaceDialogProps";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
+import { HiXMark } from "react-icons/hi2";
 
 interface WorkspacesPageContentProps {
   organizationId: string;
 }
 
-// Debounce hook for search optimization
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
@@ -43,7 +43,6 @@ export default function WorkspacesPageContent({
     error,
     currentWorkspace,
     getWorkspacesByOrganization,
-    refreshWorkspaces,
     clearError,
     getCurrentOrganizationId,
   } = useWorkspaceContext();
@@ -154,20 +153,32 @@ export default function WorkspacesPageContent({
           actions={
             <>
               <div className="relative max-w-xs w-full">
-                <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+                <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] z-10" />
                 <Input
                   type="text"
                   placeholder="Search workspaces..."
                   value={searchQuery}
                   onChange={handleSearchChange}
-                  className="pl-10 rounded-md border border-[var(--border)]"
+                  className="pl-10 pr-10 rounded-md border border-[var(--border)]"
                 />
+     
                 {isLoading && searchQuery && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
                     <div className="animate-spin h-4 w-4 border-2 border-[var(--primary)] border-t-transparent rounded-full" />
                   </div>
                 )}
+
+                
+                {searchQuery && !isLoading && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
+                  >
+                    <HiXMark size={16} />
+                  </button>
+                )}
               </div>
+
               {hasAccess && (
                 <NewWorkspaceDialog
                   open={isDialogOpen}

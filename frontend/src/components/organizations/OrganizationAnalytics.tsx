@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { organizationAnalyticsWidgets, Widget, organizationKPICards, KPICard } from "@/utils/data/organizationAnalyticsData";
+import {
+  organizationAnalyticsWidgets,
+  Widget,
+  organizationKPICards,
+  KPICard,
+} from "@/utils/data/organizationAnalyticsData";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +21,7 @@ import { PageHeaderSkeleton } from "../common/PageHeaderSkeleton";
 import { useTask } from "@/contexts/task-context";
 import { toast } from "sonner";
 import { TasksResponse } from "@/types";
-import { Calendar, LayoutDashboard } from "lucide-react";
+import { Calendar } from "lucide-react";
 import Tooltip from "../common/ToolTip";
 import ActionButton from "../common/ActionButton";
 import { TodayAgendaDialog } from "./TodayAgendaDialog";
@@ -27,12 +32,9 @@ interface OrganizationAnalyticsProps {
   organizationId: string;
 }
 
-
-
 export function OrganizationAnalytics({
   organizationId,
 }: OrganizationAnalyticsProps) {
-  
   const {
     analyticsData: data,
     analyticsLoading: loading,
@@ -46,11 +48,12 @@ export function OrganizationAnalytics({
   const [showTodayAgenda, setShowTodayAgenda] = useState(false);
 
   // Widget configuration
-  const [widgets, setWidgets] = useState<Widget[]>(organizationAnalyticsWidgets);
+  const [widgets, setWidgets] = useState<Widget[]>(
+    organizationAnalyticsWidgets
+  );
 
   const [kpiCards, setKpiCards] = useState<KPICard[]>(organizationKPICards);
 
-  
   const handleFetchData = () => {
     if (error) clearAnalyticsError();
     fetchAnalyticsData(organizationId);
@@ -61,7 +64,7 @@ export function OrganizationAnalytics({
       setTodayTask(result);
       setShowTodayAgenda(true);
     } catch (error) {
-      console.error(error)
+      console.error(error);
       toast.error("Faild to fetch today task data");
     }
   };
@@ -213,7 +216,13 @@ export function OrganizationAnalytics({
                 <Calendar className="h-4 w-4" />
               </ActionButton>
             </Tooltip>
-            <DashboardSettingsDropdown sections={settingSections} />
+            <Tooltip
+              content="Dashboard Settings"
+              position="left"
+              color="primary"
+            >
+              <DashboardSettingsDropdown sections={settingSections} />
+            </Tooltip>
           </div>
         }
       />

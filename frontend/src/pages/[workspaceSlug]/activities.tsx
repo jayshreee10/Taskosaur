@@ -13,10 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/DropdownMenu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 import {
   HiClock,
-
   HiDocumentText,
   HiChatBubbleLeft,
   HiClipboardDocumentCheck,
@@ -32,6 +38,72 @@ import { ActivityLog, Workspace } from "@/types";
 import Loader from "@/components/common/Loader";
 import EmptyState from "@/components/common/EmptyState";
 import ErrorState from "@/components/common/ErrorState";
+import Tooltip from "@/components/common/ToolTip";
+
+// Pagination Component using shadcn/ui
+interface WorkspacePaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  isLoading?: boolean;
+}
+
+function WorkspacePagination({ 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  isLoading = false 
+}: WorkspacePaginationProps) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex flex-col items-center gap-2 py-4 border-t border-[var(--border)]">
+      <div className="text-sm text-[var(--muted-foreground)]">
+        Page {currentPage} of {totalPages}
+      </div>
+      
+      <Pagination>
+        <PaginationContent>
+          {/* Previous Button */}
+          <PaginationItem>
+            <PaginationPrevious 
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage > 1 && !isLoading) {
+                  onPageChange(currentPage - 1);
+                }
+              }}
+              className={`${
+                currentPage === 1 || isLoading
+                  ? 'pointer-events-none opacity-50' 
+                  : 'cursor-pointer hover:bg-[var(--accent)]'
+              }`}
+            />
+          </PaginationItem>
+
+          {/* Next Button */}
+          <PaginationItem>
+            <PaginationNext 
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage < totalPages && !isLoading) {
+                  onPageChange(currentPage + 1);
+                }
+              }}
+              className={`${
+                currentPage === totalPages || isLoading
+                  ? 'pointer-events-none opacity-50' 
+                  : 'cursor-pointer hover:bg-[var(--accent)]'
+              }`}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    </div>
+  );
+}
 
 function WorkspaceActivityContent() {
   const router = useRouter();
@@ -46,6 +118,11 @@ function WorkspaceActivityContent() {
   const [activityFilter, setActivityFilter] = useState<
     "all" | ActivityLog["type"]
   >("all");
+  
+  // Add pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
 
   // Prevent duplicate fetches
   const fetchingRef = useRef(false);
@@ -54,7 +131,7 @@ function WorkspaceActivityContent() {
   const filterOptions = [
     {
       value: "all",
-      label: "All ActivityLog",
+      label: "All Activity",
       icon: HiClock,
       color: "bg-gray-500/10 text-gray-700",
     },
@@ -87,16 +164,16 @@ function WorkspaceActivityContent() {
   const currentFilter =
     filterOptions.find((f) => f.value === activityFilter) || filterOptions[0];
 
-  const fetchData = useCallback(async () => {
-    if (fetchingRef.current && currentSlugRef.current === workspaceSlug) {
-      // prevent multiple fetches for same slug
+  const fetchData = useCallback(async (page: number = 1) => {
+    if (fetchingRef.current && currentSlugRef.current === workspaceSlug && page === currentPage) {
+      // prevent multiple fetches for same slug and page
       return;
     }
 
     fetchingRef.current = true;
     currentSlugRef.current = workspaceSlug as string;
 
-    setIsLoading(true);
+    setIsLoadingActivity(true);
     setError(null);
 
     try {
@@ -106,14 +183,20 @@ function WorkspaceActivityContent() {
         return;
       }
 
-      const ws = await getWorkspaceBySlug(workspaceSlug as string);
+      // Only fetch workspace if not already loaded
+      let ws = workspace;
       if (!ws) {
-        setError("Workspace not found");
+        setIsLoading(true);
+        ws = await getWorkspaceBySlug(workspaceSlug as string);
+        if (!ws) {
+          setError("Workspace not found");
+          setIsLoading(false);
+          fetchingRef.current = false;
+          return;
+        }
+        setWorkspace(ws);
         setIsLoading(false);
-        fetchingRef.current = false;
-        return;
       }
-      setWorkspace(ws);
 
       let entityType: string | undefined = undefined;
       if (activityFilter !== "all") {
@@ -121,10 +204,10 @@ function WorkspaceActivityContent() {
           activityFilter.charAt(0).toUpperCase() + activityFilter.slice(1);
       }
 
-      // Fetch recent activity from workspace context API
+      // Fetch recent activity from workspace context API with pagination
       const recentActivityResponse = await getWorkspaceRecentActivity(ws.id, {
-        limit: 50,
-        page: 1,
+        limit: 20, // Set limit per page
+        page: page,
         entityType,
       });
 
@@ -159,6 +242,12 @@ function WorkspaceActivityContent() {
         }));
 
       setActivities(mappedActivities);
+      
+      // Set pagination info from response
+      if (recentActivityResponse.pagination) {
+        setCurrentPage(recentActivityResponse.pagination.currentPage);
+        setTotalPages(recentActivityResponse.pagination.totalPages);
+      }
     } catch (e) {
       console.error("Error fetching workspace activity:", e);
       setError(
@@ -166,6 +255,7 @@ function WorkspaceActivityContent() {
       );
     } finally {
       setIsLoading(false);
+      setIsLoadingActivity(false);
       fetchingRef.current = false;
     }
   }, [
@@ -175,7 +265,24 @@ function WorkspaceActivityContent() {
     isAuthenticated,
     router,
     activityFilter,
+    workspace,
+    currentPage,
   ]);
+
+  // Handle filter changes - reset to page 1
+  const handleFilterChange = async (newFilter: "all" | ActivityLog["type"]) => {
+    setActivityFilter(newFilter);
+    setCurrentPage(1);
+    fetchingRef.current = false; // Allow new fetch
+    await fetchData(1);
+  };
+
+  // Handle page changes
+  const handlePageChange = async (page: number) => {
+    if (page !== currentPage) {
+      await fetchData(page);
+    }
+  };
 
   useEffect(() => {
     if (!workspaceSlug) return;
@@ -186,6 +293,8 @@ function WorkspaceActivityContent() {
       currentSlugRef.current = "";
       setWorkspace(null);
       setActivities([]);
+      setCurrentPage(1);
+      setTotalPages(1);
     }
 
     fetchData();
@@ -202,7 +311,7 @@ function WorkspaceActivityContent() {
   }
 
   if (error) {
-    return <ErrorState error="Something went wrong" onRetry={fetchData} />;
+    return <ErrorState error="Something went wrong" onRetry={() => fetchData()} />;
   }
 
   if (!workspace) {
@@ -233,7 +342,7 @@ function WorkspaceActivityContent() {
                     {currentFilter.label}
                   </span>
                   <button
-                    onClick={() => setActivityFilter("all")}
+                    onClick={() => handleFilterChange("all")}
                     className="ml-1 hover:bg-current/20 rounded-full p-0.5 transition-colors"
                     aria-label="Clear filter"
                   >
@@ -245,19 +354,25 @@ function WorkspaceActivityContent() {
 
             {/* Filter dropdown trigger */}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-9 h-9 p-0 border-[var(--border)] hover:bg-[var(--accent)] hover:border-[var(--primary)]/50 transition-all duration-200 relative"
-                  aria-label="Filter activities"
-                >
-                  <SlidersHorizontal className="w-4 h-4" />
-                  {activityFilter !== "all" && (
-                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--primary)] rounded-full animate-pulse" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
+              <Tooltip
+                content="Filter activities"
+                position="top"
+                color="primary"
+              >
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-9 h-9 p-0 border-[var(--border)] hover:bg-[var(--accent)] hover:border-[var(--primary)]/50 transition-all duration-200 relative"
+                    aria-label="Filter activities"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    {activityFilter !== "all" && (
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--primary)] rounded-full animate-pulse" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+              </Tooltip>
 
               <DropdownMenuContent
                 align="end"
@@ -275,7 +390,7 @@ function WorkspaceActivityContent() {
                     <DropdownMenuItem
                       key={option.value}
                       onClick={() =>
-                        setActivityFilter(option.value as ActivityLog["type"])
+                        handleFilterChange(option.value as ActivityLog["type"])
                       }
                       className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all duration-200 ${
                         isActive
@@ -302,7 +417,7 @@ function WorkspaceActivityContent() {
                   <>
                     <DropdownMenuSeparator className="bg-[var(--border)]" />
                     <DropdownMenuItem
-                      onClick={() => setActivityFilter("all")}
+                      onClick={() => handleFilterChange("all")}
                       className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-[var(--accent)]/50 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all duration-200"
                     >
                       <HiXMark className="w-4 h-4" />
@@ -316,22 +431,32 @@ function WorkspaceActivityContent() {
         }
       />
 
-      {/* ActivityLog list */}
-      <ActivityFeedPanel
-        title="Workspace Activity"
-        activities={filteredActivities}
-        isLoading={isLoading}
-        error={error}
-        onRetry={() => fetchData()}
-        onClearFilter={
-          activityFilter !== "all" ? () => setActivityFilter("all") : undefined
-        }
-        emptyMessage={
-          activityFilter === "all"
-            ? "No activity yet"
-            : `No ${currentFilter.label.toLowerCase()} found`
-        }
-      />
+      {/* Activity Feed with Pagination */}
+      <div className="bg-[var(--card)] rounded-lg border border-[var(--border)] overflow-hidden">
+        <ActivityFeedPanel
+          title="Workspace Activity"
+          activities={filteredActivities}
+          isLoading={isLoadingActivity}
+          error={error}
+          onRetry={() => fetchData(currentPage)}
+          onClearFilter={
+            activityFilter !== "all" ? () => handleFilterChange("all") : undefined
+          }
+          emptyMessage={
+            activityFilter === "all"
+              ? "No activity yet"
+              : `No ${currentFilter.label.toLowerCase()} found`
+          }
+        />
+
+        {/* Pagination Controls */}
+        <WorkspacePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          isLoading={isLoadingActivity}
+        />
+      </div>
     </div>
   );
 }

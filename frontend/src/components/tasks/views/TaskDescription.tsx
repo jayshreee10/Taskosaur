@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import MDEditor from "@uiw/react-md-editor";
 
 interface TaskDescriptionProps {
@@ -24,38 +24,138 @@ const TaskDescription: React.FC<TaskDescriptionProps> = ({
     }
   }, []);
 
+  // Create a mapping of checkbox indices to actual line numbers
+  const checkboxLineMapping = useMemo(() => {
+    const lines = value.split("\n");
+    const taskLineRegex = /^(\s*-\s+)\[([x ])\](.*)$/i;
+    const mapping: number[] = [];
+
+    lines.forEach((line, lineIndex) => {
+      console.log(`Line ${lineIndex}: "${line}"`);
+      if (taskLineRegex.test(line)) {
+        mapping.push(lineIndex);
+      }
+    });
+
+    return mapping;
+  }, [value]);
+
   const handleCheckboxToggle = useCallback(
     (checkboxIndex: number) => {
-      if (!value) return;
+      const actualLineIndex = checkboxLineMapping[checkboxIndex];
+
+      if (actualLineIndex === undefined) {
+        return;
+      }
 
       const lines = value.split("\n");
-      let currentCheckboxCount = 0;
+      const taskLineRegex = /^(\s*-\s+)\[([x ])\](.*)$/i;
 
-      // Find the checkbox line by its index among checkboxes
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes("- [ ] ") || lines[i].includes("- [x] ")) {
-          if (currentCheckboxCount === checkboxIndex) {
-            // Toggle the checkbox
-            if (lines[i].includes("- [ ] ")) {
-              lines[i] = lines[i].replace("- [ ] ", "- [x] ");
-            } else if (lines[i].includes("- [x] ")) {
-              lines[i] = lines[i].replace("- [x] ", "- [ ] ");
-            }
-            break;
-          }
-          currentCheckboxCount++;
-        }
+      const match = lines[actualLineIndex]?.match(taskLineRegex);
+      if (!match) {
+        return;
       }
+
+      const [, prefix, currentMark, suffix] = match;
+      const newMark = currentMark.trim().toLowerCase() === "x" ? " " : "x";
+      lines[actualLineIndex] = `${prefix}[${newMark}]${suffix}`;
 
       const newValue = lines.join("\n");
       onChange(newValue);
-
-      if (onSaveRequest) {
-        onSaveRequest(newValue);
-      }
+      onSaveRequest?.(newValue);
     },
-    [value, onChange, onSaveRequest]
+    [value, onChange, onSaveRequest, checkboxLineMapping]
   );
+
+  // Extract checkbox states from markdown for proper indexing
+  const checkboxStates = useMemo(() => {
+    const lines = value.split("\n");
+    const taskLineRegex = /^(\s*-\s+)\[([x ])\](.*)$/i;
+    const states: boolean[] = [];
+
+    lines.forEach((line) => {
+      const match = line.match(taskLineRegex);
+      if (match) {
+        const [, , mark] = match;
+        states.push(mark.trim().toLowerCase() === "x");
+      }
+    });
+
+    return states;
+  }, [value]);
+
+  // Custom markdown renderer that handles checkboxes properly
+  const MarkdownWithInteractiveTasks: React.FC<{ md: string }> = ({ md }) => {
+    const processedMarkdown = useMemo(() => {
+      const lines = md.split("\n");
+      const taskLineRegex = /^(\s*-\s+)\[([x ])\](.*)$/i;
+      let checkboxIndex = 0;
+
+      return lines.map((line, lineIndex) => {
+        const match = line.match(taskLineRegex);
+        if (match) {
+          const [, prefix, mark, suffix] = match;
+          const isChecked = mark.trim().toLowerCase() === "x";
+          const currentCheckboxIndex = checkboxIndex;
+          checkboxIndex++;
+
+          return {
+            type: "checkbox-line",
+            prefix,
+            suffix,
+            isChecked,
+            checkboxIndex: currentCheckboxIndex,
+            originalLine: line,
+            lineIndex,
+          };
+        }
+        return {
+          type: "regular-line",
+          content: line,
+          lineIndex,
+        };
+      });
+    }, [md, checkboxStates]);
+
+    return (
+      <div className="markdown-content">
+        {processedMarkdown.map((item, idx) => {
+          if (item.type === "checkbox-line") {
+            return (
+              <div
+                key={`checkbox-${item.lineIndex}-${idx}`}
+                className="flex  mb-1"
+              >
+                {/* <span className="whitespace-pre">{item.prefix}</span> */}
+                <input
+                  type="checkbox"
+                  checked={item.isChecked}
+                  onChange={(e) => {
+                    e.preventDefault();
+                    handleCheckboxToggle(item.checkboxIndex);
+                  }}
+                  className="cursor-pointer mr-2 mt-0.5"
+                />
+                <span>{item.suffix}</span>
+              </div>
+            );
+          } else if (item.content.trim()) {
+            return (
+              <MDEditor.Markdown
+               key={`content-${item.lineIndex}-${idx}`}
+                source={item.content}
+                className="prose max-w-none"
+              />
+            );
+          } else {
+            return (
+              <div key={`empty-${item.lineIndex}-${idx}`} className="h-4"></div>
+            );
+          }
+        })}
+      </div>
+    );
+  };
 
   if (editMode) {
     return (
@@ -71,6 +171,10 @@ const TaskDescription: React.FC<TaskDescriptionProps> = ({
               "bg-[var(--background)] text-[var(--foreground)] border-none h-[420px] focus:outline-none",
           }}
           height={520}
+          preview="edit"
+          commandsFilter={(command) =>
+            command && command.name === "live" ? false : command
+          }
         />
       </div>
     );
@@ -81,9 +185,11 @@ const TaskDescription: React.FC<TaskDescriptionProps> = ({
       className="prose max-w-none bg-[var(--background)] text-sm text-[var(--foreground)] p-2 rounded-md border border-[var(--border)] markdown-body"
       data-color-mode={colorMode}
     >
-     <div className="overflow-y-auto h-full">
-            <MDEditor.Markdown source={value} className="prose max-w-none" />
-          </div>
+      {value ? (
+        <MarkdownWithInteractiveTasks md={value} />
+      ) : (
+        <div>No description provided</div>
+      )}
     </div>
   );
 };

@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import TaskDetailClient from "./TaskDetailClient";
 import { useTask } from "../../contexts/task-context";
-import { useGlobalFetchPrevention } from "@/hooks/useGlobalFetchPrevention";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import ActionButton from "@/components/common/ActionButton";
 import { DynamicBadge } from "@/components/common/DynamicBadge";
 import {
@@ -12,28 +12,13 @@ import {
   HiXMark,
   HiListBullet,
   HiExclamationTriangle,
+  HiCalendar,
+  HiChevronLeft,
+  HiChevronRight,
 } from "react-icons/hi2";
 import Tooltip from "../common/ToolTip";
-import { HiCalendar } from "react-icons/hi";
-import { Role } from "@/utils/roles";
 import { useAuth } from "@/contexts/auth-context";
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  priority: "LOW" | "MEDIUM" | "HIGH" | "HIGHEST";
-  startDate: string;
-  dueDate: string;
-  projectId: string;
-  assigneeId?: string;
-  reporterId?: string;
-  statusId: string;
-  remainingEstimate?: number;
-  parentTaskId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
+import { Task } from "@/types";
 
 interface User {
   id: string;
@@ -58,17 +43,88 @@ interface SubtasksProps {
   ) => void;
 }
 
+interface PaginationInfo {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
   <div className="flex items-center gap-2 mb-4">
-      <Icon size={16} className="text-[var(--primary)]" />
+    <Icon size={16} className="text-[var(--primary)]" />
     <h2 className="text-sm font-semibold text-[var(--foreground)]">{title}</h2>
   </div>
 );
 
+const Pagination = ({
+  pagination,
+  onPageChange,
+  isLoading,
+}: {
+  pagination: PaginationInfo;
+  onPageChange: (page: number) => void;
+  isLoading: boolean;
+}) => {
+  if (pagination.totalPages <= 1) return null;
+
+  const { page, totalPages, total, limit } = pagination;
+  const startItem = (page - 1) * limit + 1;
+  const endItem = Math.min(page * limit, total);
+
+  return (
+    <div className="flex items-center justify-between px-2 py-3 border-t border-[var(--border)] mt-4">
+      <div className="text-sm text-[var(--muted-foreground)]">
+        Showing {startItem} to {endItem} of {total} subtasks
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1 || isLoading}
+          className="h-8 px-3"
+        >
+          <HiChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+
+        <div className="flex items-center gap-1">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+            (pageNum) => (
+              <Button
+                key={pageNum}
+                variant={pageNum === page ? "default" : "outline"}
+                size="sm"
+                onClick={() => onPageChange(pageNum)}
+                disabled={isLoading}
+                className="h-8 w-8 p-0"
+              >
+                {pageNum}
+              </Button>
+            )
+          )}
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages || isLoading}
+          className="h-8 px-3"
+        >
+          Next
+          <HiChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 export default function Subtasks({
   taskId,
   projectId,
-  onSubtaskAdded,
   onSubtaskUpdated,
   onSubtaskDeleted,
   showConfirmModal,
@@ -76,23 +132,16 @@ export default function Subtasks({
   const {
     getSubtasksByParent,
     createSubtask,
-    updateTask,
-    deleteTask,
+    updateSubtask,
+    deleteSubtask,
     getAllTaskStatuses,
     isLoading,
+    subtTask,
+    subtaskPagination,
   } = useTask();
 
-  // Global fetch prevention hook
-  const {
-    shouldPreventFetch,
-    markFetchStart,
-    markFetchComplete,
-    markFetchError,
-    getCachedData,
-  } = useGlobalFetchPrevention();
   const { getUserAccess } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
-  const [subtasks, setSubtasks] = useState<Task[]>([]);
   const [taskStatuses, setTaskStatuses] = useState<any[]>([]);
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
@@ -100,21 +149,11 @@ export default function Subtasks({
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [selectedSubtask, setSelectedSubtask] = useState<Task | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(5);
 
   const router = useRouter();
   const { workspaceSlug, projectSlug } = router.query;
-
-  // Helper to normalize API Task to local Task type
-  function normalizeTask(apiTask: any): Task {
-    return {
-      ...apiTask,
-      description: apiTask.description ?? "",
-    };
-  }
-
-  function normalizeTasks(apiTasks: any[]): Task[] {
-    return apiTasks.map(normalizeTask);
-  }
 
   // Get current user from localStorage
   useEffect(() => {
@@ -133,8 +172,10 @@ export default function Subtasks({
     getUserFromStorage();
   }, []);
 
+  // Check user access
   useEffect(() => {
     if (!projectId) return;
+
     getUserAccess({ name: "project", id: projectId })
       .then((data) => {
         setHasAccess(data?.canChange);
@@ -142,113 +183,81 @@ export default function Subtasks({
       .catch((error) => {
         console.error("Error fetching user access:", error);
       });
-  }, []);
+  }, [projectId]);
 
   // Fetch task statuses
   useEffect(() => {
-    const fetchKey = "all-task-statuses";
-
-    if (shouldPreventFetch(fetchKey)) {
-      const cachedData = getCachedData(fetchKey);
-      if (cachedData) {
-        setTaskStatuses(cachedData as any[]);
-        return;
-      }
-    }
-
     const fetchStatuses = async () => {
-      markFetchStart(fetchKey);
-
       try {
         const statuses = await getAllTaskStatuses();
         setTaskStatuses(statuses);
-        markFetchComplete(fetchKey, statuses);
       } catch (error) {
         console.error("Failed to fetch task statuses:", error);
-        markFetchError(fetchKey, error as Error);
       }
     };
 
     fetchStatuses();
   }, []);
 
-  // Fetch subtasks when component mounts or taskId changes
+  // Fetch subtasks when component mounts, taskId changes, or page changes
   useEffect(() => {
     if (!taskId) return;
 
-    const fetchKey = `subtasks-${taskId}`;
-
-    if (shouldPreventFetch(fetchKey)) {
-      const cachedData = getCachedData(fetchKey);
-      if (cachedData) {
-        setSubtasks(normalizeTasks(cachedData as any[]));
-        return;
-      }
-    }
-
     const fetchSubtasks = async () => {
-      markFetchStart(fetchKey);
       try {
-        const taskSubtasks = await getSubtasksByParent(taskId);
-        setSubtasks(normalizeTasks(taskSubtasks));
-        markFetchComplete(fetchKey, taskSubtasks);
+        await getSubtasksByParent(taskId, {
+          page: currentPage,
+          limit: pageSize,
+        });
       } catch (error) {
         console.error("Failed to fetch subtasks:", error);
-        markFetchError(fetchKey, error as Error);
       }
     };
 
     fetchSubtasks();
-  }, [taskId]);
+  }, [taskId, currentPage, pageSize]);
 
-  // Refresh subtasks function for real-time updates
-  const refreshSubtasks = async () => {
-    try {
-      const taskSubtasks = await getSubtasksByParent(taskId);
-      setSubtasks(normalizeTasks(taskSubtasks));
-    } catch (error) {
-      console.error("Failed to refresh subtasks:", error);
-    }
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
+  const handleAddSubtask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!newSubtaskTitle.trim() || !currentUser) return;
 
-const handleAddSubtask = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!newSubtaskTitle.trim() || !currentUser) return;
+    try {
+      const defaultStatus =
+        taskStatuses.find((s) => s.category === "TODO") || taskStatuses[0];
 
-  try {
-    const defaultStatus =
-      taskStatuses.find((s) => s.category === "TODO") || taskStatuses[0];
+      if (!defaultStatus) {
+        console.error("No task statuses available");
+        return;
+      }
 
-    if (!defaultStatus) {
-      console.error("No task statuses available");
-      return;
+      const subtaskData = {
+        title: newSubtaskTitle.trim(),
+        description: `Subtask for parent task`,
+        priority: "MEDIUM" as const,
+        startDate: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        projectId,
+        assigneeId: currentUser.id,
+        reporterId: currentUser.id,
+        statusId: defaultStatus.id,
+        parentTaskId: taskId,
+      };
+
+      await createSubtask(subtaskData);
+
+      setNewSubtaskTitle("");
+      if (currentPage > 1 && subtTask.length >= pageSize) {
+        setCurrentPage(1);
+      }
+    } catch (error) {
+      console.error("Failed to add subtask:", error);
     }
-
-    const subtaskData = {
-      title: newSubtaskTitle.trim(),
-      description: `Subtask for parent task`,
-      priority: "MEDIUM" as const,
-      startDate: new Date().toISOString(),
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      projectId,
-      assigneeId: currentUser.id,
-      reporterId: currentUser.id,
-      statusId: defaultStatus.id,
-      parentTaskId: taskId,
-    };
-
-    const newSubtask = await createSubtask(subtaskData);
-    const normalizedSubtask = normalizeTask(newSubtask);
-    await refreshSubtasks();
-    setNewSubtaskTitle(""); // Only clear the input, don't close the form
-    // setIsAddingSubtask(false); // <-- REMOVE or COMMENT OUT this line
-    onSubtaskAdded?.(normalizedSubtask);
-  } catch (error) {
-    console.error("Failed to add subtask:", error);
-  }
-};
-
+  };
 
   const handleToggleSubtaskStatus = async (
     subtaskId: string,
@@ -259,7 +268,7 @@ const handleAddSubtask = async (e: React.FormEvent) => {
     }
 
     try {
-      const subtask = subtasks.find((s) => s.id === subtaskId);
+      const subtask = subtTask.find((s) => s.id === subtaskId);
       if (!subtask) return;
 
       const completedStatus = taskStatuses.find((s) => s.category === "DONE");
@@ -276,11 +285,7 @@ const handleAddSubtask = async (e: React.FormEvent) => {
         ? todoStatus.id
         : completedStatus.id;
 
-      await updateTask(subtaskId, {
-        statusId: newStatusId,
-      });
-
-      await refreshSubtasks();
+      await updateSubtask(subtaskId, { statusId: newStatusId });
       onSubtaskUpdated?.(subtaskId, { statusId: newStatusId });
     } catch (error) {
       console.error("Failed to toggle subtask status:", error);
@@ -304,15 +309,9 @@ const handleAddSubtask = async (e: React.FormEvent) => {
     if (!editingTitle.trim()) return;
 
     try {
-      await updateTask(subtaskId, {
-        title: editingTitle.trim(),
-      });
-
-      await refreshSubtasks();
-
+      await updateSubtask(subtaskId, { title: editingTitle.trim() });
       setEditingSubtaskId(null);
       setEditingTitle("");
-
       onSubtaskUpdated?.(subtaskId, { title: editingTitle.trim() });
     } catch (error) {
       console.error("Failed to update subtask:", error);
@@ -334,8 +333,13 @@ const handleAddSubtask = async (e: React.FormEvent) => {
 
     const confirmDelete = async () => {
       try {
-        await deleteTask(subtaskId);
-        await refreshSubtasks();
+        await deleteSubtask(subtaskId);
+
+        // If we're on a page > 1 and this was the last item on the page, go back one page
+        if (currentPage > 1 && subtTask.length === 1) {
+          setCurrentPage(currentPage - 1);
+        }
+
         onSubtaskDeleted?.(subtaskId);
       } catch (error) {
         console.error("Failed to delete subtask:", error);
@@ -350,13 +354,7 @@ const handleAddSubtask = async (e: React.FormEvent) => {
         "danger"
       );
     } else {
-      if (
-        window.confirm(
-          "Are you sure you want to delete this subtask? This action cannot be undone."
-        )
-      ) {
-        await confirmDelete();
-      }
+      await confirmDelete();
     }
   };
 
@@ -371,44 +369,40 @@ const handleAddSubtask = async (e: React.FormEvent) => {
     return currentStatus?.category === "DONE";
   };
 
-  // Helper function to get priority and status colors
+  // Helper function to get priority colors
   const getPriorityColor = (priority: string) => {
-    switch (priority?.toLowerCase()) {
-      case "highest":
-        return "#EF4444"; // red
-      case "high":
-        return "#F97316"; // orange
-      case "medium":
-        return "#F59E0B"; // yellow
-      case "low":
-        return "#10B981"; // green
-      default:
-        return "#6B7280"; // gray
-    }
+    const priorityColors = {
+      highest: "#EF4444",
+      high: "#F97316",
+      medium: "#F59E0B",
+      low: "#10B981",
+    };
+    return (
+      priorityColors[priority?.toLowerCase() as keyof typeof priorityColors] ||
+      "#6B7280"
+    );
   };
 
   const getStatusColor = (statusId: string) => {
     const status = taskStatuses.find((s) => s.id === statusId);
-    if (!status) return "#6B7280"; // gray
+    if (!status) return "#6B7280";
 
-    switch (status.name?.toLowerCase()) {
-      case "done":
-      case "completed":
-        return "#10B981"; // green
-      case "in progress":
-      case "in_progress":
-        return "#3B82F6"; // blue
-      case "review":
-        return "#8B5CF6"; // purple
-      case "todo":
-      case "to do":
-        return "#6B7280"; // gray
-      default:
-        return "#6B7280"; // gray
-    }
+    const statusColors = {
+      done: "#10B981",
+      completed: "#10B981",
+      "in progress": "#3B82F6",
+      in_progress: "#3B82F6",
+      review: "#8B5CF6",
+      todo: "#6B7280",
+      "to do": "#6B7280",
+    };
+    return (
+      statusColors[status.name?.toLowerCase() as keyof typeof statusColors] ||
+      "#6B7280"
+    );
   };
 
-  const completedCount = subtasks.filter((s) => isSubtaskCompleted(s)).length;
+  const completedCount = subtTask.filter((s) => isSubtaskCompleted(s)).length;
 
   if (!currentUser) {
     return (
@@ -432,7 +426,6 @@ const handleAddSubtask = async (e: React.FormEvent) => {
             workspaceSlug={workspaceSlug as string | undefined}
             projectSlug={projectSlug as string | undefined}
             open="modal"
-            onTaskRefetch={refreshSubtasks}
           />
         </div>
       )}
@@ -440,7 +433,9 @@ const handleAddSubtask = async (e: React.FormEvent) => {
       <div className="space-y-4">
         <SectionHeader
           icon={HiListBullet}
-          title={`Subtasks (${completedCount}/${subtasks.length})`}
+          title={`Subtasks (${completedCount}/${
+            subtaskPagination?.total || subtTask.length
+          })`}
         />
 
         {/* Loading State */}
@@ -456,14 +451,13 @@ const handleAddSubtask = async (e: React.FormEvent) => {
         )}
 
         {/* Subtasks List */}
-        {subtasks.length > 0 && (
+        {subtTask.length > 0 && (
           <div className="space-y-2">
-            {subtasks.map((subtask) => (
+            {subtTask.map((subtask) => (
               <div
                 key={subtask.id}
-                className="flex items-start gap-3 group p-3 rounded-lg hover:bg-[var(--accent)] border-none  transition-colors shadow-sm hover:shadow-md cursor-pointer"
+                className="flex items-start gap-3 group p-3 rounded-lg hover:bg-[var(--accent)] border-none transition-colors shadow-sm hover:shadow-md cursor-pointer"
                 onClick={(e) => {
-                  // Don't show details if clicking on action buttons or checkboxes
                   if (
                     (e.target as HTMLElement).closest("button") ||
                     (e.target as HTMLElement).closest(".action-button") ||
@@ -525,7 +519,6 @@ const handleAddSubtask = async (e: React.FormEvent) => {
                     <>
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          {/* Checkmark/Tick icon inline with title */}
                           <div
                             onClick={(e) =>
                               handleToggleSubtaskStatus(subtask.id, e)
@@ -647,8 +640,17 @@ const handleAddSubtask = async (e: React.FormEvent) => {
           </div>
         )}
 
+        {/* Pagination Component */}
+        {subtaskPagination && (
+          <Pagination
+            pagination={subtaskPagination}
+            onPageChange={handlePageChange}
+            isLoading={isLoading}
+          />
+        )}
+
         {/* Empty State */}
-        {!isLoading && subtasks.length === 0 && (
+        {!isLoading && subtTask.length === 0 && (
           <div className="text-center py-8 bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
             <HiListBullet className="w-8 h-8 mx-auto mb-3 text-[var(--muted-foreground)]" />
             <p className="text-sm font-medium text-[var(--foreground)] mb-2">

@@ -470,7 +470,6 @@ export class EmailService {
         priority: EmailPriority.HIGH,
       });
 
-      console.log(`Password reset confirmation email sent to: ${email}`);
     } catch (error) {
       console.error(
         `Failed to send password reset confirmation email to ${email}:`,
@@ -507,10 +506,6 @@ export class EmailService {
         data: emailData,
         priority: EmailPriority.NORMAL,
       });
-
-      console.log(
-        `Invitation email sent to: ${email} for ${data.entityType}: ${data.entityName}`,
-      );
     } catch (error) {
       console.error(
         `Failed to send invitation email to ${email} for ${data.entityType} ${data.entityName}:`,

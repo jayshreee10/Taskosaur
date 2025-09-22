@@ -31,7 +31,7 @@ export function ProjectPortfolioChart({ data }: ProjectPortfolioChartProps) {
       title="Project Portfolio Status"
       description={`${totalProjects} total projects across organization`}
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>

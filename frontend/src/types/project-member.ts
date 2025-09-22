@@ -16,11 +16,15 @@ export interface ProjectMember {
   projectId: string;
   role: string;
   joinedAt: string;
+  createdAt?: string;
   user?: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
     username: string;
+    status: string;
+    avatar: string;
+    lastLoginAt: string;
   };
 }

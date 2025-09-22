@@ -2,11 +2,11 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import { HiChevronLeft, HiChevronRight, HiCalendarDays } from "react-icons/hi2";
 import { HiX } from "react-icons/hi";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/ui/avatars/UserAvatar";
 import { StatusBadge } from "@/components/ui";
 import { PriorityBadge } from "@/components/ui";
+import MDEditor from "@uiw/react-md-editor";
 
 interface Task {
   id: string;
@@ -48,6 +48,7 @@ export default function TaskCalendarView({
   workspaceSlug,
   projectSlug,
 }: TaskCalendarViewProps) {
+  const filteredTasks = Array.isArray(tasks) ? tasks : [];
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -114,7 +115,7 @@ export default function TaskCalendarView({
       const isCurrentMonth = currentDayDate.getMonth() === month;
       const isToday = currentDayDate.getTime() === today.getTime();
 
-      const dayTasks = tasks.filter((task) => {
+      const dayTasks = filteredTasks?.filter((task) => {
         const dueDate = parseDate(task.dueDate);
         if (!dueDate) return false;
         return (
@@ -136,7 +137,7 @@ export default function TaskCalendarView({
     }
 
     return days;
-  }, [currentDate, tasks]);
+  }, [currentDate, filteredTasks]);
 
   const weekDays = useMemo(() => {
     const startOfWeek = new Date(currentDate);
@@ -153,7 +154,7 @@ export default function TaskCalendarView({
 
       const isToday = currentDay.getTime() === today.getTime();
 
-      const dayTasks = tasks.filter((task) => {
+      const dayTasks = filteredTasks.filter((task) => {
         const dueDate = parseDate(task.dueDate);
         if (!dueDate) return false;
         return (
@@ -180,7 +181,7 @@ export default function TaskCalendarView({
     }
 
     return days;
-  }, [currentDate, tasks]);
+  }, [currentDate, filteredTasks]);
 
   const navigate = (direction: "prev" | "next") => {
     const newDate = new Date(currentDate);
@@ -205,7 +206,7 @@ export default function TaskCalendarView({
     setSelectedDay(null);
   };
 
-  if (tasks.length === 0) {
+  if (tasks?.length === 0) {
     return (
       <div className="w-full bg-[var(--card)] rounded-[var(--radius)] shadow-sm p-4">
         <div className="text-center py-8 flex flex-col items-center justify-center">
@@ -546,7 +547,7 @@ export default function TaskCalendarView({
       </div>
 
       {/* Calendar Content */}
-      <div className="bg-[var(--card)]">
+      <div className="bg-[var(--card)] cursor-pointer">
         {viewMode === "month" ? renderMonthView() : renderWeekView()}
       </div>
 
@@ -625,9 +626,9 @@ export default function TaskCalendarView({
                             )}
                           </div>
                           {task.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-1">
-                              {task.description}
-                            </p>
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              <MDEditor.Markdown source={task.description} className="prose max-w-none" />
+                            </div>
                           )}
                         </div>
                         {task.assignee && (

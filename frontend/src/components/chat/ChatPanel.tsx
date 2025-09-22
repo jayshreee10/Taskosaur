@@ -33,18 +33,63 @@ export default function ChatPanel() {
   const [isContextManuallyCleared, setIsContextManuallyCleared] =
     useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const [currentOrganizationId, setCurrentOrganizationId] = useState<string | null>(null);
   const { getCurrentUser } = useAuth();
+  const [panelWidth, setPanelWidth] = useState(400);
+  const resizing = useRef(false);
+
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = true;
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!resizing.current) return;
+    const newWidth = Math.min(Math.max(window.innerWidth - e.clientX, 400), 650);
+    setPanelWidth(newWidth);
+  };
+
+  const handleMouseUp = () => {
+    resizing.current = false;
+  };
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+  // Auto-resize textarea function
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      
+      // Calculate new height based on content
+      const newHeight = Math.min(textarea.scrollHeight, 120); // Max height of 120px
+      textarea.style.height = `${newHeight}px`;
+    }
+  }, []);
+
+  // Handle input change with auto-resize
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+    // Adjust height after state update
+    setTimeout(adjustTextareaHeight, 0);
+  }, [adjustTextareaHeight]);
 
   // Load messages from session storage (improved logic)
   const loadMessagesFromHistory = useCallback(() => {
     try {
       // Only load if we don't have any messages yet
       if (messages.length > 0) {
-        console.log(
-          "[Chat] Skipping session storage load - messages already present"
-        );
         return false;
       }
 
@@ -54,20 +99,13 @@ export default function ChatPanel() {
 
         // Only load if we have substantial history (more than just a greeting)
         if (chatHistory.length > 2) {
-          const convertedMessages: Message[] = chatHistory.map(
-            (msg, index) => ({
-              role: msg.role === "system" ? "assistant" : msg.role,
-              content: msg.content,
-              timestamp: new Date(
-                Date.now() - (chatHistory.length - index) * 1000
-              ),
-              isStreaming: false,
-            })
-          );
-
-          console.log(
-            `[Chat] Loaded ${convertedMessages.length} messages from session storage`
-          );
+          const convertedMessages: Message[] = chatHistory.map((msg, index) => ({
+            role: msg.role === 'system' ? 'assistant' : msg.role,
+            content: msg.content,
+            timestamp: new Date(Date.now() - (chatHistory.length - index) * 1000),
+            isStreaming: false
+          }));
+          
           setMessages(convertedMessages);
           return true;
         }
@@ -82,10 +120,12 @@ export default function ChatPanel() {
   useEffect(() => {
     // Get current user
     const currentUser = getCurrentUser();
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem('access_token');
+    const currentOrgId = localStorage.getItem('currentOrganizationId');
 
     setUser(currentUser);
-
+    setCurrentOrganizationId(currentOrgId);
+    
     if (token && currentUser) {
       // Initialize MCP server with context
       const pathContext = extractContextFromPath(pathname);
@@ -111,7 +151,23 @@ export default function ChatPanel() {
       mcpServer.updateContext(pathContext);
     }
   }, [pathname, user, isContextManuallyCleared]);
-
+  
+    if (
+      currentOrganizationId !== null &&
+      currentOrganizationId !== localStorage.getItem('currentOrganizationId') && messages.length > 2
+    ) {
+      const newOrgId = localStorage.getItem('currentOrganizationId');
+      setCurrentOrganizationId(newOrgId);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "⚠️ Organization changed. My previous responses may no longer apply to the correct workspace or projects.",
+          timestamp: new Date(),
+        },
+      ]);
+    }
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -121,8 +177,7 @@ export default function ChatPanel() {
   useEffect(() => {
     const handleWorkspaceCreated = (event: CustomEvent) => {
       const { workspaceSlug, workspaceName } = event.detail;
-      console.log("[Chat] Workspace created, navigating to:", workspaceSlug);
-
+      
       // Navigate to the new workspace
       router.push(`/${workspaceSlug}`);
 
@@ -157,7 +212,6 @@ export default function ChatPanel() {
         },
       ]);
     };
-
     // Add event listeners
     if (typeof window !== "undefined") {
       window.addEventListener(
@@ -184,7 +238,6 @@ export default function ChatPanel() {
 
   // Stable callback for handling streaming chunks
   const handleChunk = useCallback((chunk: string) => {
-    console.log("[Chat] Received chunk:", chunk); // Debug log
     setMessages((prev) => {
       const updatedMessages = [...prev];
       const lastMessageIndex = updatedMessages.length - 1;
@@ -192,8 +245,7 @@ export default function ChatPanel() {
 
       if (
         lastMessage &&
-        lastMessage.role === "assistant" &&
-        lastMessage.isStreaming
+        lastMessage.role === "assistant"
       ) {
         // Create a new message object instead of mutating
         updatedMessages[lastMessageIndex] = {
@@ -212,7 +264,7 @@ export default function ChatPanel() {
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
 
-    console.log("[Chat] Sending message:", inputValue); // Debug log
+    // console.log("[Chat] Sending message:", inputValue); // Debug log
 
     // If user sends a message with workspace/project specification, clear the manual flag
     if (
@@ -220,7 +272,7 @@ export default function ChatPanel() {
       inputValue.toLowerCase().includes("project")
     ) {
       setIsContextManuallyCleared(false);
-      console.log("[Chat] Re-enabling automatic context detection");
+      // console.log("[Chat] Re-enabling automatic context detection");
     }
 
     const userMessage: Message = {
@@ -230,7 +282,7 @@ export default function ChatPanel() {
     };
 
     setMessages((prev) => {
-      console.log("[Chat] Adding user message to state");
+      // console.log("[Chat] Adding user message to state");
       return [...prev, userMessage];
     });
     setInputValue("");
@@ -246,7 +298,7 @@ export default function ChatPanel() {
     };
 
     setMessages((prev) => {
-      console.log("[Chat] Adding streaming placeholder");
+      // console.log("[Chat] Adding streaming placeholder");
       return [...prev, assistantMessage];
     });
 
@@ -259,7 +311,7 @@ export default function ChatPanel() {
 
       // Mark streaming as complete and sync final content
       setMessages((prev) => {
-        console.log("[Chat] Marking streaming as complete");
+        // console.log("[Chat] Marking streaming as complete");
         const updatedMessages = [...prev];
         const lastMessage = updatedMessages[updatedMessages.length - 1];
         if (
@@ -282,7 +334,7 @@ export default function ChatPanel() {
                 if (
                   lastMcpMessage.content.length > lastMessage.content.length
                 ) {
-                  console.log("[Chat] Syncing final content from MCP history");
+                  // console.log("[Chat] Syncing final content from MCP history");
                   lastMessage.content = lastMcpMessage.content;
                 }
               }
@@ -345,15 +397,16 @@ export default function ChatPanel() {
       setError("Failed to clear context. Please try again.");
     }
   };
+  
   // Improved sync logic that only runs on mount/chat open, not during active messaging
   useEffect(() => {
     const syncWithMcpHistory = () => {
       try {
         // Skip sync if context was manually cleared or if user is actively messaging
         if (isContextManuallyCleared || isLoading) {
-          console.log(
-            "[Chat] Skipping sync - context cleared or messaging in progress"
-          );
+          // console.log(
+          //   "[Chat] Skipping sync - context cleared or messaging in progress"
+          // );
           return;
         }
 
@@ -367,7 +420,7 @@ export default function ChatPanel() {
 
           // Only sync if there's a meaningful difference (more than 1 message gap)
           if (Math.abs(mcpHistory.length - currentHistoryLength) > 1) {
-            console.log("[Chat] Syncing UI messages with MCP server history");
+            // console.log("[Chat] Syncing UI messages with MCP server history");
 
             const syncedMessages: Message[] = mcpHistory.map(
               (msg: ChatMessage, index: number) => ({
@@ -403,168 +456,235 @@ export default function ChatPanel() {
   return (
     <>
       {/* Chat Panel - positioned below header */}
-      <div
-        role="chat-panel"
-        className={`fixed bg-[var(--background)] top-0 right-0 bottom-0 border-l border-[var(--border)] z-9999 transform transition-transform duration-400 ease-in-out
-          ${
-            isChatOpen ? "translate-x-0" : "translate-x-full"
-          } w-full xl:w-[400px]  `}
+      <div 
+        className={`fixed top-0 right-0 bottom-0 bg-[var(--background)] border-l border-[var(--border)] z-40 transform transition-transform duration-300 ease-in-out h-full pb-20 ${
+          isChatOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+        style={{ width: `${panelWidth}px` }}
       >
+      <div
+        onMouseDown={handleMouseDown}
+        className="absolute left-0 top-0 bottom-0 w-0.5 cursor-col-resize bg-transparent hover:bg-gray-300/40"
+      />
         {/* Chat Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border)] h-[65px] px-4">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--background)]">
           <div className="flex items-center gap-2">
-            <HiSparkles className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold text-primary">AI Assistant</h2>
+            <HiSparkles className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold text-primary">
+              AI Assistant
+            </h2>
           </div>
           <div className="flex items-center gap-2">
             {/* Context Clear Button */}
-            <Button
-              variant="ghost"
+            <button
               onClick={clearContext}
-              className="flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-primary transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--muted-foreground)] hover:bg-[var(--accent)]  rounded-md transition-all duration-200"
               title="Clear workspace/project context"
             >
               <HiArrowPath className="w-3 h-3" />
               Context
-            </Button>
+            </button>
             {messages.length > 0 && (
               <button
                 onClick={clearChat}
-                className="text-xs text-[var(--muted)] hover:text-primary"
+                className="px-2 py-1 text-xs text-[var(--muted-foreground)] hover:bg-[var(--accent)] rounded-md transition-all duration-200"
               >
                 Clear
               </button>
             )}
-            <Button
-              variant="ghost"
+            <button
               onClick={toggleChat}
-              className=" rounded-lg hover:bg-[var(--accent)] transition-colors "
+              className="p-1.5 rounded-md hover:bg-[var(--accent)] transition-all duration-200"
             >
-              <HiXMark className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            </Button>
+              <HiXMark className="w-5 h-5 text-[var(--muted-foreground)]" />
+            </button>
           </div>
         </div>
 
-        {/* Chat Messages */}
-        <div
-          className="flex-1 overflow-y-auto p-4 space-y-4"
-          style={{ height: "calc(100% - 140px)" }}
-        >
-          {messages.length === 0 ? (
-            <div className="text-center text-[var(--muted-foreground)] mt-8">
-              <HiSparkles className="w-12 h-12 mx-auto mb-4 text-[var(--muted-foreground)]" />
-              <p className="font-medium">
-                Hi! I'm your Taskosaur AI Assistant.
-              </p>
-              <p className="text-sm mt-2">Try these commands:</p>
-              <ul className="text-sm mt-3 space-y-1 text-left max-w-xs mx-auto">
-                <li>• "Create a task called [name]"</li>
-                <li>• "Show high priority tasks"</li>
-                <li>• "Mark [task] as done"</li>
-                <li>• "Create a workspace called [name]"</li>
-                <li>• "List my projects"</li>
-                <li>• "Navigate to [workspace] workspace"</li>
-              </ul>
-              <p className="text-xs mt-3 text-[var(--muted-foreground)]">
-                I'll execute these actions for you!
-              </p>
-            </div>
-          ) : (
-            <>
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[80%] p-3 rounded-lg text-sm ${
-                      message.role === "user"
-                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                        : message.role === "system"
-                        ? "bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap break-words">
-                      {message.content}
-                      {message.isStreaming && (
-                        <span className="inline-block w-1 h-4 ml-1 bg-current animate-pulse" />
-                      )}
-                    </div>
+        <div className="flex flex-col h-full">
+          <div 
+            className="flex-1 overflow-y-auto px-4 py-4 space-y-6 chatgpt-scrollbar h-full"
+            style={{ 
+              scrollbarWidth: 'none', /* Firefox */
+              msOverflowStyle: 'none'  /* Internet Explorer 10+ */
+            }}
+          >
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center text-[var(--muted)] max-w-sm">
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-400 flex items-center justify-center">
+                    <HiSparkles className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-primary mb-2">
+                    Hi! I'm your Taskosaur AI Assistant
+                  </h3>
+                  <p className="text-sm mb-4 text-gray-600 dark:text-gray-400">
+                    I can help you manage tasks, projects, and workspaces
+                  </p>
+                  <div className="text-left bg-[var(--accent)] rounded-lg p-4">
+                    <p className="text-sm font-medium mb-2 text-[var(--muted-foreground)]">Try these commands:</p>
+                    <ul className="text-sm space-y-1.5 text-gray-600 dark:text-gray-400">
+                      <li className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></span>
+                        "Create a task called [name]"
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></span>
+                        "Show high priority tasks"
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></span>
+                        "Mark [task] as done"
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></span>
+                        "Create a workspace called [name]"
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></span>
+                        "List my projects"
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></span>
+                        "Navigate to [workspace] workspace"
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {messages.map((message, index) => (
+                  <div key={index} className="group">
+                    {message.role === 'user' ? (
+                      // User Message - Right aligned like
+                      <div className="flex justify-end mb-4">
+                        <div className="flex items-start gap-3 max-w-[80%]">
+                          <div className="bg-[#1E2939] text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
+                            <div className="text-sm whitespace-pre-wrap break-words">
+                              {message.content}
+                            </div>
+                          </div>
+                          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#1E2939] text-sm font-medium flex-shrink-0">
+                            {user?.firstName?.[0]?.toUpperCase() + user?.lastName?.[0]?.toUpperCase() || 'U'}
+                          </div>
+                        </div>
+                      </div>
+                    ) : message.role === 'system' ? (
+                      // System Message - Centered
+                      <div className="flex justify-center mb-4">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm max-w-[90%]">
+                          {message.content}
+                        </div>
+                      </div>
+                    ) : (
+                      // Assistant Message - Left aligned like
+                      <div className="flex justify-start mb-4">
+                        <div className="flex items-start gap-3 max-w-[85%]">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-400 flex items-center justify-center flex-shrink-0">
+                            <HiSparkles className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm">
+                            <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words">
+                              {message.content}
+                              {message.isStreaming && (
+                                <span className="inline-block w-2 h-4 ml-1 bg-blue-600 animate-pulse rounded" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Timestamp - appears on hover */}
                     {message.timestamp && (
-                      <div
-                        className={`text-xs mt-1 ${
-                          message.role === "user"
-                            ? "text-gray-300 dark:text-gray-600"
-                            : message.role === "system"
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-gray-500 dark:text-gray-400"
-                        }`}
-                      >
-                        {message.timestamp.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 -mt-2 mb-2">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                          {message.timestamp.toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </span>
                       </div>
                     )}
                   </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </>
+            )}
+
+            {error && (
+              <div className="mx-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center flex-shrink-0">
+                    <span className="text-red-600 dark:text-red-400 text-sm">!</span>
+                  </div>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{error}</p>
                 </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </>
-          )}
+              </div>
+            )}
+          </div>
 
-          {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          {/* Chat Input Area - Fixed at bottom with auto-expanding textarea */}
+          <div className="flex-shrink-0 border-t border-[var(--border)] bg-[var(--background)] pt-4 px-2">
+            <div className="flex gap-3 items-end">
+                <textarea
+                  ref={textareaRef}
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyPress}
+                  placeholder={
+                    !user 
+                      ? "Please log in to use AI assistant..." 
+                      : "Message AI Assistant..."
+                  }
+                  disabled={isLoading || !user}
+                  rows={1}
+                  className="flex-1 px-4 py-3 bg-[var(--muted)] border-[var(--border)] focus:ring-1 focus:ring-[var(--border)] focus:border-transparent transition-all duration-200 rounded-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+                  style={{ 
+                    minHeight: '48px', 
+                    maxHeight: '120px',
+                    lineHeight: '1.5',
+                    height: '48px'
+                  }}
+                />
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isLoading || !user}
+                className="p-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md disabled:shadow-none flex-shrink-0"
+              >
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <HiPaperAirplane className="w-4 h-4" />
+                )}
+              </button>
             </div>
-          )}
-        </div>
-
-        {/* Chat Input */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[var(--border)]">
-          <div className="flex items-end gap-2">
-            <Textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder={
-                !user
-                  ? "Please log in to use AI assistant..."
-                  : "Type your message..."
-              }
-              disabled={isLoading}
-              rows={1}
-              className="px-4 bg-[var(--card)] border-[var(--border)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent transition-all duration-200 rounded-xl shadow-sm hover:shadow-md "
-              style={{ minHeight: "38px", maxHeight: "120px" }}
-              
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              className="bg-[var(--primary)]/80 hover:bg-[var(--primary)] disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors "
-            >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white dark:border-gray-900 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <HiPaperAirplane className="w-4 h-4 text-[var(--primary-foreground)]" />
-              )}
-            </Button>
           </div>
         </div>
       </div>
-
-      {/* Global styles for content squeeze */}
+      
+      {/* Global styles for content squeeze and hidden scrollbars */}
       <style jsx global>{`
         body.chat-open .flex-1.overflow-y-scroll {
           margin-right: 400px !important;
           transition: margin-right 300ms ease-in-out;
         }
-
+        
         .flex-1.overflow-y-scroll {
           transition: margin-right 300ms ease-in-out;
+        }
+
+        /* Hide scrollbars completely */
+        .chatgpt-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+
+        /* Smooth scrolling */
+        .chatgpt-scrollbar {
+          scroll-behavior: smooth;
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none;  /* Internet Explorer 10+ */
         }
       `}</style>
     </>

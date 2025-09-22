@@ -101,6 +101,14 @@ interface OrganizationContextType extends OrganizationState {
   // Add analytics methods
   fetchAnalyticsData: (organizationId: string) => Promise<void>;
   clearAnalyticsError: () => void;
+
+
+  universalSearch: (
+    query: string,
+    organizationId: string,
+    page?: number,
+    limit?: number
+  ) => Promise<any>;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(
@@ -136,7 +144,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     }
   );
 
-  // Initialize current organization from localStorage
+  
   useEffect(() => {
     const initializeCurrentOrganization = () => {
       try {
@@ -463,6 +471,15 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
 
       // Add analytics methods
       fetchAnalyticsData,
+
+      universalSearch: async (
+        query: string,
+        organizationId: string,
+        page: number = 1,
+        limit: number = 20
+      ): Promise<any> => {
+        return organizationApi.universalSearch(query, organizationId, page, limit);
+      },
     }),
     [handleApiOperation, fetchAnalyticsData]
   );

@@ -33,7 +33,7 @@ export function TaskPriorityChart({ data }: TaskPriorityChartProps) {
       title="Task Priority Distribution"
       description="Priority breakdown across all tasks"
       config={chartConfig}
-      className="border-none"
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={350}>
         <BarChart 

@@ -78,6 +78,7 @@ interface StatusColumnProps {
   onTaskDragStart: (task: KanbanTask, statusId: string) => void;
   onTaskDragEnd: () => void;
   onCreateTask: (statusId: string, taskData: any) => void;
+  onTaskClick?: (task: KanbanTask) => any
 }
 
 const StatusColumn: React.FC<StatusColumnProps> = ({
@@ -89,6 +90,7 @@ const StatusColumn: React.FC<StatusColumnProps> = ({
   onTaskDragStart,
   onTaskDragEnd,
   onCreateTask,
+  onTaskClick
 }) => {
   const { getProjectMembers } = useProjectContext();
 
@@ -227,7 +229,7 @@ const StatusColumn: React.FC<StatusColumnProps> = ({
           style={{
             backgroundColor:
               dragState.isDragging && dragState.draggedTo === status.statusId
-                ? `${status.statusColor}10` // 10% opacity of status color
+                ? `${status.statusColor}10`
                 : "transparent",
           }}
         >
@@ -241,6 +243,7 @@ const StatusColumn: React.FC<StatusColumnProps> = ({
               }
               onDragStart={onTaskDragStart}
               onDragEnd={onTaskDragEnd}
+              onClick={onTaskClick}
             />
           ))}
 

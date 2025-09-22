@@ -44,7 +44,6 @@ export default function AutomationLoader({
         enableBrowserConsoleAccess();
         
         setIsLoaded(true);
-        console.log('🚀 Taskosaur Automation System initialized successfully');
         
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to initialize automation system');
@@ -70,20 +69,19 @@ export default function AutomationLoader({
           const result = await window.TaskosaurAutomation.initialize();
           setInitResult(result);
 
-          console.log('🤖 Taskosaur Automation System initialized');
-          console.log('Result:', result);
+          console.log('🤖 Taskosaur Automation System initialized \n Result: ', result);
 
           if (enableConsoleAccess) {
-            console.log('🌐 Automation functions available in console:');
-            console.log('- TaskosaurAutomation: Main automation instance');
-            console.log('- taskosaurAuth: Authentication functions');
-            console.log('- taskosaurWorkspace: Workspace management');
-            console.log('- taskosaurProject: Project management');
-            console.log('- taskosaurTask: Task management');
-            console.log('- taskosaurHelpers: Utility functions');
-            console.log('');
-            console.log('Quick start:');
-            console.log('await TaskosaurAutomation.quickDemo()');
+            // console.log('🌐 Automation functions available in console:');
+            // console.log('- TaskosaurAutomation: Main automation instance');
+            // console.log('- taskosaurAuth: Authentication functions');
+            // console.log('- taskosaurWorkspace: Workspace management');
+            // console.log('- taskosaurProject: Project management');
+            // console.log('- taskosaurTask: Task management');
+            // console.log('- taskosaurHelpers: Utility functions');
+            // console.log('');
+            // console.log('Quick start:');
+            // console.log('await TaskosaurAutomation.quickDemo()');
           }
         }
       } catch (error) {
@@ -139,7 +137,6 @@ export default function AutomationLoader({
         </div>
         <button 
           onClick={() => {
-            console.log('🎬 Starting demo...');
             window.TaskosaurAutomation?.demos?.quickDemo?.();
           }}
           className="mt-1 text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded transition-colors"

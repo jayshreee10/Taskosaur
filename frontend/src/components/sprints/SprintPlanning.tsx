@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Task, Sprint, TaskPriority, TaskType, SprintStatus } from "@/types";
+import { Task, Sprint, TaskPriority, TaskType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,6 @@ import {
   HiFlag,
   HiPlus,
   HiClipboardDocumentList,
-  HiArrowRight,
   HiChartBar,
   HiUsers,
   HiDocumentText,
@@ -47,21 +46,6 @@ const LoadingSkeleton = () => (
   </div>
 );
 
-const getTaskTypeIcon = (type: TaskType) => {
-  switch (type) {
-    case TaskType.BUG:
-      return <HiBugAnt className="w-4 h-4" />;
-    case TaskType.STORY:
-      return <HiDocumentText className="w-4 h-4" />;
-    case TaskType.EPIC:
-      return <FiTarget className="w-4 h-4" />;
-    case TaskType.SUBTASK:
-      return <HiPencilSquare className="w-4 h-4" />;
-    default:
-      return <HiClipboardDocumentList className="w-4 h-4" />;
-  }
-};
-
 const getPriorityConfig = (priority: TaskPriority) => {
   switch (priority) {
     case "HIGHEST":
@@ -88,7 +72,6 @@ const getPriorityConfig = (priority: TaskPriority) => {
 export default function SprintPlanning({
   projectId,
   sprintId,
-  onSprintUpdate,
 }: SprintPlanningProps) {
   const [backlogTasks, setBacklogTasks] = useState<Task[]>([]);
   const [sprintTasks, setSprintTasks] = useState<Task[]>([]);
@@ -392,9 +375,6 @@ export default function SprintPlanning({
       <CardContent className="sprints-planning-task-content">
         <div className="sprints-planning-task-header">
           <div className="sprints-planning-task-type-row">
-            <div className="sprints-planning-task-type-icon">
-              {/* {getTaskTypeIcon(task.type)} */}
-            </div>
             <span className="sprints-planning-task-key"></span>
           </div>
           <div className="sprints-planning-task-badges">

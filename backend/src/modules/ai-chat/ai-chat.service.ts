@@ -2,6 +2,8 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ChatRequestDto, ChatResponseDto, ChatMessageDto } from './dto/chat.dto';
 import { SettingsService } from '../settings/settings.service';
 import * as commandsData from '../../constants/commands.json';
+import { WorkspacesService } from '../workspaces/workspaces.service';
+import { ProjectsService } from '../projects/projects.service';
 
 @Injectable()
 export class AiChatService {
@@ -13,9 +15,14 @@ export class AiChatService {
     projectSlug?: string;
     projectName?: string;
     lastUpdated: Date;
+    currentWorkSpaceProjectSlug?: string[];
   }> = new Map();
 
-  constructor(private settingsService: SettingsService) {
+  constructor(
+    private settingsService: SettingsService,
+    private workspacesService: WorkspacesService,
+    private projectService: ProjectsService,
+  ) {
     // Load commands from imported JSON
     this.commands = commandsData;
     // Clean up old contexts every hour
@@ -39,7 +46,16 @@ export class AiChatService {
     return 'custom'; // fallback for unknown providers
   }
 
-  private generateSystemPrompt(sessionContext?: { workspaceSlug?: string; workspaceName?: string; projectSlug?: string; projectName?: string; }): string {
+  private generateSystemPrompt(
+    sessionContext?: {
+      workspaceSlug?: string;
+      workspaceName?: string;
+      projectSlug?: string;
+      projectName?: string;
+      currentWorkSpaceProjectSlug?: string[];
+    },
+    slugs: string[] = [],
+  ): string {
     // Generate system prompt dynamically from commands.json
     const commandList = this.commands.commands.map(cmd => {
       const requiredParams = cmd.params.filter(p => !p.endsWith('?'));
@@ -51,17 +67,20 @@ export class AiChatService {
       }
       if (optionalParams.length > 0) {
         const cleanOptional = optionalParams.map(p => p.replace('?', ''));
-        paramDescription += paramDescription ? `, optional: ${cleanOptional.join(', ')}` : `optional: ${cleanOptional.join(', ')}`;
-      }
-      
-      const paramObj = cmd.params.reduce((obj, param) => {
-        const cleanParam = param.replace('?', '');
-        obj[cleanParam] = cleanParam.includes('Slug') ? 'slug' : 'value';
-        return obj;
-      }, {});
-      
-      return `- ${cmd.name}: ${paramDescription} → [COMMAND: ${cmd.name}] ${JSON.stringify(paramObj)}`;
-    }).join('\n');
+          paramDescription += paramDescription
+            ? `, optional: ${cleanOptional.join(', ')}`
+            : `optional: ${cleanOptional.join(', ')}`;
+        }
+
+        const paramObj = cmd.params.reduce((obj, param) => {
+          const cleanParam = param.replace('?', '');
+          obj[cleanParam] = cleanParam.includes('Slug') ? 'slug' : 'value';
+          return obj;
+        }, {});
+
+        return `- ${cmd.name}: ${paramDescription} → [COMMAND: ${cmd.name}] ${JSON.stringify(paramObj)}`;
+      })
+      .join('\n');
 
     return `You are Taskosaur AI Assistant. You can ONLY execute predefined commands - NEVER create bash commands or make up new commands.
 
@@ -73,6 +92,14 @@ CRITICAL RULES:
 2. ONLY use the predefined [COMMAND: commandName] format above
 3. If user asks for something, match it to one of the available commands
 4. If no command matches, explain what commands are available instead
+
+SLUG VALIDATION RULES:
+1. The "workspaceSlug" MUST be EXACTLY one from the AVAILABLE WORKSPACE SLUGS list.
+2. If the user input does not closely match any slug, DO NOT create a new slug.
+3. If no valid slug is found, respond by telling the user:
+    "The workspace you requested does not exist. Please choose one of the available workspaces."
+4. Only use fuzzy matching for small typos (e.g., "ramanq" → "raman").
+5. For phrases or words that don't match at all (e.g., "navigate Web application"), NEVER invent. Instead, show the available slugs.
 
 COMMAND EXECUTION FORMAT:
 - Use EXACT format: [COMMAND: commandName] {"param": "value"}
@@ -109,10 +136,31 @@ EDITING EXAMPLES:
 - "change workspace abc to Better Name" → [COMMAND: editWorkspace] {"workspaceSlug": "abc", "updates": {"name": "Better Name"}}
 - "edit workspace xyz to New Title" → [COMMAND: editWorkspace] {"workspaceSlug": "xyz", "updates": {"name": "New Title"}}
 
-CONTEXT-AWARE EXAMPLES:
-- "create task under Workspace X" → Remember X for future commands, ask for project details
-- "list projects" (after workspace mentioned) → [COMMAND: listProjects] {"workspaceSlug": "x"}
-- "show me projects in Workspace Y" → [COMMAND: listProjects] {"workspaceSlug": "y"}
+CONTEXT-AWARE BEHAVIOR RULES:
+1. **WORKSPACE CONTEXT PRIORITY**: When a workspace is set in CURRENT CONTEXT, use it as the default for ALL commands that require workspaceSlug
+2. **PROJECT CONTEXT PRIORITY**: When a project is set in CURRENT CONTEXT, use it as the default for ALL task-related commands
+3. **CONTEXT BOUNDARIES**: 
+   - NEVER suggest or use workspaces/projects NOT listed in the available lists above
+   - If user mentions a workspace/project not in current context, FIRST verify it exists in the available lists
+   - If context is missing and user doesn't specify, extract from conversation history ONLY within this session
+4. **AUTO-FILL BEHAVIOR**:
+   - For commands requiring workspaceSlug: Use current workspace automatically if not specified
+   - For commands requiring projectSlug: Use current project automatically if not specified
+   - ALWAYS inform user when auto-filling from context: "Using current workspace/project: [name]"
+5. **CONTEXT VALIDATION**:
+   - Before executing ANY command, verify the workspace/project exists in the available lists
+   - If current context becomes invalid (e.g., workspace deleted), clear it and ask user to specify
+6. **NAVIGATION MEMORY**: 
+   - Remember the user's navigation path within this session
+   - When user says "go back" or similar, use the previous context from this conversation
+   - NEVER assume context from outside this conversation session
+
+SMART CONTEXT EXAMPLES:
+- User in "workspace-a" says "create task X" → Auto-use workspace-a, ask for project if multiple available
+- User says "list projects" → Use current workspace context automatically
+- User says "go to different-workspace" → Validate against AVAILABLE WORKSPACE SLUGS first
+- User in "project-1" says "create task Y" → Auto-use current workspace and project-1
+- No context set, user says "show my projects" → Ask "Which workspace would you like to see projects from?"
 
 WORKSPACE NAME CONVERSION:
 - "Hyscaler Workspace" → slug: "hyscaler-workspace"
@@ -120,20 +168,46 @@ WORKSPACE NAME CONVERSION:
 - "Personal Projects" → slug: "personal-projects"
 - Always convert spaces to hyphens and make lowercase for slugs
 
+AVAILABLE WORKSPACE SLUGS (from database):
+  ${slugs.length > 0
+        ? slugs.map(slug => `→ slug: "${slug}"`).join('\n')
+      : '- No workspaces available'}
+
+
+PROJECT NAME CONVERSION:
+- "Hyscaler test project" → slug: "hyscaler-test-project"
+- "My Test project" → slug: "my-test-project" 
+- "Personal Projects" → slug: "personal-projects"
+- "Create a new project lab work" -> slug: "lab-work"
+- Always convert spaces to hyphens and make lowercase for slugs
+
+
 CRITICAL REMINDER:
 - NEVER execute commands with missing required parameters
 - ALWAYS ask for missing information before executing
 - createWorkspace requires BOTH name AND description - NO EXCEPTIONS
 - Be helpful but wait for complete information
+- ABSOLUTE RULE:
+  *You must NEVER invent new slugs. The "workspaceSlug" must always come from AVAILABLE WORKSPACE SLUGS. If no close match, ask the user instead of creating a new slug.
+- NEVER forget the CURRENT CONTEXT.
+- If the current context is missing, ALWAYS use the most recent workspace name or slug that the user either navigated to or created.
 
-${sessionContext && (sessionContext.workspaceSlug || sessionContext.projectSlug) ? `
+
+${sessionContext && (sessionContext.workspaceSlug || sessionContext.projectSlug || sessionContext.workspaceName) ? `
 
 CURRENT CONTEXT:
 ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspaceName || sessionContext.workspaceSlug} (slug: ${sessionContext.workspaceSlug})
-` : ''}${sessionContext.projectSlug ? `- Current Project: ${sessionContext.projectName || sessionContext.projectSlug} (slug: ${sessionContext.projectSlug})` : ''}` : ''}`;
+` : ''}${sessionContext.projectSlug ? `- Current Project: ${sessionContext.projectName || sessionContext.projectSlug} (slug: ${sessionContext.projectSlug})
+` : ''}` : ''}
+
+${sessionContext?.currentWorkSpaceProjectSlug ? `- Available Projects in Current Workspace: ${sessionContext.currentWorkSpaceProjectSlug.join(', ')}` : ''}
+`;
   }
 
-  private validateCommandParameters(commandName: string, parameters: Record<string, any>): { valid: boolean; missing: string[]; message?: string } {
+  private validateCommandParameters(
+    commandName: string,
+    parameters: Record<string, any>,
+  ): { valid: boolean; missing: string[]; message?: string } {
     const command = this.commands.commands.find(cmd => cmd.name === commandName);
     if (!command) {
       return { valid: false, missing: [], message: `Unknown command: ${commandName}` };
@@ -160,6 +234,7 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
       if (isEnabled !== 'true') {
         throw new BadRequestException('AI chat is currently disabled. Please enable it in settings.');
       }
+      const slugs = await this.workspacesService.findAllSlugs(chatRequest.currentOrganizationId ?? '');
 
       // Get or create session context
       const sessionId = chatRequest.sessionId || 'default';
@@ -167,9 +242,6 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
       if (!sessionContext) {
         sessionContext = { lastUpdated: new Date() };
         this.conversationContexts.set(sessionId, sessionContext);
-        console.log(`[CONTEXT] Created new session context for: ${sessionId}`);
-      } else {
-        console.log(`[CONTEXT] Using existing context for session ${sessionId}:`, sessionContext);
       }
 
       // Get API settings from database
@@ -189,8 +261,7 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
       const messages: ChatMessageDto[] = [];
       
       // Generate dynamic system prompt from commands.json with session context
-      const systemPrompt = this.generateSystemPrompt(sessionContext);
-
+      const systemPrompt = this.generateSystemPrompt(sessionContext, slugs);
       messages.push({
         role: 'system',
         content: systemPrompt
@@ -342,22 +413,11 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
           const commandName = commandMatch[1].trim();
           const parametersString = commandMatch[2] || '{}';
           
-          console.log('[DEBUG] Command detected:', {
-            commandName,
-            parametersString,
-            fullMatch: commandMatch[0]
-          });
-          
           let parameters: any;
           try {
             parameters = JSON.parse(parametersString);
           } catch (parseError) {
-            console.error('[DEBUG] JSON Parse Error, attempting repair:', {
-              error: parseError.message,
-              parametersString,
-              stringLength: parametersString.length,
-              charAtPos62: parametersString.charAt(62)
-            });
+
             
             // Attempt to repair incomplete JSON by adding missing closing braces
             let repairedJson = parametersString;
@@ -373,13 +433,9 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
               openBraces--;
             }
             
-            console.log('[DEBUG] Attempting to parse repaired JSON:', repairedJson);
-            
             try {
               parameters = JSON.parse(repairedJson);
-              console.log('[DEBUG] JSON repair successful!');
             } catch (repairError) {
-              console.error('[DEBUG] JSON repair failed:', repairError.message);
               throw parseError; // Throw original error
             }
           }
@@ -388,9 +444,6 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
           const validation = this.validateCommandParameters(commandName, parameters);
           
           if (!validation.valid) {
-            // If validation fails, don't execute the action but return helpful message
-            console.log(`Command validation failed for ${commandName}:`, validation.message);
-            
             // Override the AI message with parameter collection guidance
             const missingParamsList = validation.missing.length > 0 
               ? `I need the following information to proceed: ${validation.missing.join(', ')}.`
@@ -403,7 +456,6 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
             };
           }
           
-          // Fill in context-based parameters if missing
           if (sessionContext) {
             // Auto-fill workspace/project if missing and context exists
             if (commandName !== 'listWorkspaces' && commandName !== 'createWorkspace') {
@@ -417,14 +469,40 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
               }
             }
           }
-          
+
+          // Validate the project slug
+          switch (commandName) {
+            case 'navigateToProject':
+              const projectSlug = await this.projectService.validateProjectSlug(parameters.projectSlug);
+
+              if (projectSlug.status === 'exact' || projectSlug.status === 'fuzzy') {
+                parameters.projectSlug = projectSlug.slug;
+              }
+
+              switch (projectSlug.status) {
+                case 'exact':
+                  aiMessage = `✅ Great! I found the project **${projectSlug.slug}**. Taking you there now.`;
+                  break;
+
+                case 'fuzzy':
+                  aiMessage = `🤔 I couldn’t find an exact match, but I found something close: **${projectSlug.slug}**. Navigating there for you.`;
+                  break;
+
+                case 'not_found':
+                  parameters.projectSlug = '';
+                  aiMessage = `⚠️ I couldn’t find any project matching that name.  
+                  Try again with a different project name, or use **list all projects** to see what’s available.`;
+                  break;
+              }
+              break;
+          }
+
           action = {
             name: commandName,
             parameters
           };
-          
           // Update context based on command execution
-          this.updateContextFromCommand(sessionId, commandName, parameters, sessionContext);
+        await this.updateContextFromCommand(sessionId, commandName, parameters, sessionContext);
         } catch (error) {
           console.error('Failed to parse command parameters:', error);
         }
@@ -437,7 +515,6 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
       };
 
     } catch (error: any) {
-      console.error('AI Chat error:', error);
       
       if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
         return {
@@ -454,30 +531,63 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
       };
     }
   }
-  
-  private updateContextFromCommand(sessionId: string, commandName: string, parameters: Record<string, any>, context: any) {
+
+  private async updateContextFromCommand(
+    sessionId: string,
+    commandName: string,
+    parameters: Record<string, any>,
+    context: any,
+  ) {
     // Update workspace context
-    if (commandName === 'navigateToWorkspace' || commandName === 'createWorkspace') {
+    if (commandName === 'navigateToWorkspace') {
       if (parameters.workspaceSlug) {
+        const slug = await this.workspacesService.getIdBySlug(parameters.workspaceSlug);
+        const currentWorkSpaceAllProjects = await this.projectService.getAllSlugsByWorkspaceId(slug ?? '');
+        context.currentWorkSpaceProjectSlug = currentWorkSpaceAllProjects;
         context.workspaceSlug = parameters.workspaceSlug;
-        context.workspaceName = parameters.name || parameters.workspaceSlug;
+        context.workspaceName = parameters.workspaceName || parameters.workspaceSlug;
         // Clear project context when switching workspaces
         delete context.projectSlug;
         delete context.projectName;
       }
     }
     
-    // Update project context
-    if (commandName === 'navigateToProject' || commandName === 'createProject') {
-      if (parameters.projectSlug) {
-        context.projectSlug = parameters.projectSlug;
-        context.projectName = parameters.name || parameters.projectSlug;
-      }
-      if (parameters.workspaceSlug) {
-        context.workspaceSlug = parameters.workspaceSlug;
+    // Handle createWorkspace - convert name to slug and update context
+    if (commandName === 'createWorkspace') {
+      if (parameters.name) {
+        // Convert workspace name to slug format
+        const workspaceSlug = parameters.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        context.workspaceSlug = workspaceSlug;
+        context.workspaceName = parameters.name;
+        // Clear project context when creating new workspace
+        delete context.projectSlug;
+        delete context.projectName;
       }
     }
-    
+
+    // Update project context
+    const slugify = (str) =>
+      str?.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+
+    if (commandName === 'navigateToProject' || commandName === 'createProject') {
+      const { name, projectSlug, workspaceSlug } = parameters;
+
+      if (commandName === 'createProject') {
+        // Priority: name → slug
+        context.projectSlug = name ? slugify(name) : projectSlug;
+        context.projectName = name || projectSlug;
+      } else if (commandName === 'navigateToProject') {
+        // Priority: projectSlug → slug from name
+        context.projectSlug = projectSlug || (name ? slugify(name) : undefined);
+        context.projectName = projectSlug || name;
+      }
+      if (workspaceSlug) {
+        context.workspaceSlug = workspaceSlug;
+      }
+    }
+
     // Update workspace context from editWorkspace
     if (commandName === 'editWorkspace' && parameters.updates?.name) {
       if (parameters.workspaceSlug) {
@@ -492,20 +602,20 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
     // Save updated context
     this.conversationContexts.set(sessionId, context);
   }
-  
   private extractContextFromMessage(sessionId: string, message: string, context: any) {
-    console.log(`[CONTEXT] Extracting context from message: "${message}"`);
     const lowerMessage = message.toLowerCase();
     let contextUpdated = false;
     
     // Extract workspace mentions - improved patterns
     const workspacePatterns = [
-      /(?:go\s+with|use|with)\s+workspace\s+["\']([^"']+)["\']?/gi,
+      /(?:go\s+with|use|with|navigate\s+to|go\s+to)\s+workspace\s+["\']([^"']+)["\']?/gi,
       /workspace\s+is\s+["\']([^"']+)["\']?/gi,
       /use\s+["\']?([^"'.,!?\n]+)\s+workspace["\']?/gi,
       /["\']([^"']+)\s+workspace["\']?/gi,
       /in\s+(?:the\s+)?["\']?([^"'.,!?\n]+)\s+workspace["\']?/gi,
-      /["\']?([a-zA-Z][^"'.,!?\n]*?)\s+w[uo]rkspace["\']?/gi
+      /["\']?([a-zA-Z][^"'.,!?\n]*?)\s+w[uo]rkspace["\']?/gi,
+      // Add pattern for "take me to X" or "navigate to X"
+      /(?:take\s+me\s+to|navigate\s+to|go\s+to)\s+["\']?([^"'.,!?\n]+)["\']?(?:\s+workspace)?/gi
     ];
     
     for (const pattern of workspacePatterns) {
@@ -513,12 +623,7 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
       for (const match of matches) {
         if (match[1]) {
           const workspaceName = match[1].trim();
-          // Convert name to slug format
-          const workspaceSlug = workspaceName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
           
-          console.log(`[CONTEXT] ✅ Extracted workspace: "${workspaceName}" -> slug: "${workspaceSlug}"`);
-          
-          context.workspaceSlug = workspaceSlug;
           context.workspaceName = workspaceName;
           contextUpdated = true;
           
@@ -536,7 +641,7 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
     // Extract project mentions - improved patterns  
     const projectPatterns = [
       // "Ok, go with HIMS project"
-      /(?:ok,?\s+)?(?:go\s+with|use|with)\s+["\']?([^"'.,!?\n]+?)\s+project["\']?/gi,
+      /(?:ok,?\s+)?(?:go\s+with|use|with|navigate\s+to|go\s+to)\s+["\']?([^"'.,!?\n]+?)\s+project["\']?/gi,
       // "I choose hims"
       /(?:i\s+)?(?:choose|select|pick)\s+["\']?([^"'.,!?\n]+)["\']?/gi,
       // "project is HIMS"
@@ -544,7 +649,9 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
       // "HIMS project"
       /["\']?([^"'.,!?\n\s]+)\s+project["\']?/gi,
       // "in HIMS project"
-      /in\s+(?:the\s+)?["\']?([^"'.,!?\n]+?)\s+project["\']?/gi
+      /in\s+(?:the\s+)?["\']?([^"'.,!?\n]+?)\s+project["\']?/gi,
+      // Add pattern for "take me to project X"
+      /(?:take\s+me\s+to|navigate\s+to|go\s+to)\s+project\s+["\']?([^"'.,!?\n]+)["\']?/gi
     ];
     
     for (const pattern of projectPatterns) {
@@ -573,8 +680,6 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
           // Convert name to slug format
           const projectSlug = projectName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
           
-          console.log(`[CONTEXT] ✅ Extracted project: "${projectName}" -> slug: "${projectSlug}"`);
-          
           context.projectSlug = projectSlug;
           context.projectName = projectName;
           contextUpdated = true;
@@ -588,9 +693,6 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
     if (contextUpdated) {
       context.lastUpdated = new Date();
       this.conversationContexts.set(sessionId, context);
-      console.log(`[CONTEXT] ✅ Context updated for session ${sessionId}:`, context);
-    } else {
-      console.log(`[CONTEXT] ❌ No context extracted from message`);
     }
   }
 
@@ -598,9 +700,7 @@ ${sessionContext.workspaceSlug ? `- Current Workspace: ${sessionContext.workspac
   clearContext(sessionId: string): { success: boolean } {
     if (this.conversationContexts.has(sessionId)) {
       this.conversationContexts.delete(sessionId);
-      console.log(`[CONTEXT] 🔄 Cleared context for session: ${sessionId}`);
-    } else {
-      console.log(`[CONTEXT] ⚠️ No context found for session: ${sessionId}`);
+    
     }
     return { success: true };
   }

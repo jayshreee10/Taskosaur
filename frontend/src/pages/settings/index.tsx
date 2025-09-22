@@ -1,11 +1,8 @@
 import { useState, useEffect } from "react";
 import { useOrganization } from "@/contexts/organization-context";
 import { useAuth } from "@/contexts/auth-context";
-import {
-  HiPlus,
-  HiInformationCircle,
-} from "react-icons/hi2";
-import { HiCog } from "react-icons/hi";
+import { HiPlus, HiInformationCircle } from "react-icons/hi2";
+import { HiCog, HiSparkles } from "react-icons/hi";
 import { Button } from "@/components/ui/button";
 import { Organization } from "@/types";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -17,6 +14,7 @@ import Link from "next/link";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import OrganizationFormModal from "@/components/organizations/OrganizationFormModal";
 import { ChartNoAxesGantt, Users } from "lucide-react";
+import AISettingsModal from "@/components/settings/AISettings";
 
 const getManageUrl = (organization: Organization) => {
   const canManage =
@@ -37,6 +35,7 @@ function OrganizationSettingsPageContent() {
   const currentUser = getCurrentUser();
 
   const currentOrganization = getCurrentOrganizationId();
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
 
   const fetchOrganizations = async () => {
     try {
@@ -95,21 +94,34 @@ function OrganizationSettingsPageContent() {
       <div className="space-y-6">
         {/* Header */}
         <PageHeader
-          icon={<HiCog className="w-5 h-5" />}
-          title="Organization Management"
-          description="Manage your organizations and switch between different tenants"
-          actions={
-            !showCreateForm &&
-            hasAccess && (
-              <Button
-                onClick={() => setShowCreateForm(true)}
-                className="h-9 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 transition-all duration-200 font-medium flex items-center gap-2 rounded-lg shadow-none border-none"
-              >
-                <HiPlus className="w-4 h-4" />
-                Create Organization
+        icon={<HiCog className="w-5 h-5" />}
+        title="Organization Management"
+        description="Manage your organizations and switch between different tenants"
+        actions={
+          !showCreateForm &&
+          hasAccess && (
+            <div className="flex items-center gap-2">
+        {/* AI Settings Button */}
+        <Button
+          onClick={() => setIsAIModalOpen(true)}
+          variant="outline"
+          className="h-9 bg-transparent border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)] transition-all duration-200 font-medium flex items-center gap-2 rounded-lg shadow-none"
+        >
+          <HiSparkles className="w-4 h-4" />
+          AI Settings
+        </Button>
+        
+        {/* Create Organization Button */}
+        <Button
+          onClick={() => setShowCreateForm(true)}
+          className="h-9 bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 transition-all duration-200 font-medium flex items-center gap-2 rounded-lg shadow-none border-none"
+        >
+          <HiPlus className="w-4 h-4" />
+          Create Organization
               </Button>
-            )
-          }
+            </div>
+          )
+        }
         />
 
         {/* Create Organization Form */}
@@ -146,7 +158,7 @@ function OrganizationSettingsPageContent() {
                     <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
                       <span className="flex items-center gap-1.5">
                         <span className="flex items-center gap-1.5">
-                          <ChartNoAxesGantt className="h-4 w-4"/>
+                          <ChartNoAxesGantt className="h-4 w-4" />
                           {organization._count?.workspaces || 0} workspaces
                         </span>
                       </span>
@@ -177,7 +189,7 @@ function OrganizationSettingsPageContent() {
         )}
 
         {/* Help Section */}
-        <div className="bg-[var(--card)] rounded-[var(--card-radius)] border-0">
+        <div className="rounded-[var(--card-radius)] border-0 p-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0">
               <HiInformationCircle className="w-5 h-5 text-[var(--primary)]" />
@@ -197,6 +209,10 @@ function OrganizationSettingsPageContent() {
           </div>
         </div>
       </div>
+        <AISettingsModal 
+          isOpen={isAIModalOpen} 
+          onClose={() => setIsAIModalOpen(false)} 
+        />
     </div>
   );
 }

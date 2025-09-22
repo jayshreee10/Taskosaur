@@ -63,6 +63,7 @@ export function ResourceAllocationChart({ data }: ResourceAllocationChartProps) 
       title="Resource Allocation"
       description="Team member distribution by role"
       config={chartConfig}
+      className="border-[var(--border)]"
     >
       <ResponsiveContainer width="100%" height={300}>
         <BarChart 

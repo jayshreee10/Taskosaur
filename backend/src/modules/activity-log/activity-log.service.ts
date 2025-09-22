@@ -421,7 +421,25 @@ export class ActivityLogService {
     if (!workspace) {
       throw new Error('Workspace not found');
     }
-
+    const totalResult: Array<{ count: bigint }> = await this.prisma.$queryRaw`
+      SELECT COUNT(*)::bigint as count
+      FROM activity_logs al
+      WHERE 
+        (al.entity_type = 'Workspace' AND al.entity_id = ${workspaceId}::uuid)
+        OR 
+        (al.entity_type = 'Project' AND al.entity_id IN (
+          SELECT id FROM projects WHERE workspace_id = ${workspaceId}::uuid
+        ))
+        OR
+        (al.entity_type = 'Task' AND al.entity_id IN (
+          SELECT t.id FROM tasks t 
+          JOIN projects p ON t.project_id = p.id 
+          WHERE p.workspace_id = ${workspaceId}::uuid
+        ))
+    `;
+    const totalCount = Number(totalResult[0]?.count ?? 0);
+    const totalPages = Math.ceil(totalCount / limit);
+    const offset = (page - 1) * limit;
     // ✅ Fixed raw query with proper UUID casting
     const activities: any[] = await this.prisma.$queryRaw`
     SELECT 
@@ -452,7 +470,7 @@ export class ActivityLogService {
       ))
     ORDER BY al.created_at DESC
     LIMIT ${limit}::int
-    OFFSET ${(page - 1) * limit}::int
+    OFFSET ${offset}::int
   `;
 
     return {
@@ -470,6 +488,13 @@ export class ActivityLogService {
           avatar: activity.avatar,
         },
       })),
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
     };
   }
 

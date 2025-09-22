@@ -127,75 +127,66 @@ export class TasksService {
     statuses?: string[],
     userId?: string,
     search?: string,
-  ): Promise<Task[]> {
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{ data: Task[]; total: number; page: number; limit: number; totalPages: number }> {
     if (!userId) {
       throw new ForbiddenException('User context required');
     }
 
-    const { isElevated } = await this.accessControl.getOrgAccess(organizationId, userId);
+    const { isElevated } = await this.accessControl.getOrgAccess(
+      organizationId,
+      userId,
+    );
 
-    const whereClause: any = {};
-    whereClause.parentTaskId = null;
-
+    // Verify organization exists
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { id: true, name: true },
+      select: { id: true },
     });
 
     if (!organization) {
       throw new NotFoundException('Organization not found');
     }
 
-    if ((!workspaceId || workspaceId.length === 0) && (!projectId || projectId.length === 0)) {
-      const workspaces = await this.prisma.workspace.findMany({
-        where: { organizationId },
-        select: { id: true },
+    // Build base where clause
+    const whereClause: any = {
+      parentTaskId: null,
+      // Ensure tasks belong to the organization through project->workspace->organization
+      project: {
+        workspace: {
+          organizationId: organizationId,
+        },
+      },
+    };
+
+    // Add conditions using AND array to avoid conflicts
+    const andConditions: any[] = [];
+
+    // Filter by workspace if provided
+    if (workspaceId && workspaceId.length > 0) {
+      andConditions.push({
+        project: {
+          workspaceId: { in: workspaceId },
+        },
       });
-      const workspaceIds = workspaces.map((w) => w.id);
-      if (workspaceIds.length === 0) {
-        return [];
-      }
-      const projects = await this.prisma.project.findMany({
-        where: { workspaceId: { in: workspaceIds } },
-        select: { id: true },
-      });
-      const projectIds = projects.map((p) => p.id);
-      if (projectIds.length === 0) {
-        return [];
-      }
-      whereClause.projectId = { in: projectIds };
-    } else if (workspaceId && workspaceId.length > 0 && (!projectId || projectId.length === 0)) {
-      // Multiple workspaceIds supported
-      const workspaces = await this.prisma.workspace.findMany({
-        where: { id: { in: workspaceId } },
-        select: { id: true },
-      });
-      if (workspaces.length === 0) {
-        throw new NotFoundException('Workspace(s) not found');
-      }
-      const workspaceIds = workspaces.map((w) => w.id);
-      const projects = await this.prisma.project.findMany({
-        where: { workspaceId: { in: workspaceIds } },
-        select: { id: true },
-      });
-      const projectIds = projects.map((project) => project.id);
-      whereClause.projectId = { in: projectIds };
-    } else {
-      if (projectId && projectId.length > 0) {
-        if (projectId.length === 1) {
-          whereClause.projectId = projectId[0];
-        } else {
-          whereClause.projectId = { in: projectId };
-        }
-      }
     }
 
+    // Filter by project if provided
+    if (projectId && projectId.length > 0) {
+      andConditions.push({
+        projectId: { in: projectId },
+      });
+    }
 
+    // Filter by sprint if provided
     if (sprintId) {
-      whereClause.sprintId = sprintId;
+      andConditions.push({
+        sprintId: sprintId,
+      });
     }
 
-
+    // Handle parentTaskId filtering
     if (parentTaskId !== undefined) {
       if (parentTaskId === 'null' || parentTaskId === '' || parentTaskId === null) {
         whereClause.parentTaskId = null;
@@ -204,28 +195,199 @@ export class TasksService {
       }
     }
 
-
+    // Filter by priorities if provided
     if (priorities && priorities.length > 0) {
-      whereClause.priority = { in: priorities };
+      andConditions.push({
+        priority: { in: priorities },
+      });
     }
 
+    // Filter by statuses if provided
     if (statuses && statuses.length > 0) {
-      whereClause.statusId = { in: statuses };
+      andConditions.push({
+        statusId: { in: statuses },
+      });
     }
 
-    if (search && search?.trim()) {
-      whereClause.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
+    // Add search functionality
+    if (search && search.trim()) {
+      andConditions.push({
+        OR: [
+          { title: { contains: search.trim(), mode: 'insensitive' } },
+          { description: { contains: search.trim(), mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    // User access restrictions for non-elevated users
+    if (!isElevated) {
+      andConditions.push({
+        OR: [
+          { assigneeId: userId },
+          { reporterId: userId },
+          { createdBy: userId },
+        ],
+      });
+    }
+
+    // Add all conditions to the where clause
+    if (andConditions.length > 0) {
+      whereClause.AND = andConditions;
+    }
+
+    // Pagination calculation
+    const skip = (page - 1) * limit;
+
+    // Execute query and count in transaction
+    const [tasks, total] = await this.prisma.$transaction([
+      this.prisma.task.findMany({
+        where: whereClause,
+        include: {
+          labels: {
+            select: {
+              taskId: true,
+              labelId: true,
+              label: {
+                select: { id: true, name: true, color: true, description: true },
+              },
+            },
+          },
+          project: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              workspace: {
+                select: {
+                  id: true,
+                  name: true,
+                  organizationId: true,
+                },
+              },
+            },
+          },
+          assignee: {
+            select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
+          },
+          reporter: {
+            select: { id: true, firstName: true, lastName: true, avatar: true },
+          },
+          status: {
+            select: { id: true, name: true, color: true, category: true },
+          },
+          sprint: { select: { id: true, name: true, status: true } },
+          parentTask: {
+            select: { id: true, title: true, slug: true, type: true },
+          },
+          _count: { select: { childTasks: true, comments: true, attachments: true } },
+        },
+        orderBy: { taskNumber: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.task.count({ where: whereClause }),
+    ]);
+
+    // Transform the response
+    const transformedTasks = tasks.map((task) => ({
+      ...task,
+      labels: task.labels.map((taskLabel) => ({
+        taskId: taskLabel.taskId,
+        labelId: taskLabel.labelId,
+        name: taskLabel.label.name,
+        color: taskLabel.label.color,
+        description: taskLabel.label.description,
+      })),
+    }));
+
+    return {
+      data: transformedTasks,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getTasks(
+    organizationId: string,
+    projectId?: string[],
+    sprintId?: string,
+    workspaceId?: string[],
+    parentTaskId?: string,
+    priorities?: string[],
+    statuses?: string[],
+    userId?: string,
+    search?: string,
+  ): Promise<Task[]> {
+    if (!userId) {
+      throw new ForbiddenException('User context required');
+    }
+
+    const { isElevated } = await this.accessControl.getOrgAccess(organizationId, userId);
+
+    // Verify organization exists
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    // Build base where clause
+    const whereClause: any = {
+      parentTaskId: null,
+      project: {
+        workspace: { organizationId },
+      },
+    };
+
+    const andConditions: any[] = [];
+
+    if (workspaceId?.length) {
+      andConditions.push({ project: { workspaceId: { in: workspaceId } } });
+    }
+
+    if (projectId?.length) {
+      andConditions.push({ projectId: { in: projectId } });
+    }
+
+    if (sprintId) {
+      andConditions.push({ sprintId });
+    }
+
+    if (parentTaskId !== undefined) {
+      whereClause.parentTaskId =
+        parentTaskId === 'null' || parentTaskId === '' ? null : parentTaskId;
+    }
+
+    if (priorities?.length) {
+      andConditions.push({ priority: { in: priorities } });
+    }
+
+    if (statuses?.length) {
+      andConditions.push({ statusId: { in: statuses } });
+    }
+
+    if (search?.trim()) {
+      andConditions.push({
+        OR: [
+          { title: { contains: search.trim(), mode: 'insensitive' } },
+          { description: { contains: search.trim(), mode: 'insensitive' } },
+        ],
+      });
     }
 
     if (!isElevated) {
-      whereClause.OR = [
-        { assigneeId: userId },
-        { reporterId: userId },
-        { createdBy: userId },
-      ];
+      andConditions.push({
+        OR: [{ assigneeId: userId }, { reporterId: userId }, { createdBy: userId }],
+      });
+    }
+
+    if (andConditions.length > 0) {
+      whereClause.AND = andConditions;
     }
 
     const tasks = await this.prisma.task.findMany({
@@ -235,32 +397,23 @@ export class TasksService {
           select: {
             taskId: true,
             labelId: true,
-            label: {
-              select: { id: true, name: true, color: true, description: true },
-            },
+            label: { select: { id: true, name: true, color: true, description: true } },
           },
         },
         project: {
-          select: { id: true, name: true, slug: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            workspace: { select: { id: true, name: true, organizationId: true } },
+          },
         },
-        assignee: {
-          select: { id: true, firstName: true, lastName: true, avatar: true, email: true },
-        },
-        reporter: {
-          select: { id: true, firstName: true, lastName: true, avatar: true },
-        },
-        status: {
-          select: { id: true, name: true, color: true, category: true },
-        },
-        sprint: {
-          select: { id: true, name: true, status: true },
-        },
-        parentTask: {
-          select: { id: true, title: true, slug: true, type: true },
-        },
-        _count: {
-          select: { childTasks: true, comments: true },
-        },
+        assignee: { select: { id: true, firstName: true, lastName: true, avatar: true, email: true } },
+        reporter: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+        status: { select: { id: true, name: true, color: true, category: true } },
+        sprint: { select: { id: true, name: true, status: true } },
+        parentTask: { select: { id: true, title: true, slug: true, type: true } },
+        _count: { select: { childTasks: true, comments: true, attachments: true } },
       },
       orderBy: { taskNumber: 'desc' },
     });
@@ -276,6 +429,7 @@ export class TasksService {
       })),
     }));
   }
+
 
   async findOne(id: string, userId: string): Promise<Task | any> {
     const { isElevated } = await this.accessControl.getTaskAccess(id, userId);
@@ -891,7 +1045,6 @@ export class TasksService {
     }
 
     const { type, slug, includeSubtasks = false } = params;
-    console.log(type, slug)
     try {
       const whereClause: any = {};
       let workflowStatuses: any[] = [];

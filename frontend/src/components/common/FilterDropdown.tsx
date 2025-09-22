@@ -160,7 +160,7 @@ export function FilterDropdown({
         <Button
           variant="outline"
           size="sm"
-          className={`relative ${triggerClassName} transition-all duration-200`}
+          className={`relative ${triggerClassName} transition-all duration-200 h-9`}
         >
           <SlidersHorizontal className="h-5 w-5" />
 

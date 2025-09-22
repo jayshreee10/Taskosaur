@@ -11,6 +11,8 @@ import * as WorkspaceAutomation from './workspace';
 import * as ProjectAutomation from './project';
 import * as TaskAutomation from './tasks';
 import * as Helpers from './helpers';
+import * as MemberAutomation from './members';
+import * as SprintAutomation from './sprints';
 
 // Re-export types and interfaces
 export type { AutomationResult } from './helpers';
@@ -59,6 +61,31 @@ export class TaskosaurAutomation {
   public getTaskDetails = TaskAutomation.getTaskDetails;
   public deleteTask = TaskAutomation.deleteTask;
 
+  // Member management methods
+  public inviteMember = MemberAutomation.inviteMember;
+
+  // Sprint Management;
+  public createSprint = SprintAutomation.createSprint;
+
+  // Secondary Navigation Management
+  public  async navigateToDashboard() {
+  try {
+    await Helpers.navigateTo('/');
+    await Helpers.waitForElement('.dashboard-container, .space-y-6', 10000);
+    await Helpers.waitFor(1000);
+    return {
+      success: true,
+      message: 'Navigated to dashboard',
+      data: { currentPath: window.location.pathname }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Failed to navigate to dashboard',
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
   /**
    * Utility methods for common operations
    */
@@ -228,7 +255,7 @@ export class TaskosaurAutomation {
    */
   public async initialize(): Promise<Helpers.AutomationResult> {
     try {
-      console.log('🔧 Initializing Taskosaur Automation System...');
+      // console.log('🔧 Initializing Taskosaur Automation System...');
 
       // Check if we're in a browser environment
       if (typeof window === 'undefined') {
@@ -237,13 +264,13 @@ export class TaskosaurAutomation {
 
       // Check if we're on a Taskosaur domain
       const hostname = window.location.hostname;
-      console.log(`📍 Current domain: ${hostname}`);
+      // console.log(`📍 Current domain: ${hostname}`);
 
       // Perform initial checks
       const authStatus = await AuthAutomation.checkAuthenticationStatus();
       const currentContext = Helpers.getCurrentContext();
 
-      console.log('✅ Taskosaur Automation System initialized successfully');
+      // console.log('✅ Taskosaur Automation System initialized successfully');
 
       return {
         success: true,
@@ -316,7 +343,16 @@ export const {
   filterTasks,
   clearTaskFilters,
   getTaskDetails,
-  deleteTask
+  deleteTask,
+
+  // Member function
+  inviteMember,
+
+  // Sprint Management
+  createSprint,
+
+  //Secondary Navigation Management
+  navigateToDashboard
 } = automation;
 
 /**
@@ -338,18 +374,18 @@ export function enableBrowserConsoleAccess(): void {
     // Make workflows available
     (window as any).taskosaurWorkflows = automation.workflows;
     
-    console.log('🌐 Taskosaur Automation functions are now available in browser console:');
-    console.log('- TaskosaurAutomation: Main automation instance');
-    console.log('- taskosaurAuth: Authentication functions');
-    console.log('- taskosaurWorkspace: Workspace management');
-    console.log('- taskosaurProject: Project management');
-    console.log('- taskosaurTask: Task management');
-    console.log('- taskosaurHelpers: Utility functions');
-    console.log('- taskosaurWorkflows: High-level workflows');
-    console.log('');
-    console.log('Example usage:');
-    console.log('await TaskosaurAutomation.login("user@example.com", "password")');
-    console.log('await taskosaurWorkspace.createWorkspace("My Workspace", "Description")');
+    // console.log('🌐 Taskosaur Automation functions are now available in browser console:');
+    // console.log('- TaskosaurAutomation: Main automation instance');
+    // console.log('- taskosaurAuth: Authentication functions');
+    // console.log('- taskosaurWorkspace: Workspace management');
+    // console.log('- taskosaurProject: Project management');
+    // console.log('- taskosaurTask: Task management');
+    // console.log('- taskosaurHelpers: Utility functions');
+    // console.log('- taskosaurWorkflows: High-level workflows');
+    // console.log('');
+    // console.log('Example usage:');
+    // console.log('await TaskosaurAutomation.login("user@example.com", "password")');
+    // console.log('await taskosaurWorkspace.createWorkspace("My Workspace", "Description")');
   }
 }
 

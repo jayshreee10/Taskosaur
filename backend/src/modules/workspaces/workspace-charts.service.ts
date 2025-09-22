@@ -159,30 +159,39 @@ export class WorkspaceChartsService {
     /**
      * 2) Task Priority Breakdown
      */
-    async workspaceTaskPriorityBreakdown(
-        organizationId: string,
-        workspaceSlug: string,
-        userId: string,
-    ) {
-        const { isElevated } = await this.getWorkspaceWithAccess(organizationId, workspaceSlug, userId);
+ async workspaceTaskPriorityBreakdown(
+    organizationId: string,
+    workspaceSlug: string,
+    userId: string,
+) {
+    const { isElevated } = await this.getWorkspaceWithAccess(organizationId, workspaceSlug, userId);
 
-        const taskWhere = {
-            project: {
-                workspace: { slug: workspaceSlug, archive: false },
-                archive: false,
-                ...(isElevated ? {} : { members: { some: { userId } } }),
-            },
+    const projects = await this.prisma.project.findMany({
+        where: {
+            workspace: { slug: workspaceSlug, archive: false },
+            archive: false,
+            ...(isElevated ? {} : { members: { some: { userId } } }),
+        },
+        select: { id: true }
+    });
+
+    const projectIds = projects.map(p => p.id);
+
+    if (projectIds.length === 0) {
+        return [];
+    }
+
+    return this.prisma.task.groupBy({
+        by: ['priority'],
+        where: {
+            projectId: { in: projectIds },
             ...(isElevated
                 ? {}
                 : { OR: [{ assigneeId: userId }, { reporterId: userId }] }),
-        };
-
-        return this.prisma.task.groupBy({
-            by: ['priority'],
-            where: taskWhere,
-            _count: { priority: true },
-        });
-    }
+        },
+        _count: { priority: true },
+    });
+}
 
     /**
      * 3) KPI Metrics
@@ -275,18 +284,23 @@ export class WorkspaceChartsService {
     ) {
         const { isElevated } = await this.getWorkspaceWithAccess(organizationId, workspaceSlug, userId);
 
-        const sprintWhere = {
-            project: {
+        const projects = await this.prisma.project.findMany({
+            where: {
                 workspace: { slug: workspaceSlug, archive: false },
                 archive: false,
                 ...(isElevated ? {} : { members: { some: { userId } } }),
             },
-            archive: false,
-        };
+            select: { id: true }
+        });
+
+        const projectIds = projects.map(p => p.id);
 
         return this.prisma.sprint.groupBy({
             by: ['status'],
-            where: sprintWhere,
+            where: {
+                archive: false,
+                projectId: { in: projectIds }
+            },
             _count: { status: true },
         });
     }

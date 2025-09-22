@@ -55,7 +55,8 @@ export const workspaceApi = {
   },
 
   getWorkspacesByOrganization: async (
-    organizationId: string, search?: string
+    organizationId: string,
+    search?: string
   ): Promise<Workspace[]> => {
     try {
       // Validate organizationId format
@@ -68,7 +69,9 @@ export const workspaceApi = {
       }
 
       const response = await api.get<Workspace[]>(
-        `/workspaces?organizationId=${organizationId}&search=${encodeURIComponent(search || "")}`
+        `/workspaces?organizationId=${organizationId}&search=${encodeURIComponent(
+          search || ""
+        )}`
       );
       return response.data;
     } catch (error) {
@@ -145,11 +148,14 @@ export const workspaceApi = {
 
   // Workspace member operations
   getWorkspaceMembers: async (
-    workspaceId: string
+    workspaceId: string,
+    search: string
   ): Promise<WorkspaceMember[]> => {
     try {
       const response = await api.get<WorkspaceMember[]>(
-        `/workspace-members?workspaceId=${workspaceId}`
+        `/workspace-members?workspaceId=${workspaceId}${
+          search ? `&search=${(search)}` : ""
+        }`
       );
       return response.data || [];
     } catch (error) {
@@ -283,7 +289,7 @@ export const workspaceApi = {
   ): Promise<WorkspaceChartDataResponse> => {
     try {
       const params = new URLSearchParams();
-      chartTypes.forEach(type => params.append('types', type));
+      chartTypes.forEach((type) => params.append("types", type));
 
       const response = await api.get(
         `/workspaces/organization/${organizationId}/workspace/${workspaceSlug}/charts?${params.toString()}`
@@ -315,7 +321,11 @@ export const workspaceApi = {
   ): Promise<WorkspaceChartDataResponse> => {
     try {
       const allChartTypes = Object.values(WorkspaceChartType);
-      return await workspaceApi.getMultipleCharts(organizationId, workspaceSlug, allChartTypes);
+      return await workspaceApi.getMultipleCharts(
+        organizationId,
+        workspaceSlug,
+        allChartTypes
+      );
     } catch (error) {
       console.error("Get all workspace charts error:", error);
       throw error;

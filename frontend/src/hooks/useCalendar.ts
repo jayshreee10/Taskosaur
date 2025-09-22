@@ -1,5 +1,3 @@
-;
-
 import { useState, useEffect } from 'react';
 
 export interface CalendarEvent {
@@ -28,7 +26,6 @@ export function useCalendar() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Mock calendar events for demonstration
   const mockEvents: CalendarEvent[] = [
     {
       id: '1',
@@ -69,7 +66,6 @@ export function useCalendar() {
     }
   ];
 
-  // Get today's events
   const getTodayEvents = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

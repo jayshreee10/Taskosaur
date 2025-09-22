@@ -34,7 +34,6 @@ interface CommentWithAuthor extends TaskComment {
   };
 }
 
-// Memoized comment item to prevent unnecessary re-renders
 const CommentItem = React.memo(({
   comment,
   currentUser,
@@ -153,7 +152,6 @@ const CommentItem = React.memo(({
 
 CommentItem.displayName = 'CommentItem';
 
-// Comment editing component
 const CommentEditForm = ({
   comment,
   onSave,
@@ -224,9 +222,7 @@ export default function TaskComments({
     getTaskComments, 
     createTaskComment, 
     updateTaskComment, 
-    deleteTaskComment, 
-    isLoading, 
-    error 
+    deleteTaskComment,
   } = useTask();
 
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
@@ -541,11 +537,14 @@ export default function TaskComments({
                       }
                     }}
                   />
-                  {/* If you want to add an explicit ActionButton for posting, add here. Otherwise, only Textarea is used. */}
+                 
                 </div>
-                <p className="text-[12px] text-[var(--muted-foreground)] mt-1 ml-1">
-                  Press Enter to post
-                </p>
+                <div className='flex justify-end mt-2'>
+                  <ActionButton secondary  onClick={handleAddComment} disabled={isSubmitting}>
+                  Post
+                </ActionButton>
+                </div>
+               
               </div>
             </div>
           </div>

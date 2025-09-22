@@ -21,7 +21,6 @@ import {
   FileText,
   Bookmark,
   X,
-  Calendar,
   Target,
   Timer,
   Layers,
@@ -224,14 +223,12 @@ const TaskTable: React.FC<TaskTableProps> = ({
   onPageChange,
   onTaskRefetch,
   showAddTaskRow = true,
-  projects = [],
   projectsOfCurrentWorkspace = [],
   addTaskStatuses = [],
   projectMembers,
-  workspaceMembers,
   currentProject,
 }) => {
-  const { createTask } = useTask();
+  const { createTask , getTaskById, currentTask} = useTask();
   const { getTaskStatusByProject } = useProject();
   const { getProjectMembers } = useProject();
 
@@ -258,7 +255,7 @@ const TaskTable: React.FC<TaskTableProps> = ({
 
   useEffect(() => {
     const fetchProjectMeta = async () => {
-      const projectId = currentProject?.id || newTaskData?.projectId || projectSlug;
+      const projectId = currentProject?.id || newTaskData?.projectId ;
       if (addTaskStatuses && addTaskStatuses.length > 0) {
         setLocalAddTaskStatuses(addTaskStatuses);
       } else if (projectId) {
@@ -271,7 +268,6 @@ const TaskTable: React.FC<TaskTableProps> = ({
       } else {
         setLocalAddTaskStatuses([]);
       }
-      // Only fetch members if projectId is defined
       if (
         projectId &&
         (!projectSlug || !projectMembers || projectMembers.length === 0)
@@ -391,7 +387,7 @@ const TaskTable: React.FC<TaskTableProps> = ({
             <div className="flex items-start gap-2">
               <FileText className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
               <span
-                className="text-sm text-gray-900 line-clamp-2 max-w-xs"
+                className="text-sm line-clamp-2 max-w-xs"
                 title={value}
               >
                 {value}
@@ -479,7 +475,8 @@ const TaskTable: React.FC<TaskTableProps> = ({
     }
   };
 
-  const handleRowClick = (task: Task) => {
+  const handleRowClick = async (task: Task) => {
+    await getTaskById(task.id);
     setSelectedTask(task);
     setIsEditModalOpen(true);
   };
@@ -560,7 +557,7 @@ const TaskTable: React.FC<TaskTableProps> = ({
         assigneeId: newTaskData.assigneeId || undefined,
 
         dueDate: newTaskData.dueDate
-          ? new Date(newTaskData.dueDate + "T23:59:59.999Z").toISOString()
+          ? new Date(newTaskData.dueDate + "T00:00:00.000Z").toISOString()
           : undefined,
       };
 
@@ -649,10 +646,6 @@ const TaskTable: React.FC<TaskTableProps> = ({
                     </div>
                   </TableHead>
                 ))}
-                {/* Action column for buttons, match body */}
-                <TableHead className="tasktable-header-cell w-20 min-w-[5rem] max-w-[5rem]">
-                  {" "}
-                </TableHead>
               </TableRow>
             </TableHeader>
 
@@ -667,31 +660,54 @@ const TaskTable: React.FC<TaskTableProps> = ({
                     )}
                     {/* Task Title */}
                     <TableCell className="tasktable-cell-task">
-                      <Input
-                        value={newTaskData.title}
-                        onChange={(e) => {
-                          setNewTaskData((prev) => ({
-                            ...prev,
-                            title: e.target.value,
-                          }));
-                          if (!titleTouched) setTitleTouched(true);
-                        }}
-                        onBlur={() => setTitleTouched(true)}
-                        placeholder="Enter task title..."
-                        className={`border-none shadow-none focus-visible:ring-1 bg-transparent ${
-                          isTitleInvalid ? "ring-2 ring-red-500" : ""
-                        }`}
-                        autoFocus
-                        disabled={isSubmitting}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleCreateTask();
-                          } else if (e.key === "Escape") {
-                            handleCancelCreating();
-                          }
-                        }}
-                      />
+                      <div className="flex items-center">
+                        <Input
+                          value={newTaskData.title}
+                          onChange={(e) => {
+                            setNewTaskData((prev) => ({
+                              ...prev,
+                              title: e.target.value,
+                            }));
+                            if (!titleTouched) setTitleTouched(true);
+                          }}
+                          onBlur={() => setTitleTouched(true)}
+                          placeholder="Enter task title..."
+                          className={`flex-1 border-none shadow-none focus-visible:ring-1 bg-transparent ${
+                            isTitleInvalid ? "ring-2 ring-red-500" : ""
+                          }`}
+                          autoFocus
+                          disabled={isSubmitting}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleCreateTask();
+                            } else if (e.key === "Escape") {
+                              handleCancelCreating();
+                            }
+                          }}
+                        />
+
+                        <div className="flex items-center gap-1 ml-2">
+                          <Tooltip content="Create task" position="top">
+                            <button
+                              onClick={handleCreateTask}
+                              disabled={isSubmitting || !newTaskData.title.trim()}
+                              className="p-1 text-green-600 hover:bg-green-100 rounded disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Cancel" position="top">
+                            <button
+                              onClick={handleCancelCreating}
+                              disabled={isSubmitting}
+                              className="p-1 text-red-600 hover:bg-red-100 rounded cursor-pointer disabled:opacity-50"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </Tooltip>
+                        </div>
+                      </div>
                     </TableCell>
                     {/* Project column if shown */}
                     {showProject && (
@@ -754,56 +770,43 @@ const TaskTable: React.FC<TaskTableProps> = ({
                       </TableCell>
                     )}
                     {/* Priority */}
-                    <TableCell className="tasktable-cell">
-                      {newTaskData.projectId ||
-                      projectSlug ||
-                      currentProject?.id ? (
-                        <Select
-                          value={newTaskData.statusId}
-                          onValueChange={(value) =>
-                            setNewTaskData((prev) => ({
-                              ...prev,
-                              statusId: value,
-                            }))
-                          }
-                          disabled={isSubmitting}
-                        >
-                          <SelectTrigger className="border-none shadow-none bg-transparent ">
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border-none text-black">
-                            {(addTaskStatuses && addTaskStatuses.length > 0
-                              ? addTaskStatuses
-                              : localAddTaskStatuses
-                            ).length > 0 ? (
-                              (addTaskStatuses && addTaskStatuses.length > 0
-                                ? addTaskStatuses
-                                : localAddTaskStatuses
-                              ).map((status) => (
+                       <TableCell className="tasktable-cell">
+                      <Select
+                        value={newTaskData.priority}
+                        onValueChange={(value) =>
+                          setNewTaskData((prev) => ({
+                            ...prev,
+                            priority: value as
+                              | "LOW"
+                              | "MEDIUM"
+                              | "HIGH"
+                              | "HIGHEST",
+                          }))
+                        }
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="border-none shadow-none bg-transparent -ml-3">
+                          <SelectValue />
+                        </SelectTrigger>
+
+                        <SelectContent className="bg-white border-none text-black">
+                          {(TaskPriorities || TaskPriorities || []).map(
+                            (priority) => {
+                              const value = priority.value ?? "undefined";
+                              const label = priority.name ?? "undefined";
+                              return (
                                 <SelectItem
-                                  key={status.id}
-                                  value={status.id}
+                                  key={value}
+                                  value={value}
                                   className="text-black"
                                 >
-                                  {status.name}
+                                  {label}
                                 </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem
-                                value="no-status"
-                                disabled
-                                className="text-black"
-                              >
-                                No statuses found
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="text-sm text-gray-400">
-                          Select project first
-                        </span>
-                      )}
+                              );
+                            }
+                          )}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     {/* Status - only show if projectId is selected */}
                     <TableCell className="tasktable-cell">
@@ -956,29 +959,6 @@ const TaskTable: React.FC<TaskTableProps> = ({
                         <span className="text-sm text-gray-400">-</span>
                       </TableCell>
                     ))}
-                    {/* Action buttons - add extra column for this */}
-                    <TableCell className="tasktable-cell">
-                      <div className="flex items-center gap-1">
-                        <Tooltip content="Create task" position="top">
-                          <button
-                            onClick={handleCreateTask}
-                            disabled={isSubmitting || !newTaskData.title.trim()}
-                            className="p-1 text-green-600 hover:bg-green-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                        </Tooltip>
-                        <Tooltip content="Cancel" position="top">
-                          <button
-                            onClick={handleCancelCreating}
-                            disabled={isSubmitting}
-                            className="p-1 text-red-600 hover:bg-red-100 rounded disabled:opacity-50"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </Tooltip>
-                      </div>
-                    </TableCell>
                   </TableRow>
                 ) : (
                   <TableRow className="tasktable-add-row h-12 border-none transition-colors bg-[var(--mini-sidebar)]/50">
@@ -1126,8 +1106,6 @@ const TaskTable: React.FC<TaskTableProps> = ({
                       {renderDynamicCellContent(task, column)}
                     </TableCell>
                   ))}
-
-                  <TableCell className="tasktable-cell w-20"></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -1224,7 +1202,7 @@ const TaskTable: React.FC<TaskTableProps> = ({
         >
           {selectedTask && (
             <TaskDetailClient
-              task={selectedTask}
+              task={currentTask}
               open="modal"
               workspaceSlug={workspaceSlug as string}
               projectSlug={projectSlug as string}

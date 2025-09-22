@@ -58,6 +58,13 @@ export class ChatRequestDto {
   @IsOptional()
   @IsString()
   sessionId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Current Organization ID',
+  })
+  @IsOptional()
+  @IsString()
+  currentOrganizationId?: string;
 }
 
 export class ChatResponseDto {

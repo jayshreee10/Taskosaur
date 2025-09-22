@@ -17,15 +17,13 @@ function NewTaskPageContent() {
   const { workspaceSlug, projectSlug } = router.query;
 
   const { getWorkspaceBySlug } = useWorkspace();
-  const { getProjectBySlug, getProjectMembers, getTaskStatusByProject } = useProject();
+  const { getProjectBySlug } = useProject();
  
   
   const {  isAuthenticated } = useAuth();
 
   const [workspace, setWorkspace] = useState<any>(null);
   const [project, setProject] = useState<any>(null);
-  const [availableStatuses, setAvailableStatuses] = useState<any[]>([]);
-  const [availableLabels, setAvailableLabels] = useState<any[]>([]);
   const isInitializedRef = useRef(false);
 
   // Initialize data
@@ -37,8 +35,8 @@ function NewTaskPageContent() {
         setWorkspace(ws);
         const proj = await getProjectBySlug(typeof projectSlug === "string" ? projectSlug : Array.isArray(projectSlug) ? projectSlug[0] : "");
         setProject(proj);
-        const statuses = proj?.id ? await getTaskStatusByProject(proj.id) : [];
-        setAvailableStatuses(statuses);
+       
+             
         isInitializedRef.current = true;
       } catch (error) {
         console.error("Error initializing data:", error);
@@ -46,9 +44,6 @@ function NewTaskPageContent() {
     };
     fetchData();
   }, [isAuthenticated, workspaceSlug, projectSlug]);
-  console.log("availableStatuses", availableStatuses);
-  console.log("project", project);
-  console.log("workspace", workspace);
 
   if (!isAuthenticated()) {
     return (
@@ -81,8 +76,6 @@ function NewTaskPageContent() {
         projectSlug={typeof projectSlug === "string" ? projectSlug : Array.isArray(projectSlug) ? projectSlug[0] : ""}
         workspace={workspace}
         projects={project ? [project] : []}
-        availableStatuses={availableStatuses}
-        getProjectMembers={getProjectMembers}
       />
     </>
   );

@@ -21,10 +21,18 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ActivityFeedPanel } from "@/components/activity/ActivityFeedPanel";
 import { ActivityFilters, ActivityItem, ActivityResponse } from "@/types";
+import Tooltip from "@/components/common/ToolTip";
 
 type EntityTypeFilter =
   | "Task"
@@ -33,6 +41,71 @@ type EntityTypeFilter =
   | "Organization"
   | "User"
   | "all";
+
+// Simple Next/Previous Pagination Component
+interface ActivityPaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  isLoading?: boolean;
+}
+
+function ActivityPagination({ 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  isLoading = false 
+}: ActivityPaginationProps) {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex flex-col items-center gap-2 py-4">
+      <div className="text-sm text-[var(--muted-foreground)]">
+        Page {currentPage} of {totalPages}
+      </div>
+      
+      <Pagination>
+        <PaginationContent>
+          {/* Previous Button */}
+          <PaginationItem>
+            <PaginationPrevious 
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage > 1 && !isLoading) {
+                  onPageChange(currentPage - 1);
+                }
+              }}
+              className={`${
+                currentPage === 1 || isLoading
+                  ? 'pointer-events-none opacity-50' 
+                  : 'cursor-pointer hover:bg-[var(--accent)]'
+              }`}
+            />
+          </PaginationItem>
+
+          {/* Next Button */}
+          <PaginationItem>
+            <PaginationNext 
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage < totalPages && !isLoading) {
+                  onPageChange(currentPage + 1);
+                }
+              }}
+              className={`${
+                currentPage === totalPages || isLoading
+                  ? 'pointer-events-none opacity-50' 
+                  : 'cursor-pointer hover:bg-[var(--accent)]'
+              }`}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    </div>
+  );
+}
 
 function ActivityPageContent() {
   const [activeFilter, setActiveFilter] = useState<EntityTypeFilter>("all");
@@ -45,7 +118,6 @@ function ActivityPageContent() {
   const [currentOrgId, setCurrentOrgId] = useState("");
 
   const { user } = useAuth();
-
   const { getOrganizationRecentActivity, clearError } = useOrganization();
 
   useEffect(() => {
@@ -153,6 +225,12 @@ function ActivityPageContent() {
     }
   };
 
+  const handlePageChange = async (page: number) => {
+    if (page !== pagination?.currentPage) {
+      await loadActivities(page, activeFilter);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[var(--background)] p-4">
       <div className="">
@@ -180,21 +258,26 @@ function ActivityPageContent() {
                   </Badge>
                 )}
 
-                {/* Filter */}
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="relative border-none bg-[var(--accent)] hover:bg-[var(--accent)]/80"
-                      aria-label="Filter activities"
-                    >
-                      <SlidersHorizontal className="w-4 h-4" />
-                      {activeFilter !== "all" && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--primary)] rounded-full" />
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
+                  <Tooltip
+                    content="Filter activities"
+                    position="top"
+                    color="primary"
+                  >
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="relative border-none bg-[var(--accent)] hover:bg-[var(--accent)]/80"
+                        aria-label="Filter activities"
+                      >
+                        <SlidersHorizontal className="w-4 h-4" />
+                        {activeFilter !== "all" && (
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--primary)] rounded-full" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </Tooltip>
                   <DropdownMenuContent
                     align="end"
                     className="w-48 p-0 bg-[var(--card)] border border-[var(--border)]"
@@ -257,18 +340,32 @@ function ActivityPageContent() {
             }
           />
 
-          <ActivityFeedPanel
-            title="Recent Activity"
-            activities={activities}
-            isLoading={isLoadingActivity}
-            error={activityError}
-            onRetry={handleRefreshActivities}
-            onClearFilter={
-              activeFilter !== "all"
-                ? () => handleFilterChange("all")
-                : undefined
-            }
-          />
+          <div className="bg-[var(--card)] rounded-lg border border-[var(--border)] overflow-hidden">
+            <ActivityFeedPanel
+              title="Recent Activity"
+              activities={activities}
+              isLoading={isLoadingActivity}
+              error={activityError}
+              onRetry={handleRefreshActivities}
+              onClearFilter={
+                activeFilter !== "all"
+                  ? () => handleFilterChange("all")
+                  : undefined
+              }
+            />
+
+            {/* Simple Next/Previous Pagination */}
+            {pagination && (
+              <div className="border-t border-[var(--border)]">
+                <ActivityPagination
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                  isLoading={isLoadingActivity}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -143,7 +143,6 @@ export class SprintsService {
       archive: false,
     };
 
-    console.log('Finding sprints for slug:', slug, 'and status:', status);
     if (slug) {
       whereClause.project = {
         slug: slug,

@@ -26,6 +26,7 @@ import { NotificationsService } from './notifications.service';
 import { getAuthUser } from 'src/common/request.utils';
 import { Request } from 'express';
 import { NotificationPriority, NotificationType } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Notifications')
 @ApiBearerAuth('JWT-auth')
@@ -340,6 +341,27 @@ export class NotificationsController {
     await this.notificationsService.markAllAsRead(user.id, organizationId);
     return { message: 'All unread notifications marked as read' };
   }
+  @Delete('bulk')
+  @ApiOperation({
+    summary: 'Delete multiple notifications',
+    description: 'Delete multiple notifications by providing an array of IDs',
+  })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteMultipleNotifications(
+    @Req() req: Request,
+    @Body('notificationIds') notificationIds: string[],
+    @CurrentUser() user: any,
+  ) {
+    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+      throw new BadRequestException(
+        'notificationIds must be a non-empty array',
+      );
+    }
+    await this.notificationsService.deleteMultipleNotifications(
+      notificationIds,
+      user.id,
+    );
+  }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete notification' })
@@ -350,29 +372,6 @@ export class NotificationsController {
   ) {
     const user = getAuthUser(req);
     await this.notificationsService.deleteNotification(id, user.id);
-  }
-
-  @Delete('bulk')
-  @ApiOperation({
-    summary: 'Delete multiple notifications',
-    description: 'Delete multiple notifications by providing an array of IDs',
-  })
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteMultipleNotifications(
-    @Req() req: Request,
-    @Body('notificationIds') notificationIds: string[],
-  ) {
-    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
-      throw new BadRequestException(
-        'notificationIds must be a non-empty array',
-      );
-    }
-
-    const user = getAuthUser(req);
-    await this.notificationsService.deleteMultipleNotifications(
-      notificationIds,
-      user.id,
-    );
   }
 
   @Get('stats/summary')

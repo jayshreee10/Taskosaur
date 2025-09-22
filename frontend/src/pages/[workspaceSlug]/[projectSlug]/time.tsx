@@ -1,4 +1,3 @@
-;
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import OrganizationProvider from '@/contexts/organization-context';
 import WorkspaceProvider from '@/contexts/workspace-context';
@@ -9,17 +8,10 @@ import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import Breadcrumb from '@/components/layout/Breadcrumb';
 import { Toaster } from 'sonner';
-
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
 import UserAvatar from '@/components/ui/avatars/UserAvatar';
 import { Button } from '@/components/ui';
-import {Task} from '@/types'
 function TimeTrackingPageContent() {
-  const router = useRouter();
-  const { workspaceSlug, projectSlug } = router.query;
-  
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'entries' | 'reports'>('overview');
   const [dateRange, setDateRange] = useState({
@@ -30,8 +22,6 @@ function TimeTrackingPageContent() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        // const tasksData = await getTasks();
-        setTasks([]);
       } catch (error) {
         console.error('Error fetching tasks:', error);
       } finally {

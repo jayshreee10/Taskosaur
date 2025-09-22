@@ -1,5 +1,3 @@
-;
-
 import { useState } from 'react';
 import { Task } from '@/types/tasks';
 import UserAvatar from '@/components/ui/avatars/UserAvatar';
@@ -21,7 +19,6 @@ export default function TaskHierarchy({
   onCreateSubtask, 
   onConvertToSubtask,
   onPromoteToParent,
-  onMoveSubtask 
 }: TaskHierarchyProps) {
   const [showCreateSubtask, setShowCreateSubtask] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -33,14 +30,8 @@ export default function TaskHierarchy({
     dueDate: ''
   });
   const [taskToPromote, setTaskToPromote] = useState<Task | null>(null);
-
-  // Get subtasks for this task
   const subtasks = allTasks.filter(t => t.parentTaskId === task.id);
-
-  // Get parent task if this is a subtask
   const parentTask = task.parentTaskId ? allTasks.find(t => t.id === task.parentTaskId) : null;
-
-  // Get potential parent tasks (exclude current task and its subtasks)
   const potentialParents = allTasks.filter(t => 
     t.id !== task.id && 
     t.parentTaskId !== task.id &&
@@ -75,9 +66,9 @@ export default function TaskHierarchy({
   };
 
   const getTaskTypeIcon = (task: Task) => {
-    if (task.parentTaskId) return '📝'; // Subtask
-    if (allTasks.some(t => t.parentTaskId === task.id)) return '📁'; // Parent task
-    return '📋'; // Regular task
+    if (task.parentTaskId) return '📝';
+    if (allTasks.some(t => t.parentTaskId === task.id)) return '📁';
+    return '📋';
   };
 
   const getPriorityColor = (priority: string) => {

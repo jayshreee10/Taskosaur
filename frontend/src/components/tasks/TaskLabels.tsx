@@ -22,7 +22,7 @@ interface TaskLabelsProps {
   onAddLabel: (name: string, color: string) => Promise<void>;
   onAssignExistingLabel: (label: TaskLabel) => Promise<void>;
   onRemoveLabel: (labelId: string) => Promise<void>;
-  hasAccess?: boolean
+  hasAccess?: boolean;
 }
 
 const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
@@ -32,29 +32,22 @@ const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
   </div>
 );
 
-
-
 export default function TaskLabels({
   labels,
   availableLabels,
   onAddLabel,
   onAssignExistingLabel,
   onRemoveLabel,
-  hasAccess = false
+  hasAccess = false,
 }: TaskLabelsProps) {
   const [isAddingLabel, setIsAddingLabel] = useState(false);
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#3B82F6");
 
-  const { getCurrentUser } = useAuth();
-  const currentUser = getCurrentUser();
-
-  // Predefined label colors with better color palette
- 
-
   const handleAddLabel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!hasAccess) return toast.error("You don't have access to update the task label");
+    if (!hasAccess)
+      return toast.error("You don't have access to update the task label");
 
     if (!newLabelName.trim()) return;
 
@@ -73,7 +66,8 @@ export default function TaskLabels({
   };
 
   const handleRemoveLabel = async (labelId: string) => {
-    if(!hasAccess) return toast.error("You don't have access to update the task label");
+    if (!hasAccess)
+      return toast.error("You don't have access to update the task label");
 
     try {
       await onRemoveLabel(labelId);
@@ -83,8 +77,9 @@ export default function TaskLabels({
   };
 
   const handleAssignLabel = async (label: TaskLabel) => {
-    if(!hasAccess) return toast.error("You don't have access to update the task label");
-    
+    if (!hasAccess)
+      return toast.error("You don't have access to update the task label");
+
     try {
       await onAssignExistingLabel(label);
     } catch (error) {
@@ -94,10 +89,12 @@ export default function TaskLabels({
 
   // Filter out already assigned labels from available labels
   const unassignedLabels = availableLabels.filter(
-    (availableLabel) => !labels.some((assignedLabel) => 
-      (assignedLabel.id && assignedLabel.id === availableLabel.id) ||
-      (assignedLabel.labelId && assignedLabel.labelId === availableLabel.id)
-    )
+    (availableLabel) =>
+      !labels.some(
+        (assignedLabel) =>
+          (assignedLabel.id && assignedLabel.id === availableLabel.id) ||
+          (assignedLabel.labelId && assignedLabel.labelId === availableLabel.id)
+      )
   );
 
   return (
@@ -181,7 +178,7 @@ export default function TaskLabels({
                 className="h-9 border-input bg-background text-[var(--foreground)]"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label className="text-sm font-medium text-[var(--foreground)]">
                 Color
@@ -203,10 +200,12 @@ export default function TaskLabels({
                   />
                 ))}
               </div>
-              
+
               {/* Preview */}
               <div className="flex items-center gap-2 pt-2">
-                <span className="text-xs text-[var(--muted-foreground)]">Preview:</span>
+                <span className="text-xs text-[var(--muted-foreground)]">
+                  Preview:
+                </span>
                 <DynamicBadge
                   label={newLabelName || "Label preview"}
                   bgColor={newLabelColor}
@@ -214,7 +213,7 @@ export default function TaskLabels({
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 pt-2">
               <ActionButton
                 type="submit"
@@ -249,26 +248,27 @@ export default function TaskLabels({
       ) : null}
 
       {/* Quick actions */}
-      {labels.length === 0 && unassignedLabels.length === 0 && !isAddingLabel && hasAccess && (
-        <div className="text-center py-6 text-[var(--muted-foreground)]">
-          <HiTag className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p className="text-sm font-medium mb-2">No labels yet</p>
-          <p className="text-xs mb-4">
-            Create labels to organize and categorize your tasks
-          </p>
-          <ActionButton
-            variant="outline"
-            onClick={() => setIsAddingLabel(true)}
-            showPlusIcon
-            primary
-            className="min-w-[140px] mx-auto flex justify-center cursor-pointer"
-          >
-            Create first label
-          </ActionButton>
-        </div>
-      )}
-
-    
+      {labels.length === 0 &&
+        unassignedLabels.length === 0 &&
+        !isAddingLabel &&
+        hasAccess && (
+          <div className="text-center py-6 text-[var(--muted-foreground)]">
+            <HiTag className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p className="text-sm font-medium mb-2">No labels yet</p>
+            <p className="text-xs mb-4">
+              Create labels to organize and categorize your tasks
+            </p>
+            <ActionButton
+              variant="outline"
+              onClick={() => setIsAddingLabel(true)}
+              showPlusIcon
+              primary
+              className="min-w-[140px] mx-auto flex justify-center cursor-pointer"
+            >
+              Create first label
+            </ActionButton>
+          </div>
+        )}
     </div>
   );
 }

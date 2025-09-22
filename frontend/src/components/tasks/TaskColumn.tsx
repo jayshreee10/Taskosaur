@@ -1,6 +1,4 @@
-;
-
-import { useState } from 'react';
+;import { useState } from 'react';
 import { Task, TaskStatus } from '@/types';
 import TaskCard from './TaskCard';
 
@@ -19,7 +17,6 @@ export default function TaskColumn({
   status,
   tasks,
   allTasks = [],
-  onTaskMove,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -41,11 +38,6 @@ export default function TaskColumn({
     e.preventDefault();
     setIsDragOver(false);
     onDrop(status.id);
-  };
-
-  const getStatusColor = (color?: string) => {
-    if (!color) return 'bg-gray-500';
-    return `bg-[${color}]`;
   };
 
   return (

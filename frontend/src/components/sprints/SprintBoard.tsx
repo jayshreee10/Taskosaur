@@ -1,5 +1,3 @@
-;
-
 import React, { useState, useEffect } from 'react';
 import TaskColumn from '@/components/tasks/TaskColumn';
 import { Button } from '@/components/ui/button';
@@ -14,7 +12,6 @@ import {
   HiCalendar,
   HiFlag,
   HiChartBar,
-  HiUsers,
   HiClipboardDocumentList
 } from 'react-icons/hi2';
 import { HiLightningBolt } from "react-icons/hi";

@@ -1,5 +1,3 @@
-;
-
 import { useState } from 'react';
 import { Task, TaskDependency, DependencyType, TimeEntry } from '@/types/tasks';
 import { Button } from '@/components/ui';

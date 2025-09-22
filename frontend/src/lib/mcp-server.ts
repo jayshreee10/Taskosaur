@@ -52,6 +52,13 @@ class MCPServer {
     // Don't regenerate session ID on initialize - keep the persistent one
   }
   
+  getCurrentOrganizationId(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('currentOrganizationId');
+    }
+    return null;
+  }
+
   private getOrCreateSessionId(): string {
     // Try to get existing session ID from localStorage or sessionStorage
     if (typeof window !== 'undefined') {
@@ -59,9 +66,9 @@ class MCPServer {
       if (!sessionId) {
         sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         sessionStorage.setItem('mcp-session-id', sessionId);
-        console.log(`[MCP] Created new persistent session ID: ${sessionId}`);
+        // console.log(`[MCP] Created new persistent session ID: ${sessionId}`);
       } else {
-        console.log(`[MCP] Using existing session ID: ${sessionId}`);
+        // console.log(`[MCP] Using existing session ID: ${sessionId}`);
       }
       return sessionId;
     }
@@ -94,6 +101,8 @@ class MCPServer {
       content: message
     });
 
+    const currentOrganizationId: string | null = this.getCurrentOrganizationId();
+
     // Build history for context
     const history = this.conversationHistory.slice(0, -1); // Exclude current message
 
@@ -104,8 +113,11 @@ class MCPServer {
         history,
         workspaceId: this.context.currentWorkspace,
         projectId: this.context.currentProject,
-        sessionId: this.sessionId
-      });
+        sessionId: this.sessionId,
+        currentOrganizationId: currentOrganizationId
+      },
+      { timeout: 18000 }
+      );
 
       const data = apiResponse.data;
       if (!data.success) {
@@ -198,7 +210,6 @@ class MCPServer {
       // Clear backend context
       await api.delete(`/ai-chat/context/${this.sessionId}`);
       
-      console.log(`[MCP] Context cleared for session: ${this.sessionId}`);
     } catch (error) {
       console.error('[MCP] Failed to clear context on backend:', error);
       // Still clear local context even if backend fails
@@ -250,25 +261,20 @@ class MCPServer {
       
       // Convert workspace names to slugs if they're not already slugs
       if (parameters.workspaceSlug && typeof parameters.workspaceSlug === 'string') {
-        console.log(`MCP: Processing workspaceSlug: "${parameters.workspaceSlug}"`);
         
         // If it looks like a name (contains spaces, capitals, or special chars), try to find the actual slug
         if (parameters.workspaceSlug.includes(' ') || /[A-Z]/.test(parameters.workspaceSlug) || parameters.workspaceSlug.toLowerCase() !== parameters.workspaceSlug.replace(/[^a-z0-9-]/g, '')) {
-          console.log('MCP: Workspace slug looks like a name, converting...');
           
           // First try to get the slug from the current context
           const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-          const pathParts = currentPath?.split('/').filter(Boolean);
-          console.log(`MCP: Current path parts: [${pathParts.join(', ')}]`);
+          const pathParts = currentPath.split('/').filter(Boolean);
           
           // If we're already in a workspace, use that slug
-          if (pathParts?.length > 0 && !['dashboard', 'settings', 'activity'].includes(pathParts[0])) {
-            console.log(`MCP: Using current workspace slug: "${pathParts[0]}"`);
-            parameters.workspaceSlug = pathParts[0];
+          if (pathParts.length > 0 && !['dashboard', 'settings', 'activity'].includes(pathParts[0])) {
+              parameters.workspaceSlug = pathParts[0];
           } else {
             // Try to find the actual workspace slug by name
             const originalName = parameters.workspaceSlug;
-            console.log(`MCP: Searching for workspace with name: "${originalName}"`);
             
             try {
               // Import the listWorkspaces function
@@ -276,7 +282,6 @@ class MCPServer {
               const result = await listWorkspaces({ timeout: 5000 });
               
               if (result.success && result.data?.workspaces) {
-                console.log(`MCP: Found ${result.data.workspaces.length} workspaces to search`);
                 
                 // Find workspace by name (case-insensitive)
                 const matchingWorkspace = result.data.workspaces.find((w: any) => 
@@ -284,7 +289,6 @@ class MCPServer {
                 );
                 
                 if (matchingWorkspace && matchingWorkspace.slug) {
-                  console.log(`MCP: Found matching workspace with slug: "${matchingWorkspace.slug}"`);
                   parameters.workspaceSlug = matchingWorkspace.slug;
                 } else {
                   // Fallback to simple slug conversion
@@ -292,7 +296,6 @@ class MCPServer {
                     .toLowerCase()
                     .replace(/\s+/g, '-')
                     .replace(/[^a-z0-9-]/g, '');
-                  console.log(`MCP: No matching workspace found, using generated slug: "${parameters.workspaceSlug}"`);
                 }
               } else {
                 // Fallback to simple slug conversion if listWorkspaces fails
@@ -300,7 +303,6 @@ class MCPServer {
                   .toLowerCase()
                   .replace(/\s+/g, '-')
                   .replace(/[^a-z0-9-]/g, '');
-                console.log(`MCP: listWorkspaces failed, using generated slug: "${parameters.workspaceSlug}"`);
               }
             } catch {
               // Fallback to simple slug conversion if there's any error
@@ -308,14 +310,9 @@ class MCPServer {
                 .toLowerCase()
                 .replace(/\s+/g, '-')
                 .replace(/[^a-z0-9-]/g, '');
-              console.log(`MCP: Error looking up workspaces, using generated slug: "${parameters.workspaceSlug}"`);
             }
           }
-        } else {
-          console.log('MCP: Workspace slug already looks like a slug, using as-is');
         }
-        
-        console.log(`MCP: Final workspaceSlug: "${parameters.workspaceSlug}"`);
       }
 
       // Emit automation start event
@@ -361,7 +358,6 @@ class MCPServer {
             .replace(/\s+/g, '-')
             .replace(/[^a-z0-9-]/g, '');
           
-          console.log(`[MCP] Updating context after workspace creation: ${workspaceSlug}`);
           this.updateContext({
             currentWorkspace: workspaceSlug,
             currentProject: undefined // Clear project when switching workspaces
@@ -373,7 +369,6 @@ class MCPServer {
             .replace(/\s+/g, '-')
             .replace(/[^a-z0-9-]/g, '');
           
-          console.log(`[MCP] Updating context after project creation: ${parameters.workspaceSlug}/${projectSlug}`);
           this.updateContext({
             currentWorkspace: parameters.workspaceSlug,
             currentProject: projectSlug
@@ -445,8 +440,9 @@ export const mcpServer = new MCPServer();
 
 // Helper function to extract workspace and project from URL
 export function extractContextFromPath(pathname: string): Partial<TaskosaurContext> {
-  const pathParts = pathname?.split('/').filter(Boolean);
   const context: Partial<TaskosaurContext> = {};
+  if (pathname == null || pathname == undefined) return context;
+  const pathParts = pathname.split('/').filter(Boolean);
 
   if (pathParts?.length > 0 && !['dashboard', 'workspaces', 'settings', 'activities'].includes(pathParts[0])) {
     context.currentWorkspace = pathParts[0];

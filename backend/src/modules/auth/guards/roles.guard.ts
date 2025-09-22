@@ -46,18 +46,15 @@ export class RolesGuard implements CanActivate {
 
     let resolvedScopeId = scopeId;
     if (type === 'PROJECT' && idParam === 'slug') {
-      console.log('Resolving project slug to id', scopeId);
       const project = await this.prisma.project.findUnique({
         where: { slug: scopeId },
         select: { id: true },
       });
-      console.log('Resolved project:', project);
       if (!project) throw new ForbiddenException('Project not found');
       resolvedScopeId = project.id;
     }
     const memberRole = await this.getMemberRole(type, user.id, resolvedScopeId);
     if (!memberRole) throw new ForbiddenException('Not a member of this scope');
-
     const ok = requiredRoles.some(
       (r) => ROLE_RANK[memberRole] >= ROLE_RANK[r as PrismaRole],
     );
@@ -73,6 +70,11 @@ export class RolesGuard implements CanActivate {
   ) {
     switch (type) {
       case 'ORGANIZATION': {
+        
+        const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+        if (!uuidRegex.test(userId) || !uuidRegex.test(scopeId)) {
+          return null;
+        }
         const m = await this.prisma.organizationMember.findUnique({
           where: { userId_organizationId: { userId, organizationId: scopeId } },
           select: { role: true },

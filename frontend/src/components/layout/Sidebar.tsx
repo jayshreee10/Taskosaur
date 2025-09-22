@@ -45,6 +45,7 @@ const usePathnameParsing = (pathname: string, isMounted: boolean) => {
       "activities",
       "settings",
       "tasks",
+      "notifications"
     ];
 
     // Define workspace-level routes that should not be treated as project slugs
@@ -241,7 +242,7 @@ export default function Sidebar() {
             },
             {
               name: "Calendar",
-              href: `/${currentWorkspaceSlug}/${currentProjectSlug}/tasks/calendar`,
+              href: `/${currentWorkspaceSlug}/${currentProjectSlug}/calendar`,
               icon: <HiCalendar size={16} />,
               title: "Calendar",
             },
@@ -310,9 +311,18 @@ export default function Sidebar() {
     };
   }, []);
 
-  // const getSidebarColor = () => {
-  //   return "bg-[var(--sidebar)]";
-  // };
+  const normalize = (url) => url.replace(/\/$/, "");
+
+  const isActive = (pathname, itemHref, isBase = false) => {
+    const current = normalize(pathname);
+    const target = normalize(itemHref);
+
+    if (isBase) {
+      return current === target;
+    }
+
+    return current === target || current.startsWith(target + "/");
+  };
 
   const renderFullSidebar = () => (
     <div className="layout-sidebar-full">
@@ -325,6 +335,7 @@ export default function Sidebar() {
               (item) =>
                 pathname.replace(/\/$/, "") === item.href.replace(/\/$/, "")
             );
+
             return (
               <div className="layout-sidebar-header-dashboard">
                 <div className="layout-sidebar-header-dashboard-content">
@@ -361,7 +372,7 @@ export default function Sidebar() {
                 <Link
                   href={item.href}
                   className={`layout-sidebar-nav-link ${
-                    pathname.replace(/\/$/, "") === item.href.replace(/\/$/, "")
+                    isActive(pathname, item.href, item.name === "Overview")
                       ? "layout-sidebar-nav-link-active"
                       : "layout-sidebar-nav-link-inactive"
                   }`}

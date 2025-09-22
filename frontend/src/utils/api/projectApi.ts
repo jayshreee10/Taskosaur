@@ -53,14 +53,16 @@ export const projectApi = {
     }
   },
 
-  getProjectsByWorkspace: async (workspaceId: string,
+  getProjectsByWorkspace: async (
+    workspaceId: string,
     filters?: {
       status?: string;
       priority?: string;
       page?: number;
       pageSize?: number;
       search?: string;
-    }): Promise<Project[]> => {
+    }
+  ): Promise<Project[]> => {
     try {
       const params = new URLSearchParams({
         workspaceId,
@@ -70,8 +72,7 @@ export const projectApi = {
       if (filters?.page) params.append("page", filters.page.toString());
       if (filters?.pageSize)
         params.append("pageSize", filters.pageSize.toString());
-      if (filters?.search)
-        params.append("search", filters.search.trim());
+      if (filters?.search) params.append("search", filters.search.trim());
       const response = await api.get<Project[]>(
         `/projects?${params.toString()}`
       );
@@ -104,8 +105,7 @@ export const projectApi = {
       if (filters?.page) params.append("page", filters.page.toString());
       if (filters?.pageSize)
         params.append("pageSize", filters.pageSize.toString());
-      if (filters?.search)
-        params.append("search", filters.search.trim());
+      if (filters?.search) params.append("search", filters.search.trim());
       const response = await api.get<Project[]>(
         `/projects/by-organization?${params.toString()}`
       );
@@ -200,10 +200,15 @@ export const projectApi = {
     }
   },
 
-  getProjectMembers: async (projectId: string): Promise<ProjectMember[]> => {
+  getProjectMembers: async (
+    projectId: string,
+    search?: string
+  ): Promise<ProjectMember[]> => {
     try {
       const response = await api.get<ProjectMember[]>(
-        `/project-members?projectId=${projectId}`
+        `/project-members?projectId=${projectId}${
+          search ? `&search=${encodeURIComponent(search)}` : ""
+        }`
       );
       return response.data;
     } catch (error) {
@@ -293,7 +298,7 @@ export const projectApi = {
   ): Promise<ProjectChartDataResponse> => {
     try {
       const params = new URLSearchParams();
-      chartTypes.forEach(type => params.append('types', type));
+      chartTypes.forEach((type) => params.append("types", type));
 
       const response = await api.get(
         `/projects/${projectSlug}/charts?${params.toString()}`
@@ -318,7 +323,9 @@ export const projectApi = {
       throw error;
     }
   },
-  getAllCharts: async (projectSlug: string): Promise<ProjectChartDataResponse> => {
+  getAllCharts: async (
+    projectSlug: string
+  ): Promise<ProjectChartDataResponse> => {
     try {
       const allChartTypes = Object.values(ProjectChartType);
       return await projectApi.getMultipleCharts(projectSlug, allChartTypes);
@@ -339,7 +346,9 @@ export const projectApi = {
     }
   },
 
-  archiveProject: async (projectId: string): Promise<{ success: boolean; message: string }> => {
+  archiveProject: async (
+    projectId: string
+  ): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await api.patch(`/projects/archive/${projectId}`);
 

@@ -7,8 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import { HiRocketLaunch, HiSparkles, HiDocumentText, HiCalendar, HiFlag } from "react-icons/hi2";
-import { Button } from "../ui/button";
+import {
+  HiRocketLaunch,
+  HiSparkles,
+  HiDocumentText,
+  HiCalendar,
+  HiFlag,
+} from "react-icons/hi2";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
@@ -20,6 +25,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import ActionButton from "../common/ActionButton";
+import { getTodayDate } from "@/utils/handleDateChange";
 
 export const SprintFormModal = ({
   isOpen,
@@ -92,7 +98,7 @@ export const SprintFormModal = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    
+
     setSaving(true);
     try {
       const submitData = {
@@ -125,14 +131,11 @@ export const SprintFormModal = ({
     onClose();
   };
 
-  const getToday = () => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
-  };
-
-  const isValid = formData.name.trim().length > 0 && formData.startDate && formData.endDate;
+  const isValid =
+    formData.name.trim().length > 0 && formData.startDate && formData.endDate;
 
   return (
+    <div automation-id="create-sprint-modal">
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="projects-modal-container border-none">
         <DialogHeader className="projects-modal-header">
@@ -157,41 +160,48 @@ export const SprintFormModal = ({
           {/* Sprint Name */}
           <div className="projects-form-field">
             <Label htmlFor="name" className="projects-form-label">
-              <HiSparkles 
-                className="projects-form-label-icon" 
-                style={{ color: 'hsl(var(--primary))' }}
+              <HiSparkles
+                className="projects-form-label-icon"
+                style={{ color: "hsl(var(--primary))" }}
               />
-              Sprint name <span className="projects-form-label-required">*</span>
+              Sprint name{" "}
+              <span className="projects-form-label-required">*</span>
             </Label>
             <Input
               id="name"
               placeholder="Enter sprint name"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
+              }
               className="projects-form-input border-none"
-              style={{
-                '--tw-ring-color': 'hsl(var(--primary) / 0.2)',
-              } as any}
+              style={
+                {
+                  "--tw-ring-color": "hsl(var(--primary) / 0.2)",
+                } as any
+              }
               onFocus={(e) => {
-                e.target.style.boxShadow = 'none';
+                e.target.style.boxShadow = "none";
               }}
               onBlur={(e) => {
-                e.target.style.boxShadow = 'none';
+                e.target.style.boxShadow = "none";
               }}
               autoFocus
               disabled={saving}
             />
             {errors.name && (
-              <p className="text-sm text-[var(--destructive)] mt-1">{errors.name}</p>
+              <p className="text-sm text-[var(--destructive)] mt-1">
+                {errors.name}
+              </p>
             )}
           </div>
 
           {/* Sprint Goal */}
           <div className="projects-form-field">
             <Label htmlFor="goal" className="projects-form-label">
-              <HiDocumentText 
-                className="projects-form-label-icon" 
-                style={{ color: 'hsl(var(--primary))' }}
+              <HiDocumentText
+                className="projects-form-label-icon"
+                style={{ color: "hsl(var(--primary))" }}
               />
               Sprint goal
             </Label>
@@ -199,62 +209,82 @@ export const SprintFormModal = ({
               id="goal"
               placeholder="Describe the main objective and outcomes for this sprint..."
               value={formData.goal}
-              onChange={(e) => setFormData(prev => ({ ...prev, goal: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, goal: e.target.value }))
+              }
               className="projects-form-textarea border-none"
               rows={3}
               onFocus={(e) => {
-                e.target.style.boxShadow = 'none';
+                e.target.style.boxShadow = "none";
               }}
               onBlur={(e) => {
-                e.target.style.boxShadow = 'none';
+                e.target.style.boxShadow = "none";
               }}
               disabled={saving}
             />
             <p className="projects-form-hint">
-              <HiSparkles 
-                className="projects-form-hint-icon" 
-                style={{ color: 'hsl(var(--primary))' }}
+              <HiSparkles
+                className="projects-form-hint-icon"
+                style={{ color: "hsl(var(--primary))" }}
               />
-              Help your team understand the sprint's focus and expected outcomes.
+              Help your team understand the sprint's focus and expected
+              outcomes.
             </p>
           </div>
 
           {/* Sprint Status */}
           <div className="projects-form-field">
             <Label className="projects-form-label">
-              <HiFlag 
-                className="projects-form-label-icon" 
-                style={{ color: 'hsl(var(--primary))' }}
+              <HiFlag
+                className="projects-form-label-icon"
+                style={{ color: "hsl(var(--primary))" }}
               />
               Status <span className="projects-form-label-required">*</span>
             </Label>
             <Select
               value={formData.status}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Sprint["status"] }))}
+              onValueChange={(value) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  status: value as Sprint["status"],
+                }))
+              }
               disabled={saving}
             >
-              <SelectTrigger 
+              <SelectTrigger
                 className="projects-workspace-button border-none"
                 onFocus={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.boxShadow = "none";
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent className="border-none bg-[var(--card)]">
-                <SelectItem value="PLANNING" className="hover:bg-[var(--hover-bg)]">
+                <SelectItem
+                  value="PLANNING"
+                  className="hover:bg-[var(--hover-bg)]"
+                >
                   Planning
                 </SelectItem>
-                <SelectItem value="ACTIVE" className="hover:bg-[var(--hover-bg)]">
+                <SelectItem
+                  value="ACTIVE"
+                  className="hover:bg-[var(--hover-bg)]"
+                >
                   Active
                 </SelectItem>
-                <SelectItem value="COMPLETED" className="hover:bg-[var(--hover-bg)]">
+                <SelectItem
+                  value="COMPLETED"
+                  className="hover:bg-[var(--hover-bg)]"
+                >
                   Completed
                 </SelectItem>
-                <SelectItem value="CANCELLED" className="hover:bg-[var(--hover-bg)]">
+                <SelectItem
+                  value="CANCELLED"
+                  className="hover:bg-[var(--hover-bg)]"
+                >
                   Cancelled
                 </SelectItem>
               </SelectContent>
@@ -265,37 +295,46 @@ export const SprintFormModal = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="projects-form-field">
               <Label htmlFor="startDate" className="projects-form-label">
-                <HiCalendar 
-                  className="projects-form-label-icon" 
-                  style={{ color: 'hsl(var(--primary))' }}
+                <HiCalendar
+                  className="projects-form-label-icon"
+                  style={{ color: "hsl(var(--primary))" }}
                 />
-                Start date <span className="projects-form-label-required">*</span>
+                Start date{" "}
+                <span className="projects-form-label-required">*</span>
               </Label>
               <Input
                 id="startDate"
                 type="date"
                 value={formData.startDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                min={getToday()}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    startDate: e.target.value,
+                  }))
+                }
+                max={formData?.endDate || undefined}
+                min={getTodayDate()}
                 className="projects-form-input border-none"
                 onFocus={(e) => {
-                  e.target.style.boxShadow = 'none';
+                  e.target.style.boxShadow = "none";
                 }}
                 onBlur={(e) => {
-                  e.target.style.boxShadow = 'none';
+                  e.target.style.boxShadow = "none";
                 }}
                 disabled={saving}
               />
               {errors.startDate && (
-                <p className="text-sm text-[var(--destructive)] mt-1">{errors.startDate}</p>
+                <p className="text-sm text-[var(--destructive)] mt-1">
+                  {errors.startDate}
+                </p>
               )}
             </div>
 
             <div className="projects-form-field">
               <Label htmlFor="endDate" className="projects-form-label">
-                <HiCalendar 
-                  className="projects-form-label-icon" 
-                  style={{ color: 'hsl(var(--primary))' }}
+                <HiCalendar
+                  className="projects-form-label-icon"
+                  style={{ color: "hsl(var(--primary))" }}
                 />
                 End date <span className="projects-form-label-required">*</span>
               </Label>
@@ -303,18 +342,23 @@ export const SprintFormModal = ({
                 id="endDate"
                 type="date"
                 value={formData.endDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, endDate: e.target.value }))
+                }
                 className="projects-form-input border-none"
                 onFocus={(e) => {
-                  e.target.style.boxShadow = 'none';
+                  e.target.style.boxShadow = "none";
                 }}
                 onBlur={(e) => {
-                  e.target.style.boxShadow = 'none';
+                  e.target.style.boxShadow = "none";
                 }}
                 disabled={saving}
+                min={formData?.startDate || getTodayDate()}
               />
               {errors.endDate && (
-                <p className="text-sm text-[var(--destructive)] mt-1">{errors.endDate}</p>
+                <p className="text-sm text-[var(--destructive)] mt-1">
+                  {errors.endDate}
+                </p>
               )}
             </div>
           </div>
@@ -329,23 +373,22 @@ export const SprintFormModal = ({
             >
               Cancel
             </ActionButton>
-            <ActionButton
-              type="submit"
-              primary
-              disabled={!isValid || saving}
-            >
+            <ActionButton type="submit" primary disabled={!isValid || saving}>
               {saving ? (
                 <>
                   <div className="animate-spin -ml-1 mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                   {sprint ? "Updating..." : "Creating sprint..."}
                 </>
+              ) : sprint ? (
+                "Update"
               ) : (
-                sprint ? "Update" : "Create"
+                "Create"
               )}
             </ActionButton>
           </div>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </div>
   );
 };

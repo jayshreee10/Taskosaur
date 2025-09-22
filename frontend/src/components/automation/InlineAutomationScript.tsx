@@ -20,13 +20,13 @@ export default function InlineAutomationScript({
 
     // Check if automation is already loaded
     if ((window as any).TaskosaurAutomation) {
-      console.log('🤖 Taskosaur Automation already loaded');
+      // console.log('🤖 Taskosaur Automation already loaded');
       return;
     }
 
     const initializeAutomation = async () => {
       try {
-        console.log('🔧 Initializing Taskosaur Automation System...');
+        // console.log('🔧 Initializing Taskosaur Automation System...');
         
         // Initialize the TypeScript automation system
         const result = await automation.initialize();
@@ -34,8 +34,8 @@ export default function InlineAutomationScript({
         // Enable browser console access
         enableBrowserConsoleAccess();
         
-        console.log('✅ Taskosaur Automation System initialized successfully');
-        console.log('Result:', result);
+        // console.log('✅ Taskosaur Automation System initialized successfully');
+        // console.log('Result:', result);
         
       } catch (error) {
         console.error('❌ Failed to initialize automation system:', error);

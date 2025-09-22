@@ -5,15 +5,10 @@
 import {
   AutomationResult,
   waitForElement,
-  waitForElementReady,
-  simulateTyping,
   simulateClick,
   navigateTo,
-  waitForModalClose,
   waitFor,
   generateSlug,
-  selectDropdownOption,
-  simulateKeyPress
 } from './helpers';
 import { taskStatusApi } from '../api/taskStatusApi';
 import { projectApi } from '../api/projectApi';
@@ -45,21 +40,19 @@ export async function createTask(
   } = options;
 
   try {
-    console.log(`Starting task creation: "${taskTitle}" in ${workspaceSlug}/${projectSlug}`);
-    
-    // Navigate directly to the new task creation page
+// Navigate directly to the new task creation page
     const createTaskUrl = `/${workspaceSlug}/${projectSlug}/tasks/new`;
-    console.log(`Navigating directly to task creation page: ${createTaskUrl}`);
+    // console.log(`Navigating directly to task creation page: ${createTaskUrl}`);
     await navigateTo(createTaskUrl);
 
     // Wait for the task creation page to load
-    console.log('Waiting for task creation page to load...');
+    // console.log('Waiting for task creation page to load...');
     try {
       await waitForElement('.dashboard-container', timeout);
       // Additional check for the form elements
       await waitForElement('form, input#title', timeout / 2);
     } catch (error) {
-      console.log('Standard selectors not found, trying fallback...');
+      // console.log('Standard selectors not found, trying fallback...');
       await waitFor(2000); // Give page time to load
       
       // Check if we're on the task creation page
@@ -75,7 +68,7 @@ export async function createTask(
     await waitFor(1000); // Give page time to stabilize
 
     // Since we're now on the task creation page directly, no need to click a button
-    console.log('We are now on the task creation page, looking for the form...');
+    // console.log('We are now on the task creation page, looking for the form...');
     
     // Wait for the form to be ready
     await waitFor(1000);
@@ -86,10 +79,10 @@ export async function createTask(
       throw new Error('Task creation form not found on the page');
     }
     
-    console.log('Task creation form found, proceeding with field filling...');
+    // console.log('Task creation form found, proceeding with field filling...');
 
     // Find the specific title input field (from the HTML: input#title)
-    console.log('Looking for title input field...');
+    // console.log('Looking for title input field...');
     const titleSelectors = [
       'input#title',
       'input[name="title"]',
@@ -106,7 +99,7 @@ export async function createTask(
     for (const selector of titleSelectors) {
       titleInput = document.querySelector(selector) as HTMLInputElement;
       if (titleInput) {
-        console.log(`Title input found with selector: ${selector}`);
+        // console.log(`Title input found with selector: ${selector}`);
         break;
       }
     }
@@ -114,16 +107,16 @@ export async function createTask(
     if (!titleInput) {
       // Log available inputs for debugging
       const allInputs = document.querySelectorAll('input, textarea');
-      console.log('Available input fields:');
+      // console.log('Available input fields:');
       Array.from(allInputs).forEach((input, index) => {
-        console.log(`${index + 1}. ${input.tagName} - placeholder: "${input.getAttribute('placeholder')}" - name: "${input.getAttribute('name')}" - type: "${input.getAttribute('type')}"`);
+        // console.log(`${index + 1}. ${input.tagName} - placeholder: "${input.getAttribute('placeholder')}" - name: "${input.getAttribute('name')}" - type: "${input.getAttribute('type')}"`);
       });
       
       throw new Error('Task title input field not found');
     }
 
     // Fill title with React-compatible approach
-    console.log(`Filling title: "${taskTitle}"`);
+    // console.log(`Filling title: "${taskTitle}"`);
     titleInput.focus();
     titleInput.click();
     await waitFor(200);
@@ -151,7 +144,7 @@ export async function createTask(
     await waitFor(500);
 
     // Set mandatory Status field (default to first status, usually "To Do")
-    console.log('Setting mandatory Status field...');
+    // console.log('Setting mandatory Status field...');
     const statusSelectors = [
       'button[role="combobox"]', // Will check text content manually
       '[data-slot="select-trigger"]',
@@ -168,7 +161,7 @@ export async function createTask(
       const text = combobox.textContent?.toLowerCase() || '';
       if (text.includes('select a status') || text.includes('status')) {
         statusButton = combobox;
-        console.log('Status dropdown found by text content: "' + combobox.textContent + '"');
+        // console.log('Status dropdown found by text content: "' + combobox.textContent + '"');
         break;
       }
     }
@@ -182,7 +175,7 @@ export async function createTask(
           const text = element.textContent?.toLowerCase() || '';
           if (!text.includes('medium') && !text.includes('assignee') && !text.includes('reporter')) {
             statusButton = element;
-            console.log(`Status dropdown found with selector: ${selector}`);
+            // console.log(`Status dropdown found with selector: ${selector}`);
             break;
           }
         }
@@ -191,7 +184,7 @@ export async function createTask(
     }
 
     if (statusButton) {
-      console.log('Clicking status dropdown...');
+      // console.log('Clicking status dropdown...');
       await simulateClick(statusButton);
       await waitFor(1000);
 
@@ -204,7 +197,7 @@ export async function createTask(
         const optionText = option.textContent?.trim().toLowerCase() || '';
         if (optionText === 'to do' || optionText === 'todo' || optionText === 'open' || 
             optionText === 'new' || optionText === 'backlog') {
-          console.log(`Selecting status option: "${option.textContent}"`);
+          // console.log(`Selecting status option: "${option.textContent}"`);
           await simulateClick(option);
           await waitFor(500);
           break;
@@ -213,14 +206,14 @@ export async function createTask(
       
       // If no specific status found, just click the first option
       if (statusOptions.length > 0) {
-        console.log('No specific status found, selecting first option');
+        // console.log('No specific status found, selecting first option');
         await simulateClick(statusOptions[0]);
         await waitFor(500);
       }
     }
 
     // Set mandatory Priority field (default to Medium if not already set)
-    console.log('Checking Priority field...');
+    // console.log('Checking Priority field...');
     
     // Find priority dropdown by checking if it contains "Medium" or "Select" text
     const allButtons = document.querySelectorAll('button[role="combobox"]');
@@ -230,14 +223,14 @@ export async function createTask(
       const text = button.textContent?.toLowerCase() || '';
       if (text.includes('medium') || text.includes('priority')) {
         priorityButton = button;
-        console.log('Priority dropdown found: "' + button.textContent + '"');
+        // console.log('Priority dropdown found: "' + button.textContent + '"');
         break;
       }
     }
 
     // Check if priority needs to be set (if it doesn't already show "Medium")
     if (priorityButton && !priorityButton.textContent?.includes('Medium')) {
-      console.log('Priority needs to be set, clicking dropdown...');
+      // console.log('Priority needs to be set, clicking dropdown...');
       await simulateClick(priorityButton);
       await waitFor(1000);
 
@@ -248,18 +241,18 @@ export async function createTask(
       for (const option of priorityOptions) {
         const optionText = option.textContent?.trim().toLowerCase() || '';
         if (optionText === 'medium') {
-          console.log('Selecting Medium priority');
+          // console.log('Selecting Medium priority');
           await simulateClick(option);
           await waitFor(500);
           break;
         }
       }
     } else {
-      console.log('Priority already set to Medium or dropdown not found');
+      // console.log('Priority already set to Medium or dropdown not found');
     }
 
     // Set mandatory Assignee field (assign to current user)
-    console.log('Setting mandatory Assignee field...');
+    // console.log('Setting mandatory Assignee field...');
 
     // Find assignee dropdown by text content
     let assigneeButton: Element | null = null;
@@ -269,7 +262,7 @@ export async function createTask(
       const text = combobox.textContent?.toLowerCase() || '';
       if (text.includes('select assignee') || text.includes('assignee')) {
         assigneeButton = combobox;
-        console.log('Assignee dropdown found: "' + combobox.textContent + '"');
+        // console.log('Assignee dropdown found: "' + combobox.textContent + '"');
         break;
       }
     }
@@ -285,14 +278,14 @@ export async function createTask(
         // If we can't find specific assignee dropdown, use any remaining dropdown
         if (!text.includes('status') && !text.includes('medium') && !text.includes('priority')) {
           assigneeButton = combobox;
-          console.log('Using generic dropdown for assignee: "' + combobox.textContent + '"');
+          // console.log('Using generic dropdown for assignee: "' + combobox.textContent + '"');
           break;
         }
       }
     }
 
     if (assigneeButton) {
-      console.log('Clicking assignee dropdown...');
+      // console.log('Clicking assignee dropdown...');
       await simulateClick(assigneeButton);
       await waitFor(1000);
 
@@ -306,7 +299,7 @@ export async function createTask(
         const optionText = option.textContent?.trim().toLowerCase() || '';
         if (optionText === 'me' || optionText.includes('jane smith') || 
             optionText.includes('current user') || optionText.includes('assign to me')) {
-          console.log(`Selecting assignee: "${option.textContent}"`);
+          // console.log(`Selecting assignee: "${option.textContent}"`);
           await simulateClick(option);
           await waitFor(500);
           assigneeSet = true;
@@ -316,7 +309,7 @@ export async function createTask(
       
       // If no specific assignee found, just click the first option (usually current user)
       if (!assigneeSet && assigneeOptions.length > 0) {
-        console.log('No specific assignee found, selecting first option (current user)');
+        // console.log('No specific assignee found, selecting first option (current user)');
         await simulateClick(assigneeOptions[0]);
         await waitFor(500);
       }
@@ -324,7 +317,7 @@ export async function createTask(
 
     // Optional: Set description if provided (using the specific markdown editor)
     if (description) {
-      console.log('Looking for description field (markdown editor)...');
+      // console.log('Looking for description field (markdown editor)...');
       const descSelectors = [
         '.w-md-editor-text-input', // Specific to the markdown editor
         'textarea[placeholder*="Describe the task"]',
@@ -337,7 +330,7 @@ export async function createTask(
       for (const selector of descSelectors) {
         const descInput = document.querySelector(selector) as HTMLTextAreaElement;
         if (descInput) {
-          console.log(`Description field found, filling: "${description}"`);
+          // console.log(`Description field found, filling: "${description}"`);
           descInput.focus();
           descInput.click();
           await waitFor(200);
@@ -358,30 +351,31 @@ export async function createTask(
     }
 
     // Find the submit button (from HTML: button[type="submit"] with "Create Task")
-    console.log('Looking for submit button...');
+    // console.log('Looking for submit button...');
     let submitButton: Element | null = null;
     
     const submitSelectors = [
-      'button[type="submit"]', // Primary selector from HTML
-      'form button:last-of-type' // Usually the submit button
+      '#submit-form-button button',
+      'button[type="submit"]',
+      'form button:last-of-type'
     ];
-    
-    for (const selector of submitSelectors) {
-      submitButton = document.querySelector(selector);
-      if (submitButton) {
-        console.log(`Submit button found with selector: ${selector}`);
-        break;
-      }
+
+  for (const selector of submitSelectors) {
+    submitButton = document.querySelector<HTMLButtonElement>(selector);
+    if (submitButton) {
+      console.log(`Submit button found with selector: ${selector}`);
+      break;
     }
+  }
     
     // Fallback: look for any button with "Create Task" text
     if (!submitButton) {
       const allButtons = document.querySelectorAll('button');
       for (const button of allButtons) {
         const text = button.textContent?.trim() || '';
-        if (text === 'Create Task' || text.includes('Create')) {
+        if (text === 'Create Task' || text.includes('Creating')) {
           submitButton = button;
-          console.log(`Submit button found by text: "${text}"`);
+          // console.log(`Submit button found by text: "${text}"`);
           break;
         }
       }
@@ -394,7 +388,7 @@ export async function createTask(
         const text = button.textContent?.trim() || '';
         if (text === 'Create Task') {
           submitButton = button;
-          console.log('Found disabled Create Task button - will try to enable it');
+          // console.log('Found disabled Create Task button - will try to enable it');
           break;
         }
       }
@@ -407,15 +401,15 @@ export async function createTask(
     // Check if the button is still disabled (common when required fields aren't filled)
     const isDisabled = submitButton.hasAttribute('disabled');
     if (isDisabled) {
-      console.log('Submit button is disabled, checking if all required fields are filled...');
+      // console.log('Submit button is disabled, checking if all required fields are filled...');
       // We'll try to submit anyway as our field filling should have enabled it
     }
 
-    console.log('Submitting task creation form...');
+    // console.log('Submitting task creation form...');
     
     // If button is still disabled, try to enable it by triggering form validation
     if (submitButton.hasAttribute('disabled')) {
-      console.log('Button is disabled, triggering form validation...');
+      // console.log('Button is disabled, triggering form validation...');
       // Focus on the form to trigger validation
       const form = document.querySelector('form');
       if (form) {
@@ -423,11 +417,16 @@ export async function createTask(
         await waitFor(500);
       }
     }
-    
+      if (submitButton instanceof HTMLButtonElement && submitButton.disabled) {
+    console.warn("⚠️ Submit button is still disabled. Validation might not have run yet.");
+  }
+
+  console.log("Submit Buttons: ", submitButton);
+  
     await simulateClick(submitButton);
     
     // Wait for task creation to complete
-    console.log('Waiting for task creation to complete...');
+    // console.log('Waiting for task creation to complete...');
     await waitFor(3000);
     
     // Check if we've navigated away from the /new page (success indicator)
@@ -435,9 +434,9 @@ export async function createTask(
     const navigatedAway = !currentPath.includes('/tasks/new');
     
     if (navigatedAway) {
-      console.log(`✅ Task creation successful - navigated to: ${currentPath}`);
+      // console.log(`✅ Task creation successful - navigated to: ${currentPath}`);
     } else {
-      console.log('Still on task creation page - checking for success/error indicators...');
+      // console.log('Still on task creation page - checking for success/error indicators...');
       
       // Look for specific error messages (exclude page titles and form labels)
       const errorSelectors = [
@@ -485,7 +484,7 @@ export async function createTask(
       for (const selector of successSelectors) {
         if (document.querySelector(selector)) {
           hasSuccessMessage = true;
-          console.log('✅ Found success message on page');
+          // console.log('✅ Found success message on page');
           break;
         }
       }
@@ -504,11 +503,11 @@ export async function createTask(
       if (hasErrors) {
         throw new Error(`Task creation failed: ${errorText}`);
       } else if (hasSuccessMessage || formWasReset || toastSuccess) {
-        console.log('✅ Task creation appears successful based on page indicators');
+        // console.log('✅ Task creation appears successful based on page indicators');
       } else {
         // If no errors found and we're still on the page, assume success
         // since the logs show the task was actually created
-        console.log('⚠️  No clear success/error indicators, but assuming success since no errors detected');
+        // console.log('⚠️  No clear success/error indicators, but assuming success since no errors detected');
       }
     }
     
@@ -700,7 +699,6 @@ export async function updateTaskStatus(
           
           if (filteredOptions.length > statusOptions.length) {
             statusOptions = filteredOptions;
-            console.log(`Found ${statusOptions.length} status options with selector: ${selector}`);
             break;
           }
         }
@@ -716,9 +714,8 @@ export async function updateTaskStatus(
     
     for (const option of statusOptions) {
       const optionText = option.textContent?.trim();
-      console.log('Checking option:', optionText);
+      // console.log('Checking option:', optionText);
       if (optionText && optionText.toLowerCase() === newStatus.toLowerCase()) {
-        console.log('Found matching option, clicking:', optionText);
         await simulateClick(option);
         statusFound = true;
         await waitFor(500);
@@ -1217,7 +1214,6 @@ export async function filterTasks(
 
     // Count and collect filtered results
     const taskElements = document.querySelectorAll('.tasktable-row, tbody tr[data-slot="table-row"]');
-    console.log(`Found ${taskElements.length} task rows after filtering`);
 
     const filteredTasks = Array.from(taskElements).map((row, index) => {
       const titleElement = row.querySelector('.tasktable-task-title, .task-title');

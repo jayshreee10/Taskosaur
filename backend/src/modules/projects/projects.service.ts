@@ -194,7 +194,7 @@ export class ProjectsService {
           data: {
             userId,
             projectId: project.id,
-            role: Role.MANAGER,
+            role: Role.OWNER,
             createdBy: userId,
             updatedBy: userId,
           },
@@ -229,35 +229,41 @@ export class ProjectsService {
 
     const { status, priority, search, page = 1, pageSize = 10 } = filters || {};
 
-    // ✅ Step 1: Check workspace access (if workspaceId is given)
-    let isElevated = false;
-    if (workspaceId) {
-      const access = await this.accessControl.getWorkspaceAccess(workspaceId, userId);
-      isElevated = access.isElevated;
-    }
-
-    // ✅ Step 2: Build where clause
+    // Step 1: Build base where clause
     const whereClause: any = { archive: false };
 
     if (workspaceId) {
       whereClause.workspaceId = workspaceId;
+
+      // Check workspace access
+      const access = await this.accessControl.getWorkspaceAccess(workspaceId, userId);
+      const isElevated = access.isElevated;
+
+      // If not elevated, restrict to projects where user is a member
+      if (!isElevated) {
+        whereClause.members = { some: { userId } };
+      }
+      // If elevated, no additional restriction needed (will show all projects in workspace)
+    } else {
+      // No workspaceId provided - return only projects where user is a member
+      whereClause.members = { some: { userId } };
     }
 
-    // 🔹 Add status filter (handles multiple values like "ACTIVE,COMPLETED")
+    // Step 2: Add status filter
     if (status) {
       whereClause.status = status.includes(',')
         ? { in: status.split(',').map(s => s.trim()) }
         : status;
     }
 
-    // 🔹 Add priority filter (handles multiple values like "HIGH,LOW")
+    // Step 3: Add priority filter
     if (priority) {
       whereClause.priority = priority.includes(',')
         ? { in: priority.split(',').map(p => p.trim()) }
         : priority;
     }
 
-    // 🔹 Add search filter
+    // Step 4: Add search filter
     if (search) {
       whereClause.AND = [
         ...(whereClause.AND || []),
@@ -270,120 +276,7 @@ export class ProjectsService {
       ];
     }
 
-    // Restrict if not elevated
-    if (!isElevated) {
-      whereClause.OR = [
-        { workspace: { organization: { ownerId: userId } } },
-        { workspace: { organization: { members: { some: { userId } } } } },
-        { workspace: { members: { some: { userId } } } },
-        { members: { some: { userId } } },
-      ];
-    }
-
-    // ✅ Step 3: Query projects with pagination
-    return this.prisma.project.findMany({
-      where: whereClause,
-      include: {
-        workspace: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            organization: {
-              select: { id: true, name: true, slug: true },
-            },
-          },
-        },
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                avatar: true,
-              },
-            },
-          },
-        },
-        _count: { select: { members: true, tasks: true, sprints: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
-  }
-
-
-
-  async findByOrganizationId(
-    filters: ProjectFilters,
-    userId: string,
-  ): Promise<Project[]> {
-    const {
-      organizationId,
-      workspaceId,
-      status,
-      priority,
-      page = 1,
-      pageSize = 10,
-      search,
-    } = filters;
-
-    // Step 1: Verify org exists
-    const org = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { id: true },
-    });
-
-    if (!org) throw new NotFoundException('Organization not found');
-
-    // Step 2: Get access level
-    const { isElevated } = await this.accessControl.getOrgAccess(
-      organizationId,
-      userId,
-    );
-
-    // Step 3: Build where clause
-    const whereClause: any = {
-      workspace: { organizationId },
-      archive: false,
-      ...(status && {
-        status: status.includes(',')
-          ? { in: status.split(',').map(s => s.trim()) }
-          : status,
-      }),
-      ...(priority && {
-        priority: priority.includes(',')
-          ? { in: priority.split(',').map(p => p.trim()) }
-          : priority,
-      }),
-      ...(workspaceId && { workspaceId }),
-    };
-
-    if (!isElevated) {
-      // restrict to projects where user is a member
-      whereClause.OR = [
-        { workspace: { members: { some: { userId } } } },
-        { members: { some: { userId } } },
-      ];
-    }
-
-    // Step 4: Add search filter
-    if (search) {
-      whereClause.AND = [
-        ...(whereClause.AND || []),
-        {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { slug: { contains: search, mode: 'insensitive' } }
-          ],
-        },
-      ];
-    }
-
-    // Step 5: Query projects with same include structure as findOne
+    // Step 5: Query projects with pagination
     return this.prisma.project.findMany({
       where: whereClause,
       include: {
@@ -434,6 +327,215 @@ export class ProjectsService {
       take: pageSize,
     });
   }
+
+
+
+
+  async findByOrganizationId(
+    filters: ProjectFilters,
+    userId: string,
+  ): Promise<Project[]> {
+    const {
+      organizationId,
+      workspaceId,
+      status,
+      priority,
+      page = 1,
+      pageSize = 10,
+      search,
+    } = filters;
+
+    // Step 1: Verify org exists
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+
+    if (!org) throw new NotFoundException('Organization not found');
+
+    // Step 2: Get organization-level access
+    const { isElevated: orgIsElevated } = await this.accessControl.getOrgAccess(
+      organizationId,
+      userId,
+    );
+
+    // Step 3: Build base filters
+    const baseFilters: any = {
+      workspace: { organizationId },
+      archive: false,
+      ...(status && {
+        status: status.includes(',')
+          ? { in: status.split(',').map(s => s.trim()) }
+          : status,
+      }),
+      ...(priority && {
+        priority: priority.includes(',')
+          ? { in: priority.split(',').map(p => p.trim()) }
+          : priority,
+      }),
+      ...(workspaceId && { workspaceId }),
+    };
+
+    let whereClause: any;
+    if (orgIsElevated) {
+      // If elevated at org level, return all projects
+      whereClause = baseFilters;
+    } else {
+      // If not elevated at org level, check workspace-level access
+      const accessibleProjectIds = await this.getAccessibleProjectIds(
+        organizationId,
+        userId,
+        workspaceId // Pass workspace filter if provided
+      );
+      console.log(JSON.stringify(accessibleProjectIds))
+      if (accessibleProjectIds.length === 0) {
+        // No accessible projects, return empty result
+        return [];
+      }
+
+      whereClause = {
+        AND: [
+          baseFilters,
+          { id: { in: accessibleProjectIds } }
+        ]
+      };
+    }
+
+    // Step 4: Add search filter
+    if (search) {
+      const searchCondition = {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { slug: { contains: search, mode: 'insensitive' } }
+        ]
+      };
+
+      if (whereClause.AND) {
+        whereClause.AND.push(searchCondition);
+      } else {
+        whereClause = {
+          AND: [whereClause, searchCondition]
+        };
+      }
+    }
+
+    // Step 5: Query projects
+    return this.prisma.project.findMany({
+      where: whereClause,
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organization: {
+              select: { id: true, name: true, slug: true },
+            },
+          },
+        },
+        workflow: {
+          select: {
+            id: true,
+            name: true,
+            isDefault: true,
+            statuses: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                category: true,
+                position: true,
+              },
+              orderBy: { position: 'asc' },
+            },
+          },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        _count: { select: { members: true, tasks: true, sprints: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+  }
+
+  /**
+   * Helper method to get accessible project IDs based on workspace-level permissions
+   */
+  private async getAccessibleProjectIds(
+    organizationId: string,
+    userId: string,
+    workspaceId?: string
+  ): Promise<string[]> {
+    // Get all workspaces in the organization (filtered by workspaceId if provided)
+    const workspaces = await this.prisma.workspace.findMany({
+      where: {
+        organizationId,
+        archive: false,
+        ...(workspaceId && { id: workspaceId }),
+      },
+      select: { id: true },
+    });
+
+    const accessibleProjectIds: string[] = [];
+
+    // Check each workspace
+    for (const workspace of workspaces) {
+      try {
+        // Get workspace-level access for this user
+        const { isElevated: wsIsElevated } = await this.accessControl.getWorkspaceAccess(
+          workspace.id,
+          userId
+        );
+        console.log(workspace.id, wsIsElevated)
+        if (wsIsElevated) {
+          // If elevated at workspace level, get all projects in this workspace
+          const workspaceProjects = await this.prisma.project.findMany({
+            where: {
+              workspaceId: workspace.id,
+              archive: false,
+            },
+            select: { id: true },
+          });
+
+          accessibleProjectIds.push(...workspaceProjects.map(p => p.id));
+        } else {
+          // If not elevated at workspace level, get only projects where user is a member
+          const memberProjects = await this.prisma.project.findMany({
+            where: {
+              workspaceId: workspace.id,
+              archive: false,
+              members: {
+                some: { userId }
+              }
+            },
+            select: { id: true },
+          });
+          console.log(memberProjects)
+          accessibleProjectIds.push(...memberProjects.map(p => p.id));
+        }
+      } catch (error) {
+        // If user doesn't have access to workspace, skip it
+        // This handles the ForbiddenException from getWorkspaceAccess
+        continue;
+      }
+    }
+
+    return accessibleProjectIds;
+  }
+
 
 
 
@@ -586,7 +688,7 @@ export class ProjectsService {
 
   async remove(id: string, userId: string): Promise<void> {
     const { role } = await this.accessControl.getProjectAccess(id, userId);
-
+    console.log(role)
     if (role !== Role.OWNER && role !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Only owners can delete projects');
     }
@@ -805,5 +907,46 @@ export class ProjectsService {
     }
     // Optionally, add access control here if needed
     return project;
+  }
+
+  async validateProjectSlug(
+    aiSlug: string,
+  ): Promise<
+    | { status: 'exact'; slug: string }
+    | { status: 'fuzzy'; slug: string; score: number }
+    | { status: 'not_found' }
+  > {
+    // 1. Exact match
+    const exact = await this.prisma.project.findFirst({
+      where: { slug: aiSlug },
+      select: { slug: true },
+    });
+
+    if (exact) {
+      return { status: 'exact', slug: exact.slug };
+    }
+    // 2. Fuzzy match
+    const fuzzy = await this.prisma.$queryRawUnsafe<
+      { slug: string; score: number }[]
+    >(
+      `
+      SELECT slug, similarity(slug, $1) AS score
+      FROM "projects"
+      ORDER BY score DESC
+      LIMIT 3`,
+      aiSlug,
+    );
+
+    if (fuzzy.length > 0 && fuzzy[0].score >= 0.4) {
+      return { status: 'fuzzy', slug: fuzzy[0].slug, score: fuzzy[0].score };
+    }
+    return { status: 'not_found' };
+  }
+  async getAllSlugsByWorkspaceId(workspaceId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { workspaceId },
+      select: { slug: true },
+    });
+    return projects.map((project) => project.slug);
   }
 }

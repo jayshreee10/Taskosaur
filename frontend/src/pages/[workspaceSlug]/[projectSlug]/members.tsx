@@ -1,29 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import ActionButton from "@/components/common/ActionButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import UserAvatar from "@/components/ui/avatars/UserAvatar";
 import { invitationApi } from "@/utils/api/invitationsApi";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +16,6 @@ import {
 } from "@/components/ui/DropdownMenu";
 import {
   HiMagnifyingGlass,
-  HiTrash,
   HiUsers,
   HiEnvelope,
   HiExclamationTriangle,
@@ -41,18 +24,37 @@ import {
   HiUserPlus,
   HiCog,
   HiFolder,
+  HiXMark,
 } from "react-icons/hi2";
-import { HiMail } from "react-icons/hi";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import { useProjectContext } from "@/contexts/project-context";
 import { useAuth } from "@/contexts/auth-context";
 import { useGlobalFetchPrevention } from "@/hooks/useGlobalFetchPrevention";
 
-import { Member, Project, Workspace } from "@/types";
+import { Member, Project, ProjectMember, Workspace } from "@/types";
 import { Button } from "@/components/ui";
 import { X } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
-import { Role } from "@/utils/roles";
+import { ProjectInviteMemberModal } from "@/components/projects/ProjectInviteMemberModal";
+import Tooltip from "@/components/common/ToolTip";
+import { roles } from "@/utils/data/projectData";
+import ConfirmationModal from "@/components/modals/ConfirmationModal";
+
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
@@ -112,133 +114,6 @@ const EmptyState = ({
   </div>
 );
 
-const InviteModal = ({
-  isOpen,
-  onClose,
-  onInvite,
-  availableRoles,
-  isLoading = false,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onInvite: (email: string, role: string) => void;
-  availableRoles: Array<{ id: string; name: string; description: string }>;
-  isLoading?: boolean;
-}) => {
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("DEVELOPER");
-  const [inviting, setInviting] = useState(false);
-
-  // Add email validation display
-  const isEmailValid = email ? invitationApi.validateEmail(email) : true;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !isEmailValid) return;
-
-    setInviting(true);
-    try {
-      await onInvite(email.trim(), role);
-      setEmail("");
-      setRole("DEVELOPER");
-      onClose();
-    } catch (error) {
-      console.error("Failed to send invitation:", error);
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  const handleClose = () => {
-    setEmail("");
-    setRole("DEVELOPER");
-    onClose();
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[var(--card)] border-none rounded-[var(--card-radius)] shadow-lg max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-[var(--foreground)] flex items-center gap-2">
-            <HiMail className="w-5 h-5 text-[var(--primary)]" />
-            Invite Member to Project
-          </DialogTitle>
-          <DialogDescription className="text-[var(--muted-foreground)]">
-            Send an invitation to join this project.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label
-              htmlFor="invite-email"
-              className="text-sm font-medium text-[var(--foreground)]"
-            >
-              Email Address
-            </Label>
-            <Input
-              id="invite-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter email address"
-              className="mt-1 border-input bg-background text-[var(--foreground)]"
-              required
-            />
-            {email && !isEmailValid && (
-              <p className="text-xs text-[var(--destructive)] mt-1">
-                Please enter a valid email address
-              </p>
-            )}
-          </div>
-
-          <div>
-            <Label className="text-sm font-medium text-[var(--foreground)]">
-              Role
-            </Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger className="mt-1 border-input bg-background text-[var(--foreground)]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="border-none bg-[var(--card)]">
-                {availableRoles.map((r) => (
-                  <SelectItem key={r.id} value={r.name}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{r.name}</span>
-                      <span className="text-xs text-[var(--muted-foreground)]">
-                        {r.description}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <DialogFooter className="flex justify-end gap-3">
-            <ActionButton
-              secondary
-              type="button"
-              onClick={handleClose}
-              disabled={inviting}
-              className="w-20"
-            >
-              Cancel
-            </ActionButton>
-            <ActionButton
-              primary
-              type="submit"
-              disabled={inviting || !email.trim() || !isEmailValid}
-              className="w-28"
-            >
-              {inviting ? "Inviting..." : "Send Invite"}
-            </ActionButton>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 function ProjectMembersContent() {
   const params = useParams();
   const workspaceSlug = params?.workspaceSlug as string;
@@ -262,50 +137,37 @@ function ProjectMembersContent() {
   const [updatingMember, setUpdatingMember] = useState<string | null>(null);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
-  const [userWorkspaceRole, setUserWorkspaceRole] = useState<Role>();
-
+  const debouncedSearchTerm = useDebounce(searchTerm, 1000);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef<string>("");
   const currentRouteRef = useRef<string>("");
   const isInitializedRef = useRef(false);
   const fetchPrevention = useGlobalFetchPrevention();
+  const [memberToRemove, setMemberToRemove] = useState<any>(null);
 
-  const roles = [
-    {
-      id: "1",
-      name: "SUPER_ADMIN",
-      description: "Full access to project resources",
-      variant: "secondary" as const,
-    },
-    {
-      id: "2",
-      name: "MANAGER",
-      description: "Can manage project and members",
-      variant: "default" as const,
-    },
-    {
-      id: "3",
-      name: "DEVELOPER",
-      description: "Can develop and work on tasks",
-      variant: "default" as const,
-    },
-    {
-      id: "4",
-      name: "VIEWER",
-      description: "Can only view project content",
-      variant: "secondary" as const,
-    },
-  ];
+  
+
+    const [data, setData] = useState(null);
+    useEffect(() => {
+      if (!workspace?.id) return;
+      getUserAccess({ name: "workspace", id: workspace?.id })
+        .then((data) => {
+          setData(data);
+          // console.log("Access data:", data?.role, data?.canChange);
+          setHasAccess(data?.canChange);
+        })
+        .catch((error) => {
+          console.error("Error fetching user access:", error);
+        });
+    }, [workspace]);
 
   const getRoleLabel = (role: string) => {
     const roleConfig = roles.find((r) => r.name === role);
     return roleConfig?.name || role;
   };
 
-  // Get current user's role for permission checks
   const getCurrentUserRole = () => {
     const currentUser = getCurrentUser();
     if (!currentUser) return null;
@@ -316,42 +178,15 @@ function ProjectMembersContent() {
 
   const canInviteMembers = () => {
     const userRole = getCurrentUserRole();
-    return userRole === "SUPER_ADMIN" || userRole === "MANAGER";
+    return userRole === "SUPER_ADMIN" || userRole === "MANAGER" || data?.role === "OWNER";
   };
 
-  // Demo member data generator for development
-  const generateDemoMembers = useCallback((projectSlug: string): Member[] => {
-    const roleNames = ["SUPER_ADMIN", "MANAGER", "DEVELOPER", "VIEWER"];
-    const domains = ["example.com", "demo.org", "test.io"];
-    const statuses = ["ACTIVE", "PENDING", "INACTIVE"];
-
-    return Array.from({ length: 8 }, (_, i) => ({
-      id: `member-${i + 1}`,
-      email: `user${i + 1}@${domains[i % domains.length]}`,
-      firstName: `User`,
-      lastName: `${i + 1}`,
-      username: `user${i + 1}`,
-      role: roleNames[i % roleNames.length],
-      status: statuses[i % statuses.length],
-      avatarUrl: undefined,
-      joinedAt: new Date(
-        Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000
-      ).toISOString(),
-      lastActive: new Date(
-        Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
-      ).toISOString(),
-    }));
-  }, []);
-
-  useEffect(() => {
-    const initializeData = async () => {
+  const fetchMembers = useCallback(
+    async (searchValue = "") => {
       const pageKey = `${workspaceSlug}/${projectSlug}/members`;
       const requestId = `${pageKey}-${Date.now()}-${Math.random()}`;
 
-      if (
-        !isMountedRef.current ||
-        (currentRouteRef.current === pageKey && isInitializedRef.current)
-      ) {
+      if (!isMountedRef.current) {
         return;
       }
 
@@ -377,17 +212,14 @@ function ProjectMembersContent() {
         if (requestIdRef.current !== requestId || !isMountedRef.current) {
           return;
         }
-
-        // Get workspace by slug
-        const workspaceData = await getWorkspaceBySlug(workspaceSlug);
+        const workspaceData =
+          workspace || (await getWorkspaceBySlug(workspaceSlug));
         if (!workspaceData) {
           setError("Workspace not found");
           setLoading(false);
           return;
         }
         setWorkspace(workspaceData);
-
-        // Get projects in workspace and find the specific project
         const projectsData = await getProjectsByWorkspace(workspaceData.id);
         const foundProject = projectsData?.find(
           (p: any) => p.slug === projectSlug
@@ -406,64 +238,72 @@ function ProjectMembersContent() {
           return;
         }
 
-        // Get project members
         try {
-          const membersData = await getProjectMembers(foundProject.id);
+          const membersData = await getProjectMembers(
+            foundProject.id,
+            searchValue
+          );
 
           if (requestIdRef.current !== requestId || !isMountedRef.current) {
             return;
           }
 
           if (Array.isArray(membersData) && membersData.length > 0) {
-            const processedMembers = membersData.map((member: any) => ({
-              id: member.id,
-              email: member.user?.email || member.email || "",
-              firstName:
-                member.user?.firstName || member.firstName || "Unknown",
-              lastName: member.user?.lastName || member.lastName || "User",
-              username: member.user?.username || member.username || "",
-              role: member.role || "DEVELOPER",
-              status: member.user?.status || "ACTIVE",
-              avatarUrl: member.user?.avatar || member.avatarUrl,
-              joinedAt:
-                member.joinedAt || member.createdAt || new Date().toISOString(),
-              lastActive: member.user?.lastActive || member.lastActive,
-            }));
+            const processedMembers = membersData.map(
+              (member: ProjectMember) => ({
+                id: member.id,
+                email: member.user?.email || "",
+                firstName: member.user?.firstName || "Unknown",
+                lastName: member.user?.lastName || "User",
+                username: member.user?.username || "",
+                role: member.role || "DEVELOPER",
+                status: member.user?.status || "ACTIVE",
+                avatarUrl: member.user?.avatar || "",
+                joinedAt:
+                  member.joinedAt ||
+                  member.createdAt ||
+                  new Date().toISOString(),
+                lastActive: member.user?.lastLoginAt || "",
+                userId: member?.userId,
+                projectId: member?.projectId,
+              })
+            );
             setMembers(processedMembers);
             fetchPrevention.markFetchComplete(
               "project-members",
               processedMembers
             );
           } else {
-            // Fallback to demo data if API doesn't return proper data
-            const demoMembers = generateDemoMembers(projectSlug);
-            setMembers(demoMembers);
-            fetchPrevention.markFetchComplete("project-members", demoMembers);
+            setMembers([]);
+            fetchPrevention.markFetchComplete("project-members", []);
           }
         } catch (membersError) {
-          console.warn(
-            "Failed to fetch members, using demo data:",
-            membersError
-          );
-          const demoMembers = generateDemoMembers(projectSlug);
-          setMembers(demoMembers);
-          fetchPrevention.markFetchComplete("project-members", demoMembers);
+          console.error("Failed to fetch members:", membersError);
+          setError("Failed to load project members");
+          setMembers([]);
+          fetchPrevention.markFetchComplete("project-members", []);
         }
 
         isInitializedRef.current = true;
       } catch (err) {
         if (requestIdRef.current === requestId && isMountedRef.current) {
           setError(err instanceof Error ? err.message : "Failed to load data");
-
-          // Set demo data for development
-          const demoMembers = generateDemoMembers(projectSlug);
-          setMembers(demoMembers);
+          setMembers([]);
           isInitializedRef.current = false;
         }
       } finally {
         if (requestIdRef.current === requestId && isMountedRef.current) {
           setLoading(false);
         }
+      }
+    },
+    [workspaceSlug, workspace]
+  );
+
+  useEffect(() => {
+    const initializeData = async () => {
+      if (!isInitializedRef.current) {
+        await fetchMembers();
       }
     };
 
@@ -481,8 +321,11 @@ function ProjectMembersContent() {
     }, 50);
 
     return () => clearTimeout(timeoutId);
-    // Only re-run when workspaceSlug or projectSlug changes
   }, [workspaceSlug, projectSlug]);
+
+  useEffect(() => {
+    fetchMembers(debouncedSearchTerm);
+  }, [debouncedSearchTerm]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -503,25 +346,15 @@ function ProjectMembersContent() {
   const { getUserAccess } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
 
-  const filteredMembers = members.filter((member) => {
-    const name = `${member.firstName} ${member.lastName}` || "";
-    const email = member.email || "";
-    const username = member.username || "";
-    const role = member.role || "";
-    const searchLower = searchTerm.toLowerCase();
-
-    return (
-      name.toLowerCase().includes(searchLower) ||
-      email.toLowerCase().includes(searchLower) ||
-      username.toLowerCase().includes(searchLower) ||
-      role.toLowerCase().includes(searchLower)
-    );
-  });
+  const activeMembers = members.filter(
+    (member) => member.status?.toLowerCase() !== "pending"
+  );
 
   useEffect(() => {
     if (!project?.id) return;
     getUserAccess({ name: "project", id: project?.id })
       .then((data) => {
+        ``;
         setHasAccess(data?.canChange);
       })
       .catch((error) => {
@@ -533,30 +366,32 @@ function ProjectMembersContent() {
     if (!project) return;
 
     try {
-      setIsRefreshing(true);
-      const membersData = await getProjectMembers(project.id);
+      const membersData = await getProjectMembers(project.id, searchTerm);
 
       if (Array.isArray(membersData) && membersData.length > 0) {
-        const processedMembers = membersData.map((member: any) => ({
+        const processedMembers = membersData.map((member: ProjectMember) => ({
           id: member.id,
-          email: member.user?.email || member.email || "",
-          firstName: member.user?.firstName || member.firstName || "Unknown",
-          lastName: member.user?.lastName || member.lastName || "User",
-          username: member.user?.username || member.username || "",
+          email: member.user?.email || "",
+          firstName: member.user?.firstName || "Unknown",
+          lastName: member.user?.lastName || "User",
+          username: member.user?.username || "",
           role: member.role || "DEVELOPER",
           status: member.user?.status || "ACTIVE",
-          avatarUrl: member.user?.avatar || member.avatarUrl,
+          avatarUrl: member.user?.avatar,
           joinedAt:
             member.joinedAt || member.createdAt || new Date().toISOString(),
-          lastActive: member.user?.lastActive || member.lastActive,
+          lastActive: member.user?.lastLoginAt,
+          userId: member?.userId,
+          projectId: member?.projectId,
         }));
         setMembers(processedMembers);
+      } else {
+        setMembers([]);
       }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load members");
-    } finally {
-      setIsRefreshing(false);
+      setMembers([]);
     }
   };
 
@@ -575,6 +410,16 @@ function ProjectMembersContent() {
     setLoading(true);
   };
 
+  function updateLocalStorageUser(newRole: string) {
+    const tampUser = localStorage.getItem("user");
+    const updateRole = JSON.parse(tampUser);
+    const finalUser = {
+      ...updateRole,
+      role: newRole
+    }
+    localStorage.setItem("user",JSON.stringify(finalUser));
+  }
+
   const handleRoleUpdate = async (memberId: string, newRole: string) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -585,6 +430,7 @@ function ProjectMembersContent() {
     try {
       setUpdatingMember(memberId);
       await updateProjectMemberRole(memberId, currentUser.id, newRole);
+      updateLocalStorageUser(newRole); // Update new role.
       await refreshMembers();
       toast.success("Member role updated successfully");
     } catch (err) {
@@ -597,45 +443,40 @@ function ProjectMembersContent() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
+  const handleRemoveMember = async (member: ProjectMember) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
       setError("User not authenticated");
       return;
     }
 
-    if (
-      !confirm("Are you sure you want to remove this member from the project?")
-    ) {
-      return;
-    }
-
     try {
-      setRemovingMember(memberId);
-      await removeProjectMember(memberId, currentUser.id);
+      setRemovingMember(member?.id);
+      await removeProjectMember(member?.id, currentUser.id);
       await refreshMembers();
+      setMemberToRemove(null);
       toast.success("Member removed successfully");
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to remove member";
+      const errorMessage = err.message
+        ? err.message
+        : "Failed to remove member";
       setError(errorMessage);
+      setMemberToRemove(null);
       toast.error(errorMessage);
     } finally {
       setRemovingMember(null);
     }
   };
 
-  // FIXED: Updated handleInvite to use standardized invitation API
   const handleInvite = async (email: string, role: string) => {
     if (!project) {
       toast.error("Project not found");
       throw new Error("Project not found");
     }
 
-    // Validate form data using the standardized validation
     const validation = invitationApi.validateInvitationData({
       inviteeEmail: email,
-      projectId: project.id, // Use projectId for project invitations
+      projectId: project.id,
       role: role,
     });
 
@@ -645,17 +486,15 @@ function ProjectMembersContent() {
     }
 
     try {
-      // Use the standardized invitation API that hits /api/invitations
       await invitationApi.createInvitation({
         inviteeEmail: email,
-        projectId: project.id, // Use projectId for project invitations
+        projectId: project.id,
         role: role,
       });
 
       toast.success(`Invitation sent to ${email}`);
       await refreshMembers();
     } catch (error: any) {
-      // Enhanced error handling to match OrganizationMembers
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||
@@ -724,7 +563,7 @@ function ProjectMembersContent() {
   }
 
   return (
-    <div className="dashboard-container space-y-6">
+    <div className="dashboard-container space-y-6" data-automation-id="invite-member-btn">
       <PageHeader
         title={`${project?.name || "Project"} Members`}
         description={
@@ -758,11 +597,11 @@ function ProjectMembersContent() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-md font-semibold text-[var(--foreground)] flex items-center gap-2">
                   <HiUsers className="w-5 h-5 text-[var(--muted-foreground)]" />
-                  Team Members ({filteredMembers.length})
+                  Team Members ({activeMembers.length})
                 </CardTitle>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <HiMagnifyingGlass className="w-4 h-4 text-[var(--muted-foreground)]" />
+                    <HiMagnifyingGlass className="w-4 text-[var(--muted-foreground)]" />
                   </div>
                   <Input
                     type="text"
@@ -771,6 +610,15 @@ function ProjectMembersContent() {
                     className="pl-10 h-9 w-64 border-input bg-background text-[var(--foreground)]"
                     placeholder="Search members..."
                   />
+
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
+                    >
+                      <HiXMark size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -786,7 +634,7 @@ function ProjectMembersContent() {
                 </div>
               </div>
 
-              {filteredMembers.length === 0 && !loading ? (
+              {activeMembers.length === 0 && !loading ? (
                 <EmptyState
                   icon={HiUserPlus}
                   title={
@@ -802,7 +650,7 @@ function ProjectMembersContent() {
                 />
               ) : (
                 <div className="organizations-members-table-body">
-                  {filteredMembers.map((member) => (
+                  {activeMembers.map((member) => (
                     <div key={member.id} className="organizations-members-row">
                       <div className="organizations-members-row-grid min-w-full overflow-x-auto">
                         <div className="organizations-member-info">
@@ -897,17 +745,23 @@ function ProjectMembersContent() {
                         </div>
 
                         <div className="col-span-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRemoveMember(member.id)}
-                            disabled={
-                              removingMember === member.id || !hasAccess
-                            }
-                            className="h-7 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
+                          <Tooltip
+                            content="Remove Member"
+                            position="top"
+                            color="danger"
                           >
-                            <X className="w-3 h-3" />
-                          </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setMemberToRemove(member)}
+                              disabled={
+                                removingMember === member.id || !hasAccess
+                              }
+                              className="h-7 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </Tooltip>
                         </div>
                       </div>
                     </div>
@@ -1014,14 +868,24 @@ function ProjectMembersContent() {
         </div>
       </div>
 
-      {/* Invite Modal with standardized invitation API */}
-      <InviteModal
+      <ProjectInviteMemberModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         onInvite={handleInviteWithLoading}
         availableRoles={roles}
-        isLoading={inviteLoading}
       />
+
+      {memberToRemove && (
+        <ConfirmationModal
+          isOpen={true}
+          onClose={() => setMemberToRemove(null)}
+          onConfirm={() => handleRemoveMember(memberToRemove)}
+          title="Remove Member"
+          message="Are you sure you want to remove this member from the Project?"
+          confirmText="Remove"
+          cancelText="Cancel"
+        />
+      )}
     </div>
   );
 }

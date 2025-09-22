@@ -40,8 +40,8 @@ export class WorkspaceMembersController {
   }
 
   @Get()
-  findAll(@Query('workspaceId') workspaceId?: string) {
-    return this.workspaceMembersService.findAll(workspaceId);
+  findAll(@Query('workspaceId') workspaceId?: string, @Query('search') search?: string) {
+    return this.workspaceMembersService.findAll(workspaceId, search);
   }
 
   @Get('user/:userId/workspaces')

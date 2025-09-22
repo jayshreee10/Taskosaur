@@ -1,5 +1,3 @@
-;
-
 import Image from 'next/image';
 import { useState } from 'react';
 
@@ -22,7 +20,6 @@ export default function UserAvatar({
 }: UserAvatarProps) {
   const [imageError, setImageError] = useState(false);
   
-  // Size mappings
   const sizeStyles = {
     xs: { width: '1.5rem', height: '1.5rem', fontSize: '0.75rem' },
     sm: { width: '2rem', height: '2rem', fontSize: '0.875rem' },
@@ -31,7 +28,6 @@ export default function UserAvatar({
     xl: { width: '4rem', height: '4rem', fontSize: '1.5rem' }
   };
 
-  // Color mappings
   const colorStyles = {
     primary: { backgroundColor: '#3b82f6', color: '#ffffff' },
     secondary: { backgroundColor: '#6b7280', color: '#ffffff' },
@@ -72,13 +68,11 @@ export default function UserAvatar({
     return 'User';
   };
 
-  // Helper function to validate if a string is a valid URL
   const isValidUrl = (string: string) => {
     try {
       new URL(string);
       return true;
-    } catch (_) {
-      // Check if it's a relative path starting with /
+    } catch (error_) {
       return string.startsWith('/');
     }
   };

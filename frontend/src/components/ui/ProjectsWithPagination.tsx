@@ -8,47 +8,38 @@ import { Project } from '@/types';
 
 interface ProjectsWithPaginationProps {
   projects: Project[];
-  generateProjectSlug: (name: string) => string;
   viewAllLink?: string;
- 
 }
 
-
 const isValidProject = (project: Project): boolean => {
-  
   if (!project.workspace?.slug) {
-    console.warn(`Project "${project.name}" (${project.id}) missing workspace.slug - excluding from display`);
+    console.log(`Project "${project.name}" (${project.id}) missing workspace.slug - excluding from display`);
     return false;
   }
-  
- 
+
   if (!project.slug && !project.name) {
-    console.warn(`Project "${project.id}" missing both slug and name - excluding from display`);
+    console.log(`Project "${project.id}" missing both slug and name - excluding from display`);
     return false;
   }
-  
+
   return true;
 };
-
 
 const getWorkspaceSlug = (project: Project): string => {
   return project.workspace?.slug || '';
 };
 
-
-const generateProjectUrl = (project: Project, generateProjectSlug: (name: string) => string): string => {
+const generateProjectUrl = (project: Project): string => {
   const workspaceSlug = getWorkspaceSlug(project);
   const projectSlug = project.slug;
-  
+
   return `/${workspaceSlug}/${projectSlug}`;
 };
-
 
 const generateWorkspaceProjectsUrl = (project: Project): string => {
   const workspaceSlug = getWorkspaceSlug(project);
   return `/${workspaceSlug}/projects`;
 };
-
 
 const generateNewProjectUrl = (project: Project): string => {
   const workspaceSlug = getWorkspaceSlug(project);
@@ -57,15 +48,14 @@ const generateNewProjectUrl = (project: Project): string => {
 
 const ProjectsWithPagination: React.FC<ProjectsWithPaginationProps> = ({
   projects,
-  generateProjectSlug,
   viewAllLink,
 }) => {
   const router = useRouter();
 
   const validProjects = projects.filter(isValidProject);
-  
+
   if (validProjects.length !== projects.length) {
-    console.warn(`Filtered out ${projects.length - validProjects.length} invalid projects without workspace data`);
+    console.log(`Filtered out ${projects.length - validProjects.length} invalid projects without workspace data`);
   }
 
   const displayedProjects = validProjects.slice(0, 3);
@@ -75,7 +65,7 @@ const ProjectsWithPagination: React.FC<ProjectsWithPaginationProps> = ({
   const newProjectUrl = firstValidProject ? generateNewProjectUrl(firstValidProject) : '/workspaces';
 
   const handleProjectClick = (project: Project) => {
-    const projectUrl = generateProjectUrl(project, generateProjectSlug);
+    const projectUrl = generateProjectUrl(project);
     router.push(projectUrl);
   };
 
@@ -134,7 +124,6 @@ const ProjectsWithPagination: React.FC<ProjectsWithPaginationProps> = ({
                     <div className="text-sm font-medium text-[var(--accent-foreground)] capitalize">
                       {project.name}
                     </div>
-                    {/* Optional: Show workspace name for context */}
                     <div className="text-[12px] text-[var(--muted-foreground)] capitalize">
                       {project.workspace?.name}
                     </div>

@@ -21,13 +21,10 @@ import { HiViewGrid } from "react-icons/hi";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  CreateWorkflowData,
-  TaskStatus,
-  Workflow,
-} from "@/types";
+import { CreateWorkflowData, TaskStatus, Workflow } from "@/types";
 import Tooltip from "../common/ToolTip";
 import { Check } from "lucide-react";
+import ConfirmationModal from "../modals/ConfirmationModal";
 
 interface WorkflowManagerProps {
   organizationId?: string;
@@ -86,7 +83,6 @@ export default function WorkflowManager({
   isLoading = false,
   error = null,
   onCreateWorkflow,
-  onUpdateWorkflow,
   onDeleteWorkflow,
   onSetDefaultWorkflow,
   isProjectLevel = false,
@@ -102,7 +98,7 @@ export default function WorkflowManager({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-
+  const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null);
   const { getCurrentUser } = useAuth();
   const { currentOrganization } = useOrganization();
   const currentUser = getCurrentUser();
@@ -178,14 +174,6 @@ export default function WorkflowManager({
         return;
       }
 
-      if (
-        !confirm(
-          "Are you sure you want to delete this workflow? This action cannot be undone."
-        )
-      ) {
-        return;
-      }
-
       try {
         setIsUpdating(true);
 
@@ -210,6 +198,7 @@ export default function WorkflowManager({
       } catch (error) {
       } finally {
         setIsUpdating(false);
+        setWorkflowToDelete(null);
       }
     },
     [workflows, selectedWorkflow, onDeleteWorkflow, onRefresh]
@@ -600,7 +589,7 @@ export default function WorkflowManager({
                                 disabled={isUpdating}
                                 className="h-8 border-none bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 text-[var(--foreground)] transition-all duration-200"
                               >
-                                <Check className="w-3 h-3"/>
+                                <Check className="w-3 h-3" />
                                 Set as Default
                               </Button>
                             )}
@@ -614,7 +603,7 @@ export default function WorkflowManager({
                                   variant="outline"
                                   size="sm"
                                   onClick={() =>
-                                    handleDeleteWorkflow(selectedWorkflow.id)
+                                    setWorkflowToDelete(selectedWorkflow.id)
                                   }
                                   disabled={isUpdating}
                                   className="h-8 border-none bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/20 text-[var(--destructive)] transition-all duration-200"
@@ -729,6 +718,16 @@ export default function WorkflowManager({
         organizationId={organizationId || currentOrganization?.id || ""}
         isProjectLevel={isProjectLevel}
         isLoading={isUpdating}
+      />
+
+      <ConfirmationModal
+        isOpen={!!workflowToDelete}
+        onClose={() => setWorkflowToDelete(null)}
+        onConfirm={() => handleDeleteWorkflow(workflowToDelete!)}
+        title="Delete Workflow"
+        message="Are you sure you want to delete this workflow? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </div>
   );

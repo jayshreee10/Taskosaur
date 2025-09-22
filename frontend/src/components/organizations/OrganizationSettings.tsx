@@ -19,13 +19,10 @@ import { toast } from "sonner";
 import {
   HiCog,
   HiGlobeAlt,
-  HiRocketLaunch,
-  HiBell,
   HiShieldCheck,
   HiExclamationTriangle,
 } from "react-icons/hi2";
 import { useOrganization } from "@/contexts/organization-context";
-import { useRouter } from "next/router";
 import { Calendar, Clock, Globe, Languages } from "lucide-react";
 
 interface OrganizationSettingsProps {
@@ -38,13 +35,12 @@ export default function OrganizationSettingsComponent({
   onUpdate,
 }: OrganizationSettingsProps) {
   const { updateOrganization, deleteOrganization } = useOrganization();
-  const router = useRouter();
+ 
   const [activeTab, setActiveTab] = useState("general");
   const [isLoading, setIsLoading] = useState(false);
   const [settings, setSettings] = useState<OrganizationSettings>({
     general: {
       name: organization.name,
-      slug: organization.slug,
       description: organization.description || "",
       avatar: organization.avatar || "",
       website: organization.website || "",
@@ -157,7 +153,8 @@ export default function OrganizationSettingsComponent({
           htmlFor="org-name"
           className="text-sm font-medium text-[var(--foreground)]"
         >
-          Organization Name
+          Organization Name{" "}
+          <span className="text-red-500">*</span>
         </Label>
         <Input
           id="org-name"
@@ -167,27 +164,6 @@ export default function OrganizationSettingsComponent({
             setSettings((prev) => ({
               ...prev,
               general: { ...prev.general, name: e.target.value },
-            }))
-          }
-          className="mt-1 border-input bg-background text-[var(--foreground)]"
-        />
-      </div>
-
-      <div>
-        <Label
-          htmlFor="org-slug"
-          className="text-sm font-medium text-[var(--foreground)]"
-        >
-          Slug
-        </Label>
-        <Input
-          id="org-slug"
-          type="text"
-          value={settings.general.slug}
-          onChange={(e) =>
-            setSettings((prev) => ({
-              ...prev,
-              general: { ...prev.general, slug: e.target.value },
             }))
           }
           className="mt-1 border-input bg-background text-[var(--foreground)]"
@@ -220,7 +196,7 @@ export default function OrganizationSettingsComponent({
           htmlFor="org-website"
           className="text-sm font-medium text-[var(--foreground)]"
         >
-          Website
+          Website<span className="text-red-500">*</span>
         </Label>
         <Input
           id="org-website"
@@ -577,7 +553,7 @@ export default function OrganizationSettingsComponent({
       </div>
 
       <div className="border-t border-[var(--border)] pt-6">
-        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-950/20 border-none  rounded-lg p-4">
           <div className="flex items-start gap-3">
             <HiExclamationTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">

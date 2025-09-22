@@ -1,4 +1,3 @@
-// hooks/useDragAndDrop.ts
 import { useState, useRef, useCallback } from 'react';
 
 interface DragState<T = unknown> {
@@ -21,9 +20,6 @@ export function useDragAndDrop<T = unknown>(callbacks: DragCallbacks<T> = {}) {
     draggedFrom: '',
     draggedTo: null,
   });
-
-  const dragRef = useRef<HTMLElement | null>(null);
-  const dropRef = useRef<HTMLElement | null>(null);
 
   // Extract stable callback references
   const { onDragStart, onDragEnd, onDrop } = callbacks;

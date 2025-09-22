@@ -406,16 +406,22 @@ export class OrganizationChartsService {
    */
   async organizationTaskDistribution(orgId: string, userId: string) {
     const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
-    const base = {
-      project: { workspace: { organizationId: orgId }, archive: false },
-    };
-    const where = isElevated
-      ? base
-      : { ...base, OR: [{ assigneeId: userId }, { reporterId: userId }] };
+
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        project: { workspace: { organizationId: orgId, archive: false } },
+        ...(isElevated
+          ? {}
+          : { OR: [{ assigneeId: userId }, { reporterId: userId }] }),
+      },
+      select: { id: true, priority: true },
+    });
 
     return this.prisma.task.groupBy({
       by: ['priority'],
-      where,
+      where: {
+        id: { in: tasks.map((t) => t.id) },
+      },
       _count: { priority: true },
     });
   }
@@ -444,20 +450,24 @@ export class OrganizationChartsService {
    */
   async organizationSprintMetrics(orgId: string, userId: string) {
     const { isElevated } = await this.accessControl.getOrgAccess(orgId, userId);
-    const base = {
-      archive: false,
-      project: { workspace: { organizationId: orgId }, archive: false },
-    };
-    const where = isElevated
-      ? base
-      : {
-        ...base,
-        project: { ...base.project, members: { some: { userId } } },
-      };
+
+    const sprints = await this.prisma.sprint.findMany({
+      where: {
+        archive: false,
+        project: {
+          workspace: { organizationId: orgId },
+          archive: false,
+          ...(isElevated ? {} : { members: { some: { userId } } }),
+        },
+      },
+      select: { id: true, status: true },
+    });
 
     return this.prisma.sprint.groupBy({
       by: ['status'],
-      where,
+      where: {
+        id: { in: sprints.map((s) => s.id) },
+      },
       _count: { status: true },
     });
   }
