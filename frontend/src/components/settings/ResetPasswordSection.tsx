@@ -13,22 +13,16 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
-function isValidPassword(password: any) {
+function isValidPassword(password: string) {
   return (
     /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password)
   );
 }
 
 const extractErrorMessage = (response: any) => {
-  if (response?.message?.message) {
-    return response.message.message;
-  }
-  if (typeof response?.message === "string") {
-    return response.message;
-  }
-  if (Array.isArray(response?.message)) {
-    return response.message.join(", ");
-  }
+  if (response?.message?.message) return response.message.message;
+  if (typeof response?.message === "string") return response.message;
+  if (Array.isArray(response?.message)) return response.message.join(", ");
   return "Failed to change password. Please try again.";
 };
 
@@ -49,7 +43,7 @@ export default function ResetPasswordSection() {
     confirmPassword: "",
   });
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrors({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -58,7 +52,7 @@ export default function ResetPasswordSection() {
       setErrors((prev) => ({
         ...prev,
         newPassword:
-          "Password must contain at least one uppercase letter, one lowercase letter, and one number.",
+          "Password must contain uppercase, lowercase, and a number.",
       }));
       setLoading(false);
       return;
@@ -85,7 +79,6 @@ export default function ResetPasswordSection() {
         setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       } else {
         const errorMsg = extractErrorMessage(response);
-
         if (errorMsg.toLowerCase().includes("current password")) {
           setErrors((prev) => ({ ...prev, currentPassword: errorMsg }));
         } else if (errorMsg.toLowerCase().includes("new password")) {
@@ -94,7 +87,7 @@ export default function ResetPasswordSection() {
           toast.error(errorMsg);
         }
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to change password. Please try again.");
     } finally {
       setLoading(false);
@@ -102,21 +95,23 @@ export default function ResetPasswordSection() {
   };
 
   return (
-    <Card className="border-none">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-medium">Reset Password</CardTitle>
-        <CardDescription className="text-sm text-gray-600">
+    <Card className="border-none bg-[var(--card)] gap-2">
+      <CardHeader >
+        <CardTitle className="text-sm font-medium text-[var(--foreground)]">
+          Reset Password
+        </CardTitle>
+        <CardDescription className="text-[13px] text-[var(--muted-foreground)] tracking-wide">
           Change your account password to keep your account secure.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="pt-0">
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Current Password Field */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">
-                Current Password
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {/* Current Password */}
+            <div className="space-y-1">
+              <Label className="text-sm font-medium text-[var(--foreground)]">
+                Current Password <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
                 <Input
@@ -126,12 +121,15 @@ export default function ResetPasswordSection() {
                     setForm({ ...form, currentPassword: e.target.value })
                   }
                   placeholder="Enter current password"
-                  className={errors.currentPassword ? "border-red-500" : ""}
+                  className={`h-8 text-xs bg-[var(--background)] border-[var(--border)] ${
+                    errors.currentPassword ? "ring-2 ring-red-500" : ""
+                  }`}
+              
                   required
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                 >
                   {showCurrentPassword ? (
@@ -142,16 +140,14 @@ export default function ResetPasswordSection() {
                 </button>
               </div>
               {errors.currentPassword && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.currentPassword}
-                </p>
+                <p className="text-xs text-red-500">{errors.currentPassword}</p>
               )}
             </div>
 
-            {/* New Password Field */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">
-                New Password
+            {/* New Password */}
+            <div className="space-y-1">
+              <Label className="text-sm font-medium text-[var(--foreground)]">
+                New Password <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
                 <Input
@@ -161,32 +157,32 @@ export default function ResetPasswordSection() {
                     setForm({ ...form, newPassword: e.target.value })
                   }
                   placeholder="Enter new password"
-                  className={errors.newPassword ? "border-red-500" : ""}
+                  className={`h-8 text-xs bg-[var(--background)] border-[var(--border)] ${
+                    errors.newPassword ? "ring-2 ring-red-500" : ""
+                  }`}
                   required
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
                   onClick={() => setShowNewPassword(!showNewPassword)}
                 >
                   {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
               {errors.newPassword ? (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.newPassword}
-                </p>
+                <p className="text-xs text-red-500">{errors.newPassword}</p>
               ) : (
-                <p className="text-gray-500 text-xs mt-1">
+                <p className="text-[13px] ml-2 text-[var(--muted-foreground)]">
                   Must contain uppercase, lowercase, and number
                 </p>
               )}
             </div>
 
-            {/* Confirm Password Field */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">
-                Confirm Password
+            {/* Confirm Password */}
+            <div className="space-y-1">
+              <Label className="text-sm font-medium text-[var(--foreground)]">
+                Confirm Password <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
                 <Input
@@ -196,12 +192,14 @@ export default function ResetPasswordSection() {
                     setForm({ ...form, confirmPassword: e.target.value })
                   }
                   placeholder="Confirm new password"
-                  className={errors.confirmPassword ? "border-red-500" : ""}
+                  className={`h-8 text-xs bg-[var(--background)] border-[var(--border)] ${
+                    errors.confirmPassword ? "ring-2 ring-red-500" : ""
+                  }`}
                   required
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
                   {showConfirmPassword ? (
@@ -212,18 +210,21 @@ export default function ResetPasswordSection() {
                 </button>
               </div>
               {errors.confirmPassword && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.confirmPassword}
-                </p>
+                <p className="text-xs text-red-500">{errors.confirmPassword}</p>
               )}
             </div>
           </div>
 
-          <div className="pt-6 flex justify-end">
-            <ActionButton type="submit" disabled={loading} primary>
+          <div className="pt-2 flex justify-end">
+            <ActionButton
+              type="submit"
+              disabled={loading}
+              primary
+              className="h-8 px-3 text-sm border-none"
+            >
               {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   Updating...
                 </div>
               ) : (

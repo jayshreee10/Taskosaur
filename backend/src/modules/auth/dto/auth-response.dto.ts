@@ -26,6 +26,8 @@ export class AuthResponseDto {
     username?: string;
     role: Role;
     avatar?: string;
+    bio?: string;
+    mobileNumber?: string;
   };
 }
 

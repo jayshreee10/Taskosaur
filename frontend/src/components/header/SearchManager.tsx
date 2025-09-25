@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { HiMagnifyingGlass, HiXMark } from "react-icons/hi2";
 import { Button } from "../ui";
+import Tooltip from "../common/ToolTip";
 import { useOrganization } from "@/contexts/organization-context";
 import { TokenManager } from "@/lib/api";
 import { useRouter } from "next/router";
@@ -30,6 +31,7 @@ const SearchManager = () => {
   const [results, setResults] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [page, setPage] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const inputRef = useRef(null);
@@ -43,19 +45,25 @@ const SearchManager = () => {
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
-  const paginatedResults = results.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE
-  );
-  const totalPages = Math.ceil(results.length / PAGE_SIZE);
+  const paginatedResults = results;
+  const totalPages = Math.ceil(totalResults / PAGE_SIZE);
 
-  // Fetch results with debounced search term
+  // Fetch results with debounced search term and page
   useEffect(() => {
     const fetchResults = async () => {
-      if (debouncedSearchTerm.trim() === "" || !currentOrganizationId) {
+      const trimmed = debouncedSearchTerm.trim();
+      if (trimmed === "" || !currentOrganizationId) {
         setResults([]);
         setSelectedIndex(0);
         setError(null);
+        setTotalResults(0);
+        return;
+      }
+      if (trimmed.length < 2) {
+        setResults([]);
+        setSelectedIndex(0);
+        setError("Query must be at least 2 characters long");
+        setTotalResults(0);
         return;
       }
 
@@ -64,30 +72,30 @@ const SearchManager = () => {
 
       try {
         const response = await universalSearch(
-          debouncedSearchTerm.trim(),
+          trimmed,
           currentOrganizationId,
-          1,
-          50 // Get more results for local pagination
+          page,
+          PAGE_SIZE
         );
-        
-        // Handle the response structure from your backend
         setResults(response?.results || []);
+        setTotalResults(response?.total || (response?.results?.length ?? 0));
         setSelectedIndex(0);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Search failed");
         setResults([]);
+        setTotalResults(0);
       } finally {
         setLoading(false);
       }
     };
 
     fetchResults();
-  }, [debouncedSearchTerm, currentOrganizationId, universalSearch]);
+  }, [debouncedSearchTerm, currentOrganizationId, universalSearch, page]);
 
-  // Reset page when searchTerm or results change
+  // Reset page when searchTerm changes
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearchTerm, results.length]);
+  }, [debouncedSearchTerm]);
 
   // Handle opening the search
   const openSearch = () => {
@@ -98,7 +106,6 @@ const SearchManager = () => {
     setPage(1);
     setError(null);
 
-    // Add blur effect to main content
     const mainContent = document.getElementById("main-app") || document.body;
     mainContent.style.filter = "blur(8px)";
     mainContent.style.transition = "filter 0.3s ease-out";
@@ -118,16 +125,14 @@ const SearchManager = () => {
     mainContent.style.filter = "none";
   };
 
-  // Add this function to map workspace names to slugs
   const getWorkspaceSlug = (workspaceName) => {
     return workspaceName.toLowerCase().replace(/\s+/g, '-');
   };
 
-  // Replace the handleResultSelect function with this:
   const handleResultSelect = (result) => {
     console.log("Selected:", result);
 
-    let navigationUrl = result.url; // fallback to backend URL
+    let navigationUrl = result.url;
 
     // Map different result types to correct frontend routes
     switch (result.type) {
@@ -139,6 +144,8 @@ const SearchManager = () => {
         } else {
           navigationUrl = `/tasks/${result.id}`;
         }
+        router.push(navigationUrl);
+        closeSearch();
         break;
       case 'project':
         if (result.context.workspace) {
@@ -146,10 +153,14 @@ const SearchManager = () => {
           const projectSlug = result.context.project.slug;
           navigationUrl = `/${workspaceSlug}/${projectSlug}`;
         }
+        router.push(navigationUrl);
+        closeSearch();
         break;
       case 'workspace':
         const workspaceSlug = getWorkspaceSlug(result.title);
         navigationUrl = `/${workspaceSlug}`;
+        router.push(navigationUrl);
+        closeSearch();
         break;
       case 'sprint':
         if (result.context.workspace && result.context.project) {
@@ -157,16 +168,16 @@ const SearchManager = () => {
           const projectSlug = result.context.project.slug;
           navigationUrl = `/${workspaceSlug}/${projectSlug}/sprints/${result.id}`;
         }
+        router.push(navigationUrl);
+        closeSearch();
         break;
       case 'user':
-        navigationUrl = `/users/${result.id}`;
+        closeSearch();
         break;
       default:
-        navigationUrl = result.url;
+        router.push(navigationUrl);
+        closeSearch();
     }
-
-    router.push(navigationUrl);
-    closeSearch();
   };
 
   // Handle keyboard navigation
@@ -261,13 +272,15 @@ const SearchManager = () => {
   };
 
   const TriggerButton = () => (
-    <Button
-      onClick={openSearch}
-      className="header-mode-toggle"
-      title="Search (⌘K)"
-    >
-      <HiMagnifyingGlass className="size-4" />
-    </Button>
+    <Tooltip content="Search" position="bottom" color="primary">
+      <Button
+        onClick={openSearch}
+        className="header-mode-toggle shadow-none"
+        
+      >
+        <HiMagnifyingGlass className="header-mode-toggle-icon" />
+      </Button>
+    </Tooltip>
   );
 
   const SearchOverlay = () => (
@@ -292,12 +305,10 @@ const SearchManager = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 bg-transparent text-sm text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:outline-none"
           />
-          
           {/* Loading spinner when searching */}
           {loading && (
             <div className="ml-2 animate-spin h-4 w-4 border-2 border-[var(--primary)] border-t-transparent rounded-full" />
           )}
-          
           {/* Clear button when searchTerm is not empty and not loading */}
           {searchTerm && !loading && (
             <button
@@ -314,47 +325,40 @@ const SearchManager = () => {
               <HiXMark className="w-4 h-4" />
             </button>
           )}
-          
-          {/* Close button */}
-          <button
-            onClick={closeSearch}
-            className="ml-2 p-1 rounded-lg hover:bg-[var(--accent)]/50 transition-colors duration-200 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-            aria-label="Close search"
-          >
-            <HiXMark className="w-4 h-4" />
-          </button>
+         
         </div>
 
         {/* Results Section */}
-        <div className="max-h-80 overflow-y-auto flex-1">
+        <div className={`max-h-80 overflow-y-auto flex-1 ${
+          (loading || error || (searchTerm && !loading && !error && results.length === 0) || (searchTerm === "" && !loading && !error))
+            ? 'flex flex-col justify-center items-center'
+            : ''
+        }`}>
           {/* Loading state */}
           {loading && (
-            <div className="px-4 py-8 text-center text-[var(--muted-foreground)]">
+            <div className="flex flex-col items-center justify-center w-full h-full px-4 py-8 text-center text-[var(--muted-foreground)]">
               <div className="text-4xl mb-2 opacity-50">⏳</div>
               <div className="text-sm font-medium mb-1">Searching...</div>
             </div>
           )}
-
           {/* Error state */}
           {error && (
-            <div className="px-4 py-8 text-center text-[var(--muted-foreground)]">
-              <div className="text-4xl mb-2 opacity-50">❌</div>
-              <div className="text-sm font-medium mb-1">{error}</div>
+            <div className="flex flex-col items-center justify-center w-full h-full px-4 py-8 text-center text-[var(--muted-foreground)]">
+              <div className="text-4xl mb-2 opacity-80 text-red-500">❌</div>
+              <div className="text-base font-medium mb-1">{error}</div>
             </div>
           )}
-
           {/* No results state */}
           {searchTerm && !loading && !error && results.length === 0 && (
-            <div className="px-4 py-8 text-center text-[var(--muted-foreground)]">
+            <div className="flex flex-col items-center justify-center w-full h-full px-4 py-8 text-center text-[var(--muted-foreground)]">
               <div className="text-4xl mb-2 opacity-50">🔍</div>
               <div className="text-sm font-medium mb-1">No results found</div>
               <div className="text-xs">Try a different search term</div>
             </div>
           )}
-
           {/* Results list */}
           {!loading && !error && paginatedResults.length > 0 && (
-            <div ref={resultsRef} className="py-1">
+            <div ref={resultsRef} className="py-1 w-full flex flex-col justify-start items-stretch">
               {paginatedResults.map((result, index) => (
                 <div
                   key={result.id || index}
@@ -370,10 +374,10 @@ const SearchManager = () => {
                     {getResultIcon(result.type)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate text-xs cursor-pointer">
+                    <div className="font-medium truncate text-[14px] cursor-pointer">
                       {result.title}
                     </div>
-                    <div className="text-xs opacity-70 truncate">
+                    <div className="text-[13px] opacity-70 truncate">
                       {result.context?.workspace?.name && `${result.context.workspace.name} • `}
                       {result.context?.project?.name && `${result.context.project.name} • `}
                       {result.type}
@@ -386,12 +390,11 @@ const SearchManager = () => {
               ))}
             </div>
           )}
-
           {/* Empty state */}
           {searchTerm === "" && !loading && !error && (
-            <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center text-[var(--muted-foreground)]">
-              <div className="text-4xl mb-2 opacity-60">✨</div>
-              <div className="text-sm font-medium mb-1 text-[var(--foreground)]">
+            <div className="flex flex-col items-center justify-center w-full h-full px-4 py-8 text-center text-[var(--muted-foreground)]">
+              <div className="text-5xl mb-2 opacity-60">✨</div>
+              <div className="text-base font-medium mb-1 text-[var(--foreground)]">
                 Spotlight Search
               </div>
               <div className="text-xs mb-2">
@@ -399,7 +402,7 @@ const SearchManager = () => {
               </div>
               <div className="text-xs opacity-50 flex items-center gap-2 mt-2">
                 <span className="inline-flex items-center gap-1 bg-[var(--muted)]/30 px-1 py-0.5 rounded">
-                  <span>⌘K</span>
+                  <span>⌘K to open</span>
                 </span>
                 <span className="mx-1">•</span>
                 <span className="inline-flex items-center gap-1 bg-[var(--muted)]/30 px-1 py-0.5 rounded">
@@ -420,7 +423,7 @@ const SearchManager = () => {
               <button
                 className="px-2 py-1 text-xs rounded bg-[var(--muted)]/30 hover:bg-[var(--muted)]/50 disabled:opacity-50"
                 onClick={() => setPage(page - 1)}
-                disabled={page === 1}
+                disabled={page === 1 || loading}
                 aria-label="Previous page"
               >
                 ←
@@ -433,7 +436,7 @@ const SearchManager = () => {
               <button
                 className="px-2 py-1 text-xs rounded bg-[var(--muted)]/30 hover:bg-[var(--muted)]/50 disabled:opacity-50"
                 onClick={() => setPage(page + 1)}
-                disabled={page === totalPages}
+                disabled={page === totalPages || loading}
                 aria-label="Next page"
               >
                 →

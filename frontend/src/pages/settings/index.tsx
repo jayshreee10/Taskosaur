@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useWorkspaceContext } from "@/contexts/workspace-context";
 import OrganizationFormModal from "@/components/organizations/OrganizationFormModal";
 import { ChartNoAxesGantt, Users } from "lucide-react";
-import AISettingsModal from "@/components/settings/AISettings";
+
 
 const getManageUrl = (organization: Organization) => {
   const canManage =
@@ -35,7 +35,6 @@ function OrganizationSettingsPageContent() {
   const currentUser = getCurrentUser();
 
   const currentOrganization = getCurrentOrganizationId();
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
 
   const fetchOrganizations = async () => {
     try {
@@ -101,15 +100,7 @@ function OrganizationSettingsPageContent() {
           !showCreateForm &&
           hasAccess && (
             <div className="flex items-center gap-2">
-        {/* AI Settings Button */}
-        <Button
-          onClick={() => setIsAIModalOpen(true)}
-          variant="outline"
-          className="h-9 bg-transparent border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)] transition-all duration-200 font-medium flex items-center gap-2 rounded-lg shadow-none"
-        >
-          <HiSparkles className="w-4 h-4" />
-          AI Settings
-        </Button>
+        
         
         {/* Create Organization Button */}
         <Button
@@ -209,10 +200,7 @@ function OrganizationSettingsPageContent() {
           </div>
         </div>
       </div>
-        <AISettingsModal 
-          isOpen={isAIModalOpen} 
-          onClose={() => setIsAIModalOpen(false)} 
-        />
+       
     </div>
   );
 }

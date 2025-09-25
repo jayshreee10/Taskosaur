@@ -82,6 +82,8 @@ export class AuthService {
         username: user.username || undefined,
         role: user.role,
         avatar: user.avatar || undefined,
+        bio: user.bio || undefined,
+        mobileNumber: user.mobileNumber || undefined,
       },
     };
   }
@@ -132,6 +134,8 @@ export class AuthService {
         username: user.username || undefined,
         role: user.role,
         avatar: user.avatar || undefined,
+        bio: user.bio || undefined,
+        mobileNumber: user.mobileNumber || undefined,
       },
     };
   }

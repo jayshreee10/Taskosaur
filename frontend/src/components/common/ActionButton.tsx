@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { HiPlus } from "react-icons/hi2";
 
 export interface ActionButtonProps {
+  leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
@@ -21,6 +22,7 @@ export interface ActionButtonProps {
 const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProps>(
   (
     {
+      leftIcon,
       rightIcon,
       children,
       className = "",
@@ -95,6 +97,7 @@ const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProps>(
             <HiPlus className="w-4 h-4" />
           </span>
         )}
+        {leftIcon && <span className="flex-shrink-0">{leftIcon}</span>}
         <span className="truncate">{children}</span>
         {rightIcon && <span className="flex-shrink-0">{rightIcon}</span>}
       </Button>

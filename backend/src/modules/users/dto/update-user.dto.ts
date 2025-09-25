@@ -5,6 +5,9 @@ import { IsOptional, IsEnum } from 'class-validator';
 import { UserStatus } from '@prisma/client';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  mobileNumber?: string;
   @ApiProperty({ required: false, enum: UserStatus })
   @IsOptional()
   @IsEnum(UserStatus)

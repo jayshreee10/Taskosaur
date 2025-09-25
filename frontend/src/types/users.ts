@@ -25,6 +25,7 @@ export interface User {
   username?: string;
   avatar?: string;
   bio?: string;
+  mobileNumber?: string;
   timezone?: string;
   language?: string;
   role?: "SUPER_ADMIN" | "OWNER" | "MANAGER" | "MEMBER" | "VIEWER";

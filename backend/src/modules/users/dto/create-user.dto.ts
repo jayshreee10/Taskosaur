@@ -10,6 +10,7 @@ import {
 import { Role } from '@prisma/client';
 
 export class CreateUserDto {
+
   @ApiProperty({
     description: 'User email address',
     example: 'john.doe@acme.com',
@@ -18,6 +19,15 @@ export class CreateUserDto {
   @IsEmail()
   @IsNotEmpty()
   email: string;
+
+  @ApiProperty({
+    description: 'User mobile number',
+    example: '+1234567890',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  mobileNumber?: string;
 
   @ApiProperty({
     description: 'Unique username for the user',

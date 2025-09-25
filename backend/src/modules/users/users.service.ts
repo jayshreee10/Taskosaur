@@ -62,6 +62,7 @@ export class UsersService {
         lastName: true,
         avatar: true,
         bio: true,
+        mobileNumber: true,
         timezone: true,
         language: true,
         role: true,
@@ -75,6 +76,7 @@ export class UsersService {
         resetTokenExpiry: true,
         createdAt: true,
         updatedAt: true,
+        
       },
     });
     const usersWithAvatarUrls = await Promise.all(
@@ -102,6 +104,7 @@ export class UsersService {
         lastName: true,
         avatar: true,
         bio: true,
+        mobileNumber: true,
         timezone: true,
         language: true,
         role: true,

@@ -267,11 +267,11 @@ export default function Header() {
     },
     {
       content: "Invitations",
-      component: <InvitationManager userId={currentUser?.id} />,
+      component: <InvitationManager userId={currentUser?.id} />, 
     },
     { content: "Toggle Theme", component: <ModeToggle /> },
     {
-      content:"Search", component: <div className=""><SearchManager /></div>
+      content: "Search", component: <div className="search-manager-header"><SearchManager /></div>, noTooltip: true
     }
   ];
 
@@ -417,15 +417,19 @@ export default function Header() {
 
             {hasOrganizationAccess && (
               <>
-                {headerOptions.map(({ content, component }, idx) => (
-                  <Tooltip
-                    key={idx}
-                    content={content}
-                    position="bottom"
-                    color="primary"
-                  >
-                    {component}
-                  </Tooltip>
+                {headerOptions.map(({ content, component, noTooltip }, idx) => (
+                  noTooltip ? (
+                    <span key={idx}>{component}</span>
+                  ) : (
+                    <Tooltip
+                      key={idx}
+                      content={content}
+                      position="bottom"
+                      color="primary"
+                    >
+                      {component}
+                    </Tooltip>
+                  )
                 ))}
 
                 {toggleChat && isAIEnabled && (

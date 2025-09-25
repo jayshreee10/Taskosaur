@@ -1,6 +1,8 @@
 export interface UpdateUserData {
   firstName?: string;
   lastName?: string;
+  email?: string;
+  mobileNumber?: string;
   bio?: string;
   timezone?: string;
   language?: string;

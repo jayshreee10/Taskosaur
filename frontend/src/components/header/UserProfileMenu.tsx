@@ -132,7 +132,7 @@ export default function UserProfileMenu({
                     <HiCog className="header-user-menu-icon-settings" />
                   </div>
 
-                  <div className="header-user-menu-text">Settings</div>
+                  <div className="header-user-menu-text">Profile</div>
                 </Link>
               </DropdownMenuItem>
 

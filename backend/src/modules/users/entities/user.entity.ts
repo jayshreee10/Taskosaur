@@ -2,8 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Role, UserStatus } from '@prisma/client';
 
 export class User {
+
   @ApiProperty()
   id: string;
+
+  @ApiProperty({ required: false })
+  mobileNumber?: string;
 
   @ApiProperty()
   email: string;

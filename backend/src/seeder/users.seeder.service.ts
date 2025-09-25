@@ -25,6 +25,7 @@ export class UsersSeederService {
         bio: 'System administrator with full access to all features',
         timezone: 'UTC',
         language: 'en',
+        mobileNumber: '+10000000001',
       },
       {
         email: 'john.doe@taskosaur.com',
@@ -40,6 +41,7 @@ export class UsersSeederService {
         language: 'en',
         avatar:
           'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+        mobileNumber: '+10000000002',
       },
       {
         email: 'jane.smith@taskosaur.com',
@@ -55,6 +57,7 @@ export class UsersSeederService {
         language: 'en',
         avatar:
           'https://images.unsplash.com/photo-1494790108755-2616b612b606?w=150',
+        mobileNumber: '+10000000003',
       },
       {
         email: 'mike.wilson@taskosaur.com',
@@ -70,6 +73,7 @@ export class UsersSeederService {
         language: 'en',
         avatar:
           'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        mobileNumber: '+10000000004',
       },
       {
         email: 'sarah.jones@taskosaur.com',
@@ -85,6 +89,7 @@ export class UsersSeederService {
         language: 'en',
         avatar:
           'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        mobileNumber: '+10000000005',
       },
       {
         email: 'alex.brown@taskosaur.com',
@@ -100,6 +105,7 @@ export class UsersSeederService {
         language: 'en',
         avatar:
           'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+        mobileNumber: '+10000000006',
       },
       {
         email: 'emma.davis@taskosaur.com',
@@ -115,6 +121,7 @@ export class UsersSeederService {
         language: 'en',
         avatar:
           'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+        mobileNumber: '+10000000007',
       },
       {
         email: 'tom.garcia@taskosaur.com',
@@ -128,6 +135,7 @@ export class UsersSeederService {
         bio: 'Junior Developer eager to learn and contribute',
         timezone: 'America/Denver',
         language: 'en',
+        mobileNumber: '+10000000008',
       },
     ];
 
@@ -193,6 +201,9 @@ export class UsersSeederService {
         username: true,
         firstName: true,
         lastName: true,
+        bio: true,
+        mobileNumber: true,
+        timezone: true,
         role: true,
         status: true,
         createdAt: true,

@@ -18,7 +18,7 @@
 }
 
 .projects-modal-icon-content {
-  @apply h-6 w-6 text-white;
+  @apply h-6 w-6 text-[var(--card)];
 }
 
 .projects-modal-info {
