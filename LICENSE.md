@@ -1,27 +1,27 @@
 # Business Source License
 
-License text copyright (c) 2025 JABASU Inc., All Rights Reserved.
+License text copyright (c) 2025 NetTantra Technologies (India) Private Limited, All Rights Reserved.
 
 "Business Source License" is a trademark of MariaDB Corporation Ab.
 
 ## License Details
 
-- **Licensor:** JABASU Inc.
-- **Licensed Work:** The Licensed Work is (c) 2025 JABASU Inc.
+- **Licensor:** NetTantra Technologies (India) Private Limited
+- **Licensed Work:** The Licensed Work is (c) 2025 NetTantra Technologies (India) Private Limited
 - **Change Date:** Four years from the date the Licensed Work is published
 - **Change License:** MPL 2.0
 
 ## Additional Use Grant
 
-You may make production use of the Licensed Work, provided Your use does not include offering the Licensed Work to third parties on a hosted or embedded basis in order to compete with JABASU Inc.'s paid version(s) of the Licensed Work. 
+You may make production use of the Licensed Work, provided Your use does not include offering the Licensed Work to third parties on a hosted or embedded basis in order to compete with NetTantra Technologies (India) Private Limited's paid version(s) of the Licensed Work. 
 
-For purposes of this license: A "competitive offering" is a Product that is offered to third parties on a paid basis, including through paid support arrangements, that significantly overlaps with the capabilities of JABASU Inc's paid version(s) of the Licensed Work. If Your Product is not a competitive offering when You first make it generally available, it will not become a competitive offering later due to JABASU Inc. releasing a new version of the Licensed Work with additional capabilities.
+For purposes of this license: A "competitive offering" is a Product that is offered to third parties on a paid basis, including through paid support arrangements, that significantly overlaps with the capabilities of JABASU Inc's paid version(s) of the Licensed Work. If Your Product is not a competitive offering when You first make it generally available, it will not become a competitive offering later due to NetTantra Technologies (India) Private Limited releasing a new version of the Licensed Work with additional capabilities.
 
 In addition, Products that are not provided on a paid basis are not competitive. "Product" means software that is offered to end users to manage in their own environments or offered as a service on a hosted basis.
 
 "Embedded" means including the source code or executable code from the Licensed Work in a competitive offering. "Embedded" also means packaging the competitive offering in such a way that the Licensed Work must be accessed or downloaded for the competitive offering to operate.
 
-Hosting or using the Licensed Work(s) for internal purposes within an organization is not considered a competitive offering. JABASU Inc. considers your organization to include all of your affiliates under common control. 
+Hosting or using the Licensed Work(s) for internal purposes within an organization is not considered a competitive offering. NetTantra Technologies (India) Private Limited considers your organization to include all of your affiliates under common control. 
 
 For binding interpretive guidance on using Taskosaur under the Business Source License, please contact licensing@jabasu.com.
 
