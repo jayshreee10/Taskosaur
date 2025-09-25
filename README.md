@@ -567,7 +567,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## License
 
-This project is licensed under the Business Source License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Business Source License - see the [LICENSE](LICENSE.md) file for details.
 
 ## Acknowledgments
 
