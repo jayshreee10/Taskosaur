@@ -577,7 +577,6 @@ This project is licensed under the Business Source License - see the [LICENSE](L
 - [Tailwind CSS](https://tailwindcss.com/) - CSS framework
 
 ## Support
-
 - Email: support@taskosaur.com
 - Issues: [GitHub Issues](https://github.com/Taskosaur/taskosaur/issues)
 - Discussions: [GitHub Discussions](https://github.com/Taskosaur/taskosaur/discussions)
